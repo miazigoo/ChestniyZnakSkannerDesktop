@@ -23,6 +23,12 @@ class FakeApiClient:
         self.last_call = ("GET", url, {"params": params})
         if url.endswith("catalog/stats"):
             return {"codes_count": 10, "scans_count": 3}
+        if url.endswith("packing/boxes/1"):
+            return {
+                "ok": True,
+                "reason_code": "box_loaded",
+                "box": _box_detail_payload(),
+            }
         if url.endswith("printer/printers"):
             return {
                 "ok": True,
@@ -107,6 +113,22 @@ def _box_payload() -> dict[str, Any]:
     }
 
 
+def _box_detail_payload() -> dict[str, Any]:
+    """Возвращает payload детальной коробки для DTO."""
+
+    payload = _box_payload()
+    payload["items"] = [
+        {
+            "id": 10,
+            "code_id": 100,
+            "gtin": "04601234567890",
+            "serial": "SERIAL",
+            "visible_code": "010460123456789021SERIAL",
+        }
+    ]
+    return payload
+
+
 def test_chestniy_znak_service_verify_exists() -> None:
     """Проверяет маппинг сервиса проверки существования кода."""
 
@@ -136,6 +158,15 @@ def test_packing_service_open_box() -> None:
     result = PackingService(client).open_box(device_id="pc-1", count_in_packing=False)
     assert result.created is True
     assert result.box.box_id == 1
+
+
+def test_packing_service_get_box() -> None:
+    """Проверяет маппинг детальной карточки коробки."""
+
+    client = FakeApiClient()
+    result = PackingService(client).get_box(1)
+    assert result.box_id == 1
+    assert result.items[0].serial == "SERIAL"
 
 
 def test_printer_service_set_selection() -> None:

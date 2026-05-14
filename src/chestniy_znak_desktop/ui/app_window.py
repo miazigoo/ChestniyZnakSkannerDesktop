@@ -74,6 +74,9 @@ class AppWindow(QMainWindow):
         self._main_screen.boxes_screen.previous_page_requested.connect(
             self._boxes_controller.previous_page
         )
+        self._main_screen.boxes_screen.box_detail_requested.connect(
+            self._boxes_controller.load_detail
+        )
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box
         )

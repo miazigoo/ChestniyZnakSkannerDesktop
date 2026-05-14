@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from chestniy_znak_desktop.api.models.packing import BoxDto, BoxListDto
+from chestniy_znak_desktop.api.models.packing import BoxDetailDto, BoxDto, BoxListDto
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 
 
@@ -54,6 +54,24 @@ class FakeBoxesService:
             limit=limit,
             offset=offset,
             has_more=offset == 0,
+        )
+
+    def get_box(self, box_id: int) -> BoxDetailDto:
+        """Возвращает детальную fake-коробку."""
+
+        if self.error is not None:
+            raise self.error
+        return BoxDetailDto(
+            **_box().model_dump(),
+            items=[
+                {
+                    "id": box_id,
+                    "code_id": 100,
+                    "gtin": "04601234567890",
+                    "serial": "SERIAL",
+                    "visible_code": "010460123456789021SERIAL",
+                }
+            ],
         )
 
 
@@ -145,3 +163,28 @@ def test_boxes_controller_reports_error() -> None:
 
     assert controller.state.status_message == "Ошибка загрузки коробок"
     assert controller.state.error_message == "Backend недоступен"
+
+
+def test_boxes_controller_loads_box_detail() -> None:
+    """Проверяет загрузку детальной карточки выбранной коробки."""
+
+    controller, _service = _controller_pair()
+
+    controller.load_detail(10)
+
+    assert controller.state.detail is not None
+    assert controller.state.detail.box_id == 10
+    assert controller.state.detail.items[0].serial == "SERIAL"
+    assert controller.state.detail_status_message == "Коробка #10 загружена"
+
+
+def test_boxes_controller_reports_detail_error() -> None:
+    """Проверяет ошибку загрузки детальной карточки."""
+
+    controller, service = _controller_pair()
+    service.error = RuntimeError("Коробка не найдена")
+
+    controller.load_detail(10)
+
+    assert controller.state.detail_status_message == "Ошибка загрузки коробки"
+    assert controller.state.detail_error_message == "Коробка не найдена"

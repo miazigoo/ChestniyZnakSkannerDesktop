@@ -48,6 +48,13 @@ class PackingService:
             raise
         return BoxDetailDto.model_validate(payload)
 
+    def get_box(self, box_id: int) -> BoxDetailDto:
+        """Возвращает детальную карточку коробки по ID."""
+
+        payload = self._api_client.get(f"chestniy-znak/packing/boxes/{box_id}")
+        result = BoxActionResultDto.model_validate(payload)
+        return BoxDetailDto.model_validate(result.box.model_dump())
+
     def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
         """Открывает новую коробку или возвращает активную коробку пользователя."""
 

@@ -7,7 +7,7 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.models.packing import BoxDto, BoxListDto
+from chestniy_znak_desktop.api.models.packing import BoxDetailDto, BoxDto, BoxListDto
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 
 
@@ -22,6 +22,9 @@ class BoxesBackend(Protocol):
         offset: int = 0,
     ) -> BoxListDto:
         """Возвращает страницу коробок."""
+
+    def get_box(self, box_id: int) -> BoxDetailDto:
+        """Возвращает детальную карточку коробки."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +41,32 @@ class BoxRowUi:
 
 
 @dataclass(frozen=True, slots=True)
+class BoxDetailItemUi:
+    """UI-модель кода внутри выбранной коробки."""
+
+    id: int
+    gtin: str
+    serial: str
+    visible_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class BoxDetailUi:
+    """UI-модель детальной карточки выбранной коробки."""
+
+    box_id: int
+    order_name: str
+    sscc: str
+    filled: int
+    capacity: int
+    status: str
+    count_in_packing: str
+    operator: str
+    print_status: str
+    items: list[BoxDetailItemUi] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
 class BoxesUiState:
     """Состояние экрана списка коробок."""
 
@@ -49,8 +78,13 @@ class BoxesUiState:
     total: int = 0
     has_more: bool = False
     rows: list[BoxRowUi] = field(default_factory=list)
+    selected_box_id: int | None = None
+    detail: BoxDetailUi | None = None
+    is_detail_busy: bool = False
     status_message: str = "Загрузите список коробок"
     error_message: str = ""
+    detail_status_message: str = "Выберите коробку для просмотра состава"
+    detail_error_message: str = ""
 
     @property
     def page_title(self) -> str:
@@ -141,6 +175,33 @@ class BoxesController(QObject):
             return
         self._load_page(max(0, self._state.offset - self._state.limit))
 
+    def load_detail(self, box_id: int) -> None:
+        """Загружает детальную карточку выбранной коробки."""
+
+        if self._state.is_detail_busy:
+            return
+        self._set_state(
+            BoxesUiState(
+                status_filter=self._state.status_filter,
+                query=self._state.query,
+                limit=self._state.limit,
+                offset=self._state.offset,
+                total=self._state.total,
+                has_more=self._state.has_more,
+                rows=self._state.rows,
+                selected_box_id=box_id,
+                detail=self._state.detail,
+                is_detail_busy=True,
+                status_message=self._state.status_message,
+                detail_status_message=f"Загружаем коробку #{box_id}...",
+            )
+        )
+        self._task_runner.submit(
+            lambda: self._boxes_service.get_box(box_id),
+            self._on_detail_loaded,
+            self._on_detail_error,
+        )
+
     def _load_page(self, offset: int) -> None:
         """Запускает загрузку страницы коробок."""
 
@@ -156,6 +217,9 @@ class BoxesController(QObject):
                 offset=offset,
                 total=self._state.total,
                 rows=self._state.rows,
+                selected_box_id=self._state.selected_box_id,
+                detail=self._state.detail,
+                detail_status_message=self._state.detail_status_message,
                 status_message="Загружаем коробки...",
             )
         )
@@ -184,6 +248,9 @@ class BoxesController(QObject):
                 total=result.total,
                 has_more=result.has_more,
                 rows=[self._box_to_row(box) for box in result.items],
+                selected_box_id=self._state.selected_box_id,
+                detail=self._state.detail,
+                detail_status_message=self._state.detail_status_message,
                 status_message="Коробки загружены",
             )
         )
@@ -200,8 +267,52 @@ class BoxesController(QObject):
                 total=self._state.total,
                 has_more=self._state.has_more,
                 rows=self._state.rows,
+                selected_box_id=self._state.selected_box_id,
+                detail=self._state.detail,
+                detail_status_message=self._state.detail_status_message,
                 status_message="Ошибка загрузки коробок",
                 error_message=str(exc),
+            )
+        )
+
+    def _on_detail_loaded(self, result: object) -> None:
+        """Обрабатывает загруженную детальную карточку коробки."""
+
+        if not isinstance(result, BoxDetailDto):
+            raise TypeError("Ожидался результат BoxDetailDto")
+        self._set_state(
+            BoxesUiState(
+                status_filter=self._state.status_filter,
+                query=self._state.query,
+                limit=self._state.limit,
+                offset=self._state.offset,
+                total=self._state.total,
+                has_more=self._state.has_more,
+                rows=self._state.rows,
+                selected_box_id=result.box_id,
+                detail=self._box_detail_to_ui(result),
+                status_message=self._state.status_message,
+                detail_status_message=f"Коробка #{result.box_id} загружена",
+            )
+        )
+
+    def _on_detail_error(self, exc: Exception) -> None:
+        """Обрабатывает ошибку загрузки выбранной коробки."""
+
+        self._set_state(
+            BoxesUiState(
+                status_filter=self._state.status_filter,
+                query=self._state.query,
+                limit=self._state.limit,
+                offset=self._state.offset,
+                total=self._state.total,
+                has_more=self._state.has_more,
+                rows=self._state.rows,
+                selected_box_id=self._state.selected_box_id,
+                detail=self._state.detail,
+                status_message=self._state.status_message,
+                detail_status_message="Ошибка загрузки коробки",
+                detail_error_message=str(exc),
             )
         )
 
@@ -223,6 +334,31 @@ class BoxesController(QObject):
             status="Закрыта" if box.is_closed else "Открыта",
             operator=box.active_user_name or box.created_by_name or "-",
             print_status=BoxesController._print_status(box),
+        )
+
+    @staticmethod
+    def _box_detail_to_ui(box: BoxDetailDto) -> BoxDetailUi:
+        """Преобразует детальную DTO коробки в UI-модель."""
+
+        return BoxDetailUi(
+            box_id=box.box_id,
+            order_name=box.order_name or "-",
+            sscc=box.sscc or "-",
+            filled=box.filled,
+            capacity=box.capacity,
+            status="Закрыта" if box.is_closed else "Открыта",
+            count_in_packing="Да" if box.count_in_packing else "Нет",
+            operator=box.active_user_name or box.created_by_name or "-",
+            print_status=BoxesController._print_status(box),
+            items=[
+                BoxDetailItemUi(
+                    id=item.id,
+                    gtin=item.gtin,
+                    serial=item.serial,
+                    visible_code=item.visible_code,
+                )
+                for item in box.items
+            ],
         )
 
     @staticmethod

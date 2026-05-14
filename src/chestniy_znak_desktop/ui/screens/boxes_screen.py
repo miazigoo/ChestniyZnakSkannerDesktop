@@ -26,6 +26,7 @@ class BoxesScreen(QWidget):
     status_filter_changed = Signal(str)
     next_page_requested = Signal()
     previous_page_requested = Signal()
+    box_detail_requested = Signal(int)
 
     def __init__(self) -> None:
         """Создает базовый экран списка коробок."""
@@ -51,10 +52,19 @@ class BoxesScreen(QWidget):
         self._next_button = QPushButton("Дальше")
         self._next_button.clicked.connect(self.next_page_requested.emit)
         self._page_label = QLabel("0 / 0")
+        self._detail_button = QPushButton("Открыть детали")
+        self._detail_button.clicked.connect(self._emit_selected_box_detail)
         self._table = QTableWidget(0, 7)
         self._table.setHorizontalHeaderLabels(
             ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
         )
+        self._table.cellDoubleClicked.connect(self._emit_row_detail)
+        self._detail_title = QLabel("Детали коробки")
+        self._detail_status = QLabel("Выберите коробку для просмотра состава")
+        self._detail_error = QLabel("")
+        self._detail_summary = QLabel("Коробка: -")
+        self._detail_items_table = QTableWidget(0, 4)
+        self._detail_items_table.setHorizontalHeaderLabels(["ID", "GTIN", "Serial", "Код"])
 
         filters = QHBoxLayout()
         filters.addWidget(self._status_filter)
@@ -66,6 +76,7 @@ class BoxesScreen(QWidget):
         pagination.addWidget(self._previous_button)
         pagination.addWidget(self._page_label)
         pagination.addWidget(self._next_button)
+        pagination.addWidget(self._detail_button)
         pagination.addStretch(1)
 
         layout = QVBoxLayout(self)
@@ -75,6 +86,11 @@ class BoxesScreen(QWidget):
         layout.addLayout(filters)
         layout.addWidget(self._table)
         layout.addLayout(pagination)
+        layout.addWidget(self._detail_title)
+        layout.addWidget(self._detail_status)
+        layout.addWidget(self._detail_error)
+        layout.addWidget(self._detail_summary)
+        layout.addWidget(self._detail_items_table)
 
     def apply_state(self, state: BoxesUiState) -> None:
         """Обновляет таблицу и элементы управления из состояния контроллера."""
@@ -85,6 +101,7 @@ class BoxesScreen(QWidget):
         self._set_busy(state.is_busy)
         self._previous_button.setEnabled(not state.is_busy and state.has_previous)
         self._next_button.setEnabled(not state.is_busy and state.has_more)
+        self._detail_button.setEnabled(not state.is_detail_busy and bool(state.rows))
         self._table.setRowCount(len(state.rows))
         for row_index, row in enumerate(state.rows):
             values = [
@@ -98,6 +115,9 @@ class BoxesScreen(QWidget):
             ]
             for column_index, value in enumerate(values):
                 self._table.setItem(row_index, column_index, QTableWidgetItem(value))
+        if state.rows and self._table.currentRow() < 0:
+            self._table.setCurrentCell(0, 0)
+        self._apply_detail(state)
 
     def _set_busy(self, is_busy: bool) -> None:
         """Включает или отключает элементы управления на время загрузки."""
@@ -116,3 +136,47 @@ class BoxesScreen(QWidget):
         """Публикует выбранный фильтр статуса коробок."""
 
         self.status_filter_changed.emit(str(self._status_filter.currentData()))
+
+    def _emit_selected_box_detail(self) -> None:
+        """Публикует запрос деталей для выбранной строки таблицы."""
+
+        row = self._table.currentRow()
+        if row < 0:
+            return
+        self._emit_row_detail(row, 0)
+
+    def _emit_row_detail(self, row: int, _column: int) -> None:
+        """Публикует запрос деталей для строки таблицы."""
+
+        item = self._table.item(row, 0)
+        if item is None:
+            return
+        self.box_detail_requested.emit(int(item.text()))
+
+    def _apply_detail(self, state: BoxesUiState) -> None:
+        """Обновляет панель деталей выбранной коробки."""
+
+        self._detail_status.setText(state.detail_status_message)
+        self._detail_error.setText(state.detail_error_message)
+        if state.detail is None:
+            self._detail_summary.setText("Коробка: -")
+            self._detail_items_table.setRowCount(0)
+            return
+        detail = state.detail
+        self._detail_summary.setText(
+            (
+                f"Коробка #{detail.box_id} | Заказ: {detail.order_name} | "
+                f"SSCC: {detail.sscc} | {detail.filled}/{detail.capacity} | "
+                f"{detail.status} | Учитывать: {detail.count_in_packing} | "
+                f"Оператор: {detail.operator} | Печать: {detail.print_status}"
+            )
+        )
+        self._detail_items_table.setRowCount(len(detail.items))
+        for row_index, item in enumerate(detail.items):
+            values = [str(item.id), item.gtin, item.serial, item.visible_code]
+            for column_index, value in enumerate(values):
+                self._detail_items_table.setItem(
+                    row_index,
+                    column_index,
+                    QTableWidgetItem(value),
+                )
