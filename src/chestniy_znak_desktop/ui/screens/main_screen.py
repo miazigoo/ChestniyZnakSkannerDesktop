@@ -17,6 +17,7 @@ from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen
 from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScreen
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen
+from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen
 from chestniy_znak_desktop.ui.widgets.user_session_panel import UserSessionPanel
 
 
@@ -34,11 +35,13 @@ class MainScreen(QWidget):
         self._session_panel = UserSessionPanel()
         self._packing_screen = PackingScreen()
         self._boxes_screen = BoxesScreen()
+        self._verify_screen = VerifyScreen()
         self._defect_screen = DefectScreen()
         self._settings_screen = SettingsScreen()
         self._diagnostics_screen = DiagnosticsScreen()
         self._stack.addWidget(self._packing_screen)
         self._stack.addWidget(self._boxes_screen)
+        self._stack.addWidget(self._verify_screen)
         self._stack.addWidget(self._defect_screen)
         self._stack.addWidget(self._settings_screen)
         self._stack.addWidget(self._diagnostics_screen)
@@ -48,10 +51,11 @@ class MainScreen(QWidget):
         nav.addWidget(self._session_panel)
         nav.addWidget(self._nav_button("Упаковка", 0, "packing"))
         nav.addWidget(self._nav_button("Коробки", 1, "boxes"))
-        nav.addWidget(self._nav_button("Брак", 2, "defect"))
+        nav.addWidget(self._nav_button("Проверка", 2, "verify"))
+        nav.addWidget(self._nav_button("Брак", 3, "defect"))
         nav.addStretch(1)
-        nav.addWidget(self._nav_button("Настройки", 3, "settings"))
-        nav.addWidget(self._nav_button("Диагностика", 4, "diagnostics"))
+        nav.addWidget(self._nav_button("Настройки", 4, "settings"))
+        nav.addWidget(self._nav_button("Диагностика", 5, "diagnostics"))
 
         layout = QHBoxLayout(self)
         layout.addLayout(nav)
@@ -76,6 +80,12 @@ class MainScreen(QWidget):
         return self._defect_screen
 
     @property
+    def verify_screen(self) -> VerifyScreen:
+        """Возвращает экран проверки для подключения контроллера."""
+
+        return self._verify_screen
+
+    @property
     def settings_screen(self) -> SettingsScreen:
         """Возвращает экран настроек для подключения контроллеров."""
 
@@ -92,6 +102,7 @@ class MainScreen(QWidget):
 
         self._session_panel.apply_snapshot(snapshot)
         self._packing_screen.apply_runtime_snapshot(snapshot)
+        self._verify_screen.apply_runtime_snapshot(snapshot)
         self._defect_screen.apply_runtime_snapshot(snapshot)
         self._diagnostics_screen.apply_runtime_snapshot(snapshot)
 

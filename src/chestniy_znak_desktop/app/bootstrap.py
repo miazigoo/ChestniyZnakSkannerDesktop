@@ -24,6 +24,7 @@ from chestniy_znak_desktop.controllers.packing_controller import PackingControll
 from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
+from chestniy_znak_desktop.controllers.verify_controller import VerifyController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
@@ -84,6 +85,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     )
     packing_service = PackingService(api_client)
     printer_service = PrinterService(api_client)
+    chz_service = ChestniyZnakService(api_client)
     packing_controller = PackingController(
         packing_service=packing_service,
         task_runner=api_task_runner,
@@ -108,7 +110,12 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         sound_service=sound_service,
     )
     defect_controller = DefectController(
-        defect_service=ChestniyZnakService(api_client),
+        defect_service=chz_service,
+        task_runner=api_task_runner,
+        sound_service=sound_service,
+    )
+    verify_controller = VerifyController(
+        verify_service=chz_service,
         task_runner=api_task_runner,
         sound_service=sound_service,
     )
@@ -136,6 +143,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         boxes_controller=boxes_controller,
         box_edit_controller=box_edit_controller,
         defect_controller=defect_controller,
+        verify_controller=verify_controller,
         diagnostics_controller=diagnostics_controller,
         printer_controller=printer_controller,
         scanner_controller=scanner_controller,

@@ -14,6 +14,7 @@ from chestniy_znak_desktop.controllers.packing_controller import PackingControll
 from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
+from chestniy_znak_desktop.controllers.verify_controller import VerifyController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
@@ -34,6 +35,7 @@ class AppWindow(QMainWindow):
         boxes_controller: BoxesController,
         box_edit_controller: BoxEditController,
         defect_controller: DefectController,
+        verify_controller: VerifyController,
         diagnostics_controller: DiagnosticsController,
         printer_controller: PrinterController,
         scanner_controller: ScannerController,
@@ -49,6 +51,7 @@ class AppWindow(QMainWindow):
         self._boxes_controller = boxes_controller
         self._box_edit_controller = box_edit_controller
         self._defect_controller = defect_controller
+        self._verify_controller = verify_controller
         self._diagnostics_controller = diagnostics_controller
         self._printer_controller = printer_controller
         self._scanner_controller = scanner_controller
@@ -78,6 +81,7 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._verify_controller.state_changed.connect(self._main_screen.verify_screen.apply_state)
         self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
         self._diagnostics_controller.state_changed.connect(
             self._main_screen.diagnostics_screen.apply_state
@@ -210,6 +214,9 @@ class AppWindow(QMainWindow):
             return
         if self._scan_target == "defect":
             self._defect_controller.on_code_scanned(code)
+            return
+        if self._scan_target == "verify":
+            self._verify_controller.on_code_scanned(code)
             return
         if self._scan_target == "packing":
             self._packing_controller.on_code_scanned(code)

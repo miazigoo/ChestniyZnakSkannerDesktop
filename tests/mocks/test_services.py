@@ -56,6 +56,21 @@ class FakeApiClient:
         """Возвращает payload для POST-сценария."""
 
         self.last_call = ("POST", url, {"json": json, "params": params})
+        if url.endswith("verify") and not url.endswith("verify/exists"):
+            return {
+                "status": "OK",
+                "message": "Код найден",
+                "scan_id": 1,
+                "code": {
+                    "id": 1,
+                    "gtin": "04601234567890",
+                    "serial": "SERIAL",
+                    "visible_code": "010460123456789021SERIAL",
+                    "order_name": "26-0001",
+                    "device_name": "Device",
+                },
+                "warnings": [],
+            }
         if url.endswith("verify/exists"):
             return {
                 "ok": True,
@@ -202,6 +217,29 @@ def test_chestniy_znak_service_verify_exists() -> None:
                 "code": "code",
                 "scanner_id": "desktop-com",
                 "allow_duplicate": True,
+                "save_scan": True,
+            },
+            "params": None,
+        },
+    )
+
+
+def test_chestniy_znak_service_verify() -> None:
+    """Проверяет маппинг полной проверки кода."""
+
+    client = FakeApiClient()
+    result = ChestniyZnakService(client).verify("code", "desktop-com")
+    assert result.status == "OK"
+    assert result.code is not None
+    assert result.code.order_name == "26-0001"
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/verify",
+        {
+            "json": {
+                "code": "code",
+                "scanner_id": "desktop-com",
+                "allow_duplicate": False,
                 "save_scan": True,
             },
             "params": None,
