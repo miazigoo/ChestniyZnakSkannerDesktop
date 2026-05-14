@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen
 from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen
 from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScreen
@@ -35,12 +36,14 @@ class MainScreen(QWidget):
         self._session_panel = UserSessionPanel()
         self._packing_screen = PackingScreen()
         self._boxes_screen = BoxesScreen()
+        self._box_lookup_screen = BoxLookupScreen()
         self._verify_screen = VerifyScreen()
         self._defect_screen = DefectScreen()
         self._settings_screen = SettingsScreen()
         self._diagnostics_screen = DiagnosticsScreen()
         self._stack.addWidget(self._packing_screen)
         self._stack.addWidget(self._boxes_screen)
+        self._stack.addWidget(self._box_lookup_screen)
         self._stack.addWidget(self._verify_screen)
         self._stack.addWidget(self._defect_screen)
         self._stack.addWidget(self._settings_screen)
@@ -51,11 +54,12 @@ class MainScreen(QWidget):
         nav.addWidget(self._session_panel)
         nav.addWidget(self._nav_button("Упаковка", 0, "packing"))
         nav.addWidget(self._nav_button("Коробки", 1, "boxes"))
-        nav.addWidget(self._nav_button("Проверка", 2, "verify"))
-        nav.addWidget(self._nav_button("Брак", 3, "defect"))
+        nav.addWidget(self._nav_button("Поиск коробки", 2, "box_lookup"))
+        nav.addWidget(self._nav_button("Проверка", 3, "verify"))
+        nav.addWidget(self._nav_button("Брак", 4, "defect"))
         nav.addStretch(1)
-        nav.addWidget(self._nav_button("Настройки", 4, "settings"))
-        nav.addWidget(self._nav_button("Диагностика", 5, "diagnostics"))
+        nav.addWidget(self._nav_button("Настройки", 5, "settings"))
+        nav.addWidget(self._nav_button("Диагностика", 6, "diagnostics"))
 
         layout = QHBoxLayout(self)
         layout.addLayout(nav)
@@ -72,6 +76,12 @@ class MainScreen(QWidget):
         """Возвращает экран коробок для подключения контроллера."""
 
         return self._boxes_screen
+
+    @property
+    def box_lookup_screen(self) -> BoxLookupScreen:
+        """Возвращает экран поиска коробки для подключения контроллера."""
+
+        return self._box_lookup_screen
 
     @property
     def defect_screen(self) -> DefectScreen:
@@ -102,9 +112,15 @@ class MainScreen(QWidget):
 
         self._session_panel.apply_snapshot(snapshot)
         self._packing_screen.apply_runtime_snapshot(snapshot)
+        self._box_lookup_screen.apply_runtime_snapshot(snapshot)
         self._verify_screen.apply_runtime_snapshot(snapshot)
         self._defect_screen.apply_runtime_snapshot(snapshot)
         self._diagnostics_screen.apply_runtime_snapshot(snapshot)
+
+    def show_boxes(self) -> None:
+        """Переключает рабочую область на список коробок."""
+
+        self._show_screen(1, "boxes")
 
     def _nav_button(self, title: str, index: int, screen_name: str) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""

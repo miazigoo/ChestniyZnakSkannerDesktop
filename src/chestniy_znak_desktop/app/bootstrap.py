@@ -17,6 +17,7 @@ from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
+from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
@@ -99,6 +100,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
         sound_service=sound_service,
     )
+    box_lookup_controller = BoxLookupController(
+        boxes_service=packing_service,
+        task_runner=api_task_runner,
+        sound_service=sound_service,
+    )
     printer_controller = PrinterController(
         printer_service=printer_service,
         task_runner=api_task_runner,
@@ -141,6 +147,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         auth_controller=auth_controller,
         packing_controller=packing_controller,
         boxes_controller=boxes_controller,
+        box_lookup_controller=box_lookup_controller,
         box_edit_controller=box_edit_controller,
         defect_controller=defect_controller,
         verify_controller=verify_controller,

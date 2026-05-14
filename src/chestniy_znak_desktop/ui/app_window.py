@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
+from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
@@ -33,6 +34,7 @@ class AppWindow(QMainWindow):
         auth_controller: AuthController,
         packing_controller: PackingController,
         boxes_controller: BoxesController,
+        box_lookup_controller: BoxLookupController,
         box_edit_controller: BoxEditController,
         defect_controller: DefectController,
         verify_controller: VerifyController,
@@ -49,6 +51,7 @@ class AppWindow(QMainWindow):
         self._auth_controller = auth_controller
         self._packing_controller = packing_controller
         self._boxes_controller = boxes_controller
+        self._box_lookup_controller = box_lookup_controller
         self._box_edit_controller = box_edit_controller
         self._defect_controller = defect_controller
         self._verify_controller = verify_controller
@@ -81,6 +84,10 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._box_lookup_controller.state_changed.connect(
+            self._main_screen.box_lookup_screen.apply_state
+        )
+        self._box_lookup_controller.box_found.connect(self._open_found_box)
         self._verify_controller.state_changed.connect(self._main_screen.verify_screen.apply_state)
         self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
         self._diagnostics_controller.state_changed.connect(
@@ -129,6 +136,9 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.boxes_screen.delete_empty_box_requested.connect(
             self._box_edit_controller.delete_empty_box
+        )
+        self._main_screen.box_lookup_screen.reset_requested.connect(
+            self._box_lookup_controller.reset_status
         )
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box
@@ -206,6 +216,12 @@ class AppWindow(QMainWindow):
 
         self._scan_target = screen_name
 
+    def _open_found_box(self, box_id: int) -> None:
+        """Открывает найденную коробку в рабочем экране коробок."""
+
+        self._main_screen.show_boxes()
+        self._boxes_controller.load_detail(box_id)
+
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
@@ -214,6 +230,9 @@ class AppWindow(QMainWindow):
             return
         if self._scan_target == "defect":
             self._defect_controller.on_code_scanned(code)
+            return
+        if self._scan_target == "box_lookup":
+            self._box_lookup_controller.on_code_scanned(code)
             return
         if self._scan_target == "verify":
             self._verify_controller.on_code_scanned(code)
