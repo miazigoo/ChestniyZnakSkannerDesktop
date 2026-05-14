@@ -43,6 +43,20 @@ def test_main_screen_can_be_created() -> None:
     assert screen is not None
 
 
+def test_boxes_screen_has_backend_status_filters() -> None:
+    """Проверяет наличие backend-фильтров списка коробок."""
+
+    qapp()
+    screen = BoxesScreen()
+
+    values = [
+        screen._status_filter.itemData(index)  # noqa: SLF001
+        for index in range(screen._status_filter.count())  # noqa: SLF001
+    ]
+
+    assert values == ["all", "active", "open", "edit", "closed", "empty"]
+
+
 def test_main_screen_emits_logout_request() -> None:
     """Проверяет проброс запроса выхода из рабочего экрана."""
 
