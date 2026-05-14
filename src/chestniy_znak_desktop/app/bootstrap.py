@@ -27,7 +27,7 @@ from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
-from chestniy_znak_desktop.services.sound_service import SoundService
+from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.ui.app_window import AppWindow
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
 
@@ -60,6 +60,12 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     sound_service = SoundService(
         enabled=settings.sound_enabled,
         volume=settings.sound_volume,
+        sound_files={
+            SoundEvent.OK: settings.sound_ok_file,
+            SoundEvent.WARNING: settings.sound_warning_file,
+            SoundEvent.ERROR: settings.sound_error_file,
+            SoundEvent.VICTORY: settings.sound_victory_file,
+        },
     )
     auth_controller = AuthController(
         auth_service=AuthService(api_client),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSlider,
     QVBoxLayout,
     QWidget,
 )
@@ -67,6 +68,13 @@ class SettingsScreen(QWidget):
         self._theme_select.addItems(["light", "dark"])
         self._sound_enabled = QCheckBox("Звуки включены")
         self._sound_enabled.setChecked(True)
+        self._sound_volume = QSlider(Qt.Orientation.Horizontal)
+        self._sound_volume.setRange(0, 100)
+        self._sound_volume.setValue(85)
+        self._sound_ok = QComboBox()
+        self._sound_warning = QComboBox()
+        self._sound_error = QComboBox()
+        self._sound_victory = QComboBox()
         self._save_button = QPushButton("Сохранить настройки")
         self._save_button.clicked.connect(self._emit_settings_save)
         self._settings_status = QLabel("")
@@ -93,6 +101,16 @@ class SettingsScreen(QWidget):
         layout.addWidget(self._printer_error)
         layout.addWidget(self._theme_select)
         layout.addWidget(self._sound_enabled)
+        layout.addWidget(QLabel("Громкость звуков"))
+        layout.addWidget(self._sound_volume)
+        layout.addWidget(QLabel("Звук успеха"))
+        layout.addWidget(self._sound_ok)
+        layout.addWidget(QLabel("Звук предупреждения"))
+        layout.addWidget(self._sound_warning)
+        layout.addWidget(QLabel("Звук ошибки"))
+        layout.addWidget(self._sound_error)
+        layout.addWidget(QLabel("Звук закрытия коробки"))
+        layout.addWidget(self._sound_victory)
         layout.addWidget(self._save_button)
         layout.addWidget(self._settings_status)
         layout.addWidget(self._settings_error)
@@ -107,6 +125,23 @@ class SettingsScreen(QWidget):
         if theme_index >= 0:
             self._theme_select.setCurrentIndex(theme_index)
         self._sound_enabled.setChecked(state.sound_enabled)
+        self._sound_volume.setValue(int(state.sound_volume * 100))
+        self._apply_sound_combo(self._sound_ok, state.available_sound_files, state.sound_ok_file)
+        self._apply_sound_combo(
+            self._sound_warning,
+            state.available_sound_files,
+            state.sound_warning_file,
+        )
+        self._apply_sound_combo(
+            self._sound_error,
+            state.available_sound_files,
+            state.sound_error_file,
+        )
+        self._apply_sound_combo(
+            self._sound_victory,
+            state.available_sound_files,
+            state.sound_victory_file,
+        )
         self._settings_status.setText(state.status_message)
         self._settings_error.setText(state.error_message)
 
@@ -175,5 +210,22 @@ class SettingsScreen(QWidget):
                 device_id=self._device_input.text(),
                 theme_name=self._theme_select.currentText(),
                 sound_enabled=self._sound_enabled.isChecked(),
+                sound_volume=self._sound_volume.value() / 100,
+                sound_ok_file=self._sound_ok.currentText(),
+                sound_warning_file=self._sound_warning.currentText(),
+                sound_error_file=self._sound_error.currentText(),
+                sound_victory_file=self._sound_victory.currentText(),
             )
         )
+
+    @staticmethod
+    def _apply_sound_combo(combo: QComboBox, files: list[str], selected_file: str) -> None:
+        """Заполняет combo доступными файлами звуков."""
+
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(files)
+        index = combo.findText(selected_file)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        combo.blockSignals(False)

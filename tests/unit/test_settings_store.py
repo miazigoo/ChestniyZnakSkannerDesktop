@@ -30,6 +30,10 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
             scanner_baudrate=115200,
             sound_enabled=False,
             sound_volume=0.4,
+            sound_ok_file="ok_03.mp3",
+            sound_warning_file="other_order.mp3",
+            sound_error_file="error_02.mp3",
+            sound_victory_file="victory.mp3",
         )
     )
     loaded = SettingsStore.from_file(str(settings_path)).load(AppConfig())
@@ -38,3 +42,6 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
     assert loaded.scanner_baudrate == 115200
     assert loaded.sound_enabled is False
     assert loaded.sound_volume == 0.4
+    assert loaded.sound_ok_file == "ok_03.mp3"
+    assert loaded.sound_warning_file == "other_order.mp3"
+    assert loaded.sound_error_file == "error_02.mp3"

@@ -47,6 +47,10 @@ def _controller(  # type: ignore[no-untyped-def]
         scanner_baudrate=9600,
         sound_enabled=True,
         sound_volume=0.85,
+        sound_ok_file="ok_02.mp3",
+        sound_warning_file="other.mp3",
+        sound_error_file="error.mp3",
+        sound_victory_file="victory.mp3",
     )
     controller = SettingsController(
         settings_store=store,
@@ -71,6 +75,11 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
             device_id="desktop-2",
             theme_name="dark",
             sound_enabled=False,
+            sound_volume=0.4,
+            sound_ok_file="ok_03.mp3",
+            sound_warning_file="other_order.mp3",
+            sound_error_file="error_02.mp3",
+            sound_victory_file="victory.mp3",
         )
     )
 
@@ -79,6 +88,10 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
     assert loaded.device_id == "desktop-2"
     assert loaded.theme_name == "dark"
     assert loaded.sound_enabled is False
+    assert loaded.sound_volume == 0.4
+    assert loaded.sound_ok_file == "ok_03.mp3"
+    assert loaded.sound_warning_file == "other_order.mp3"
+    assert loaded.sound_error_file == "error_02.mp3"
     assert states[-1].status_message.startswith("Настройки сохранены")
 
 
@@ -95,6 +108,11 @@ def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-un
             device_id="desktop-2",
             theme_name="dark",
             sound_enabled=False,
+            sound_volume=0.4,
+            sound_ok_file="ok_03.mp3",
+            sound_warning_file="other_order.mp3",
+            sound_error_file="error_02.mp3",
+            sound_victory_file="victory.mp3",
         )
     )
 

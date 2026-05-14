@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from chestniy_znak_desktop.app.settings_store import SettingsStore, UserSettings
-from chestniy_znak_desktop.services.sound_service import SoundService
+from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
 
 
@@ -20,6 +20,11 @@ class SettingsFormData:
     device_id: str
     theme_name: str
     sound_enabled: bool
+    sound_volume: float
+    sound_ok_file: str
+    sound_warning_file: str
+    sound_error_file: str
+    sound_victory_file: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +35,12 @@ class SettingsUiState:
     device_id: str
     theme_name: str
     sound_enabled: bool
+    sound_volume: float
+    sound_ok_file: str
+    sound_warning_file: str
+    sound_error_file: str
+    sound_victory_file: str
+    available_sound_files: list[str]
     status_message: str = ""
     error_message: str = ""
 
@@ -85,6 +96,11 @@ class SettingsController(QObject):
             device_id=device_id,
             theme_name=form_data.theme_name,
             sound_enabled=form_data.sound_enabled,
+            sound_volume=form_data.sound_volume,
+            sound_ok_file=form_data.sound_ok_file,
+            sound_warning_file=form_data.sound_warning_file,
+            sound_error_file=form_data.sound_error_file,
+            sound_victory_file=form_data.sound_victory_file,
         )
         self._apply_live_settings()
         self._save("Настройки сохранены. Backend и Device ID применятся после перезапуска.")
@@ -106,6 +122,17 @@ class SettingsController(QObject):
 
         self._theme_manager.set_theme(self._settings.theme_name, self._qt_app)
         self._sound_service.set_enabled(self._settings.sound_enabled)
+        self._sound_service.set_volume(self._settings.sound_volume)
+        self._sound_service.set_sound_file(SoundEvent.OK, self._settings.sound_ok_file)
+        self._sound_service.set_sound_file(
+            SoundEvent.WARNING,
+            self._settings.sound_warning_file,
+        )
+        self._sound_service.set_sound_file(SoundEvent.ERROR, self._settings.sound_error_file)
+        self._sound_service.set_sound_file(
+            SoundEvent.VICTORY,
+            self._settings.sound_victory_file,
+        )
 
     def _save(self, status_message: str) -> None:
         """Сохраняет настройки и публикует успешный статус."""
@@ -126,6 +153,12 @@ class SettingsController(QObject):
                 device_id=self._settings.device_id,
                 theme_name=self._settings.theme_name,
                 sound_enabled=self._settings.sound_enabled,
+                sound_volume=self._settings.sound_volume,
+                sound_ok_file=self._settings.sound_ok_file,
+                sound_warning_file=self._settings.sound_warning_file,
+                sound_error_file=self._settings.sound_error_file,
+                sound_victory_file=self._settings.sound_victory_file,
+                available_sound_files=SoundService.available_sound_files(),
                 status_message=status_message,
                 error_message=error_message,
             )

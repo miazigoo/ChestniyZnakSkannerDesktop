@@ -21,12 +21,20 @@ class SoundEvent(str, Enum):
 class SoundService:
     """Проигрывает короткие звуковые сигналы оператору."""
 
-    def __init__(self, enabled: bool = True, volume: float = 0.85) -> None:
+    def __init__(
+        self,
+        enabled: bool = True,
+        volume: float = 0.85,
+        sound_files: dict[SoundEvent, str] | None = None,
+    ) -> None:
         """Создает кеш звуковых эффектов."""
 
         self._effects: dict[SoundEvent, QSoundEffect] = {}
         self._enabled = enabled
         self._volume = max(0.0, min(volume, 1.0))
+        self._sound_files = {event: event.value for event in SoundEvent}
+        if sound_files is not None:
+            self._sound_files.update(sound_files)
 
     def set_enabled(self, enabled: bool) -> None:
         """Включает или выключает звуковую обратную связь."""
@@ -40,6 +48,12 @@ class SoundService:
         for effect in self._effects.values():
             effect.setVolume(self._volume)
 
+    def set_sound_file(self, event: SoundEvent, filename: str) -> None:
+        """Меняет файл звука для события и сбрасывает кеш эффекта."""
+
+        self._sound_files[event] = filename
+        self._effects.pop(event, None)
+
     def play(self, event: SoundEvent) -> None:
         """Проигрывает звук для указанного события."""
 
@@ -47,15 +61,25 @@ class SoundService:
             return
         effect = self._effects.get(event)
         if effect is None:
-            effect = self._create_effect(event, volume=self._volume)
+            effect = self._create_effect(self._sound_files[event], volume=self._volume)
             self._effects[event] = effect
         effect.play()
 
     @staticmethod
-    def _create_effect(event: SoundEvent, volume: float) -> QSoundEffect:
+    def available_sound_files() -> list[str]:
+        """Возвращает список доступных mp3-файлов звуков."""
+
+        return sorted(
+            path.name
+            for path in files("chestniy_znak_desktop.resources.sounds").iterdir()
+            if path.name.endswith(".mp3")
+        )
+
+    @staticmethod
+    def _create_effect(filename: str, volume: float) -> QSoundEffect:
         """Создает Qt-эффект для mp3-файла из ресурсов."""
 
-        path = files("chestniy_znak_desktop.resources.sounds").joinpath(event.value)
+        path = files("chestniy_znak_desktop.resources.sounds").joinpath(filename)
         effect = QSoundEffect()
         effect.setSource(QUrl.fromLocalFile(str(path)))
         effect.setVolume(volume)

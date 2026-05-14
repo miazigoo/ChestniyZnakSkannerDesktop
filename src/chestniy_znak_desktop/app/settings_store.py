@@ -20,6 +20,10 @@ class UserSettings:
     scanner_baudrate: int = 9600
     sound_enabled: bool = True
     sound_volume: float = 0.85
+    sound_ok_file: str = "ok_02.mp3"
+    sound_warning_file: str = "other.mp3"
+    sound_error_file: str = "error.mp3"
+    sound_victory_file: str = "victory.mp3"
 
 
 class SettingsStore:
@@ -53,6 +57,10 @@ class SettingsStore:
             scanner_baudrate=self._int_value("scanner/baudrate", 9600),
             sound_enabled=self._bool_value("sound/enabled", True),
             sound_volume=self._float_value("sound/volume", 0.85),
+            sound_ok_file=self._value("sound/ok_file", "ok_02.mp3"),
+            sound_warning_file=self._value("sound/warning_file", "other.mp3"),
+            sound_error_file=self._value("sound/error_file", "error.mp3"),
+            sound_victory_file=self._value("sound/victory_file", "victory.mp3"),
         )
 
     def save(self, settings: UserSettings) -> None:
@@ -65,6 +73,10 @@ class SettingsStore:
         self._settings.setValue("scanner/baudrate", settings.scanner_baudrate)
         self._settings.setValue("sound/enabled", settings.sound_enabled)
         self._settings.setValue("sound/volume", settings.sound_volume)
+        self._settings.setValue("sound/ok_file", settings.sound_ok_file)
+        self._settings.setValue("sound/warning_file", settings.sound_warning_file)
+        self._settings.setValue("sound/error_file", settings.sound_error_file)
+        self._settings.setValue("sound/victory_file", settings.sound_victory_file)
         self._settings.sync()
 
     def _value(self, key: str, default: str) -> str:
