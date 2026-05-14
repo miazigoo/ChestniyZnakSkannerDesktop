@@ -50,6 +50,12 @@ class MainScreen(QWidget):
 
         return self._packing_screen
 
+    @property
+    def settings_screen(self) -> SettingsScreen:
+        """Возвращает экран настроек для подключения контроллеров."""
+
+        return self._settings_screen
+
     def _nav_button(self, title: str, index: int) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""
 

@@ -12,6 +12,7 @@ from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
@@ -54,15 +55,23 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
         sound_service=sound_service,
     )
+    scanner_controller = ScannerController(
+        runtime_controller=runtime_controller,
+        initial_port=settings.scanner_port,
+        initial_baudrate=settings.scanner_baudrate,
+    )
     window = AppWindow(
         app_state=state,
         runtime_controller=runtime_controller,
         auth_controller=auth_controller,
         packing_controller=packing_controller,
+        scanner_controller=scanner_controller,
     )
     window.destroyed.connect(lambda _obj: runtime_controller.stop())
     window.destroyed.connect(lambda _obj: api_client.close())
+    window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     runtime_controller.start()
+    scanner_controller.refresh_ports()
     auth_controller.restore_session()
     return window
