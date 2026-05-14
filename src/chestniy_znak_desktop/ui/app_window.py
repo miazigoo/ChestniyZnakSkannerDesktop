@@ -9,6 +9,7 @@ from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
+from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
@@ -33,6 +34,7 @@ class AppWindow(QMainWindow):
         boxes_controller: BoxesController,
         box_edit_controller: BoxEditController,
         defect_controller: DefectController,
+        diagnostics_controller: DiagnosticsController,
         printer_controller: PrinterController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
@@ -47,6 +49,7 @@ class AppWindow(QMainWindow):
         self._boxes_controller = boxes_controller
         self._box_edit_controller = box_edit_controller
         self._defect_controller = defect_controller
+        self._diagnostics_controller = diagnostics_controller
         self._printer_controller = printer_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
@@ -76,6 +79,12 @@ class AppWindow(QMainWindow):
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
+        self._diagnostics_controller.state_changed.connect(
+            self._main_screen.diagnostics_screen.apply_state
+        )
+        self._main_screen.diagnostics_screen.logs_refresh_requested.connect(
+            self._diagnostics_controller.refresh_logs
+        )
         self._printer_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_printer_state
         )

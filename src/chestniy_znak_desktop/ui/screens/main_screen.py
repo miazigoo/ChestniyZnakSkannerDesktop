@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen
 from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen
+from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScreen
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen
 from chestniy_znak_desktop.ui.widgets.user_session_panel import UserSessionPanel
@@ -35,10 +36,12 @@ class MainScreen(QWidget):
         self._boxes_screen = BoxesScreen()
         self._defect_screen = DefectScreen()
         self._settings_screen = SettingsScreen()
+        self._diagnostics_screen = DiagnosticsScreen()
         self._stack.addWidget(self._packing_screen)
         self._stack.addWidget(self._boxes_screen)
         self._stack.addWidget(self._defect_screen)
         self._stack.addWidget(self._settings_screen)
+        self._stack.addWidget(self._diagnostics_screen)
         self._session_panel.logout_requested.connect(self.logout_requested.emit)
 
         nav = QVBoxLayout()
@@ -48,6 +51,7 @@ class MainScreen(QWidget):
         nav.addWidget(self._nav_button("Брак", 2, "defect"))
         nav.addStretch(1)
         nav.addWidget(self._nav_button("Настройки", 3, "settings"))
+        nav.addWidget(self._nav_button("Диагностика", 4, "diagnostics"))
 
         layout = QHBoxLayout(self)
         layout.addLayout(nav)
@@ -77,12 +81,19 @@ class MainScreen(QWidget):
 
         return self._settings_screen
 
+    @property
+    def diagnostics_screen(self) -> DiagnosticsScreen:
+        """Возвращает экран диагностики для подключения контроллера."""
+
+        return self._diagnostics_screen
+
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет рабочий экран из общего runtime snapshot."""
 
         self._session_panel.apply_snapshot(snapshot)
         self._packing_screen.apply_runtime_snapshot(snapshot)
         self._defect_screen.apply_runtime_snapshot(snapshot)
+        self._diagnostics_screen.apply_runtime_snapshot(snapshot)
 
     def _nav_button(self, title: str, index: int, screen_name: str) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""

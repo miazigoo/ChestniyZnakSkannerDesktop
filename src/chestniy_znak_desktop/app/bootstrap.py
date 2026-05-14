@@ -19,6 +19,7 @@ from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
+from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
@@ -28,6 +29,7 @@ from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
+from chestniy_znak_desktop.services.log_service import LogService
 from chestniy_znak_desktop.ui.app_window import AppWindow
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
 
@@ -110,6 +112,10 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         task_runner=api_task_runner,
         sound_service=sound_service,
     )
+    diagnostics_controller = DiagnosticsController(
+        config=config,
+        log_service=LogService(config.data_dir / "logs" / "desktop.log"),
+    )
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
         initial_port=settings.scanner_port,
@@ -130,6 +136,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         boxes_controller=boxes_controller,
         box_edit_controller=box_edit_controller,
         defect_controller=defect_controller,
+        diagnostics_controller=diagnostics_controller,
         printer_controller=printer_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
@@ -144,6 +151,8 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     scanner_controller.refresh_ports()
     scanner_controller.start_if_configured()
     settings_controller.publish_state()
+    diagnostics_controller.publish_state()
+    diagnostics_controller.refresh_logs()
     auth_controller.restore_session()
     return window
 
