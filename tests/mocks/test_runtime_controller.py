@@ -80,3 +80,34 @@ def test_runtime_controller_delegates_lifecycle() -> None:
     assert monitor.started is True
     assert monitor.stopped is True
     assert monitor.retry_count == 1
+
+
+def test_runtime_controller_emits_updated_blocking_message() -> None:
+    """Проверяет публикацию новой причины блокировки без смены bool-флага."""
+
+    app_state = AppState(config=AppConfig())
+    app_state.set_authenticated_user("Operator")
+    monitor = FakeConnectionMonitor()
+    controller = RuntimeController(app_state=app_state, connection_monitor=monitor)
+    blocking_events: list[tuple[bool, str]] = []
+    controller.blocking_changed.connect(
+        lambda is_blocking, message: blocking_events.append((is_blocking, message))
+    )
+
+    controller.set_connection_state(
+        ConnectionState(
+            status=ConnectionStatus.DISCONNECTED,
+            message="Нет связи",
+        )
+    )
+    controller.set_connection_state(
+        ConnectionState(
+            status=ConnectionStatus.DISCONNECTED,
+            message="Backend не отвечает",
+        )
+    )
+
+    assert blocking_events == [
+        (True, "Нет связи"),
+        (True, "Backend не отвечает"),
+    ]

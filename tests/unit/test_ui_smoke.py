@@ -41,6 +41,19 @@ def test_main_screen_can_be_created() -> None:
     assert screen is not None
 
 
+def test_main_screen_emits_logout_request() -> None:
+    """Проверяет проброс запроса выхода из рабочего экрана."""
+
+    qapp()
+    screen = MainScreen()
+    requests: list[bool] = []
+    screen.logout_requested.connect(lambda: requests.append(True))
+
+    screen.logout_requested.emit()
+
+    assert requests == [True]
+
+
 def test_runtime_status_bar_accepts_snapshot() -> None:
     """Проверяет обновление статусной панели runtime snapshot."""
 

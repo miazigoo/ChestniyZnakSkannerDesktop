@@ -32,6 +32,7 @@ class RuntimeController(QObject):
         self._app_state = app_state
         self._connection_monitor = connection_monitor
         self._last_blocking = app_state.snapshot.is_blocking
+        self._last_blocking_message = ""
         self._connection_monitor.state_changed.connect(self.set_connection_state)
 
     @property
@@ -106,6 +107,21 @@ class RuntimeController(QObject):
 
         snapshot = self._app_state.snapshot
         self.snapshot_changed.emit(snapshot)
-        if snapshot.is_blocking != self._last_blocking:
+        blocking_message = self._blocking_message(snapshot)
+        if (
+            snapshot.is_blocking != self._last_blocking
+            or blocking_message != self._last_blocking_message
+        ):
             self._last_blocking = snapshot.is_blocking
-            self.blocking_changed.emit(snapshot.is_blocking, snapshot.connection.message)
+            self._last_blocking_message = blocking_message
+            self.blocking_changed.emit(snapshot.is_blocking, blocking_message)
+
+    @staticmethod
+    def _blocking_message(snapshot: RuntimeSnapshot) -> str:
+        """Возвращает текст причины блокировки рабочих экранов."""
+
+        if not snapshot.session.is_authenticated:
+            return "Требуется авторизация оператора"
+        if snapshot.connection.is_blocking:
+            return snapshot.connection.message
+        return ""
