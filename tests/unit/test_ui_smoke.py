@@ -29,6 +29,9 @@ from chestniy_znak_desktop.controllers.boxes_controller import (  # noqa: E402
     BoxRowUi,
     BoxesUiState,
 )
+from chestniy_znak_desktop.controllers.box_lookup_controller import (  # noqa: E402
+    BoxLookupUiState,
+)
 from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingBoxUi,
     PackingItemUi,
@@ -37,6 +40,7 @@ from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
@@ -136,6 +140,34 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
     assert screen._table.rowCount() == 1  # noqa: SLF001
     assert screen._detail_items_table.rowCount() == 1  # noqa: SLF001
     assert screen._print_label_button.isEnabled() is True  # noqa: SLF001
+
+
+def test_box_lookup_screen_shows_scanner_result() -> None:
+    """Проверяет современный scanner-only экран поиска коробки."""
+
+    qapp()
+    screen = BoxLookupScreen()
+    screen.apply_runtime_snapshot(
+        RuntimeSnapshot(
+            scanner=ScannerState(
+                status=ScannerStatus.RUNNING,
+                port="/dev/rfcomm0",
+            )
+        )
+    )
+    screen.apply_state(
+        BoxLookupUiState(
+            status_message="Коробка #77 найдена",
+            last_scanned_code="(00)046012345678901234",
+            found_box_id=77,
+            found_box_summary="#77 | Заказ 77 | 046012345678901234 | 2/10",
+            log=["(00)046012345678901234: #77 | Заказ 77"],
+        )
+    )
+
+    assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
+    assert "Коробка:" in screen._found.text()  # noqa: SLF001
+    assert screen._reset_button.isEnabled() is True  # noqa: SLF001
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:
