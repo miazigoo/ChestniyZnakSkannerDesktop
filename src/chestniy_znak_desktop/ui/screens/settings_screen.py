@@ -2,29 +2,32 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSlider,
-    QVBoxLayout,
-    QWidget,
-)
+from dataclasses import replace
 
-from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QLabel, QStackedWidget, QVBoxLayout, QWidget
+
+from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
+from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
 from chestniy_znak_desktop.controllers.settings_controller import (
     SettingsFormData,
     SettingsUiState,
 )
+from chestniy_znak_desktop.ui.screens.settings_pages.app_page import AppSettingsPage
+from chestniy_znak_desktop.ui.screens.settings_pages.hub_page import SettingsHubPage
+from chestniy_znak_desktop.ui.screens.settings_pages.printer_page import (
+    PrinterSettingsPage,
+)
+from chestniy_znak_desktop.ui.screens.settings_pages.scanner_page import (
+    ScannerSettingsPage,
+)
+from chestniy_znak_desktop.ui.screens.settings_pages.sound_page import SoundSettingsPage
+from chestniy_znak_desktop.ui.screens.settings_pages.theme_page import ThemeSettingsPage
 
 
 class SettingsScreen(QWidget):
-    """Показывает настройки backend, сканера, темы и звуков."""
+    """Показывает настройки приложения через отдельные группы."""
 
     scanner_ports_refresh_requested = Signal()
     scanner_start_requested = Signal()
@@ -34,198 +37,166 @@ class SettingsScreen(QWidget):
     settings_save_requested = Signal(SettingsFormData)
     printer_refresh_requested = Signal()
     printer_selected = Signal(int)
+    sound_preview_requested = Signal(str)
 
     def __init__(self) -> None:
-        """Создает базовую форму настроек."""
+        """Создает grouped-навигацию настроек."""
 
         super().__init__()
-        self._title = QLabel("Настройки")
-        self._backend_input = QLineEdit()
-        self._backend_input.setPlaceholderText("Backend URL")
-        self._device_input = QLineEdit()
-        self._device_input.setPlaceholderText("Device ID")
-        self._scanner_port = QComboBox()
-        self._scanner_port.setEditable(True)
-        self._scanner_port.currentTextChanged.connect(self.scanner_port_changed.emit)
-        self._scanner_baudrate = QComboBox()
-        self._scanner_baudrate.addItems(["9600", "19200", "38400", "57600", "115200"])
-        self._scanner_baudrate.currentTextChanged.connect(self._emit_baudrate)
-        self._scanner_status = QLabel("Сканер не запущен")
-        self._scanner_error = QLabel("")
-        self._refresh_ports_button = QPushButton("Обновить порты")
-        self._refresh_ports_button.clicked.connect(self.scanner_ports_refresh_requested.emit)
-        self._start_scanner_button = QPushButton("Запустить сканер")
-        self._start_scanner_button.clicked.connect(self.scanner_start_requested.emit)
-        self._stop_scanner_button = QPushButton("Остановить сканер")
-        self._stop_scanner_button.clicked.connect(self.scanner_stop_requested.emit)
-        self._printer_select = QComboBox()
-        self._printer_select.currentIndexChanged.connect(self._emit_printer_selected)
-        self._printer_status = QLabel("Принтер не выбран")
-        self._printer_error = QLabel("")
-        self._refresh_printers_button = QPushButton("Обновить принтеры")
-        self._refresh_printers_button.clicked.connect(self.printer_refresh_requested.emit)
-        self._theme_select = QComboBox()
-        self._theme_select.addItems(["light", "dark"])
-        self._sound_enabled = QCheckBox("Звуки включены")
-        self._sound_enabled.setChecked(True)
-        self._sound_volume = QSlider(Qt.Orientation.Horizontal)
-        self._sound_volume.setRange(0, 100)
-        self._sound_volume.setValue(85)
-        self._sound_ok = QComboBox()
-        self._sound_warning = QComboBox()
-        self._sound_error = QComboBox()
-        self._sound_victory = QComboBox()
-        self._save_button = QPushButton("Сохранить настройки")
-        self._save_button.clicked.connect(self._emit_settings_save)
-        self._settings_status = QLabel("")
-        self._settings_error = QLabel("")
-        scanner_actions = QHBoxLayout()
-        scanner_actions.addWidget(self._refresh_ports_button)
-        scanner_actions.addWidget(self._start_scanner_button)
-        scanner_actions.addWidget(self._stop_scanner_button)
+        self._settings_state = SettingsUiState(
+            api_base_url=AppConfig().api_base_url,
+            device_id=AppConfig().device_id,
+            theme_name="light",
+            sound_enabled=True,
+            sound_volume=0.85,
+            sound_ok_file="ok_02.mp3",
+            sound_warning_file="other.mp3",
+            sound_error_file="error.mp3",
+            sound_victory_file="victory.mp3",
+            available_sound_files=[],
+        )
+        self._stack = QStackedWidget()
+        self._hub_page = SettingsHubPage()
+        self._app_page = AppSettingsPage()
+        self._scanner_page = ScannerSettingsPage()
+        self._printer_page = PrinterSettingsPage()
+        self._theme_page = ThemeSettingsPage()
+        self._sound_page = SoundSettingsPage()
+        self._status_label = QLabel("")
+        self._error_label = QLabel("")
+        self._register_pages()
+        self._connect_pages()
+
         layout = QVBoxLayout(self)
-        layout.addWidget(self._title)
-        layout.addWidget(self._backend_input)
-        layout.addWidget(self._device_input)
-        layout.addWidget(QLabel("COM/SPP порт сканера"))
-        layout.addWidget(self._scanner_port)
-        layout.addWidget(QLabel("Скорость порта"))
-        layout.addWidget(self._scanner_baudrate)
-        layout.addLayout(scanner_actions)
-        layout.addWidget(self._scanner_status)
-        layout.addWidget(self._scanner_error)
-        layout.addWidget(QLabel("Принтер этикеток"))
-        layout.addWidget(self._printer_select)
-        layout.addWidget(self._refresh_printers_button)
-        layout.addWidget(self._printer_status)
-        layout.addWidget(self._printer_error)
-        layout.addWidget(self._theme_select)
-        layout.addWidget(self._sound_enabled)
-        layout.addWidget(QLabel("Громкость звуков"))
-        layout.addWidget(self._sound_volume)
-        layout.addWidget(QLabel("Звук успеха"))
-        layout.addWidget(self._sound_ok)
-        layout.addWidget(QLabel("Звук предупреждения"))
-        layout.addWidget(self._sound_warning)
-        layout.addWidget(QLabel("Звук ошибки"))
-        layout.addWidget(self._sound_error)
-        layout.addWidget(QLabel("Звук закрытия коробки"))
-        layout.addWidget(self._sound_victory)
-        layout.addWidget(self._save_button)
-        layout.addWidget(self._settings_status)
-        layout.addWidget(self._settings_error)
-        layout.addStretch(1)
+        layout.addWidget(self._stack, stretch=1)
+        layout.addWidget(self._status_label)
+        layout.addWidget(self._error_label)
 
     def apply_settings_state(self, state: SettingsUiState) -> None:
-        """Обновляет основные поля настроек приложения."""
+        """Обновляет все страницы из состояния пользовательских настроек."""
 
-        self._backend_input.setText(state.api_base_url)
-        self._device_input.setText(state.device_id)
-        theme_index = self._theme_select.findText(state.theme_name)
-        if theme_index >= 0:
-            self._theme_select.setCurrentIndex(theme_index)
-        self._sound_enabled.setChecked(state.sound_enabled)
-        self._sound_volume.setValue(int(state.sound_volume * 100))
-        self._apply_sound_combo(self._sound_ok, state.available_sound_files, state.sound_ok_file)
-        self._apply_sound_combo(
-            self._sound_warning,
-            state.available_sound_files,
-            state.sound_warning_file,
-        )
-        self._apply_sound_combo(
-            self._sound_error,
-            state.available_sound_files,
-            state.sound_error_file,
-        )
-        self._apply_sound_combo(
-            self._sound_victory,
-            state.available_sound_files,
-            state.sound_victory_file,
-        )
-        self._settings_status.setText(state.status_message)
-        self._settings_error.setText(state.error_message)
+        self._settings_state = state
+        self._app_page.apply_state(state)
+        self._theme_page.apply_state(state)
+        self._sound_page.apply_state(state)
+        self._status_label.setText(state.status_message)
+        self._error_label.setText(state.error_message)
 
     def apply_scanner_state(self, state: ScannerUiState) -> None:
-        """Обновляет элементы настроек сканера."""
+        """Обновляет страницу сканера."""
 
-        self._scanner_port.blockSignals(True)
-        self._scanner_port.clear()
-        for port in state.ports:
-            self._scanner_port.addItem(port.title, port.device)
-        if state.selected_port:
-            index = self._scanner_port.findData(state.selected_port)
-            if index >= 0:
-                self._scanner_port.setCurrentIndex(index)
-            else:
-                self._scanner_port.setEditText(state.selected_port)
-        self._scanner_port.blockSignals(False)
-        self._scanner_baudrate.blockSignals(True)
-        baudrate_index = self._scanner_baudrate.findText(str(state.baudrate))
-        if baudrate_index >= 0:
-            self._scanner_baudrate.setCurrentIndex(baudrate_index)
-        self._scanner_baudrate.blockSignals(False)
-        self._scanner_status.setText(state.status_message)
-        self._scanner_error.setText(state.error_message)
-        self._start_scanner_button.setEnabled(not state.is_running)
-        self._stop_scanner_button.setEnabled(state.is_running)
+        self._scanner_page.apply_state(state)
 
     def apply_printer_state(self, state: PrinterUiState) -> None:
-        """Обновляет элементы выбора принтера."""
+        """Обновляет страницу принтера."""
 
-        self._printer_select.blockSignals(True)
-        self._printer_select.clear()
-        self._printer_select.addItem("Принтер не выбран", 0)
-        for printer in state.printers:
-            self._printer_select.addItem(printer.title, printer.id)
-        if state.selected_printer_id is not None:
-            index = self._printer_select.findData(state.selected_printer_id)
-            if index >= 0:
-                self._printer_select.setCurrentIndex(index)
-        self._printer_select.blockSignals(False)
-        self._printer_status.setText(state.status_message)
-        self._printer_error.setText(state.error_message)
-        self._printer_select.setEnabled(not state.is_busy)
-        self._refresh_printers_button.setEnabled(not state.is_busy)
+        self._printer_page.apply_state(state)
 
-    def _emit_baudrate(self, value: str) -> None:
-        """Публикует выбранную скорость serial-порта."""
+    def _register_pages(self) -> None:
+        """Добавляет страницы в стек настроек."""
 
-        if not value:
-            return
-        self.scanner_baudrate_changed.emit(int(value))
+        for page in (
+            self._hub_page,
+            self._app_page,
+            self._scanner_page,
+            self._printer_page,
+            self._theme_page,
+            self._sound_page,
+        ):
+            self._stack.addWidget(page)
 
-    def _emit_printer_selected(self, _index: int) -> None:
-        """Публикует выбранный принтер."""
+    def _connect_pages(self) -> None:
+        """Связывает внутренние страницы с внешними сигналами."""
 
-        printer_id = int(self._printer_select.currentData() or 0)
-        if printer_id > 0:
-            self.printer_selected.emit(printer_id)
+        self._hub_page.app_requested.connect(lambda: self._show_page(self._app_page))
+        self._hub_page.scanner_requested.connect(lambda: self._show_page(self._scanner_page))
+        self._hub_page.printer_requested.connect(lambda: self._show_page(self._printer_page))
+        self._hub_page.theme_requested.connect(lambda: self._show_page(self._theme_page))
+        self._hub_page.sound_requested.connect(lambda: self._show_page(self._sound_page))
+        for page in (
+            self._app_page,
+            self._scanner_page,
+            self._printer_page,
+            self._theme_page,
+            self._sound_page,
+        ):
+            page.back_requested.connect(self._show_hub)
 
-    def _emit_settings_save(self) -> None:
-        """Публикует данные формы настроек для сохранения."""
+        self._app_page.save_requested.connect(self._save_app_settings)
+        self._scanner_page.ports_refresh_requested.connect(
+            self.scanner_ports_refresh_requested.emit
+        )
+        self._scanner_page.scanner_start_requested.connect(self.scanner_start_requested.emit)
+        self._scanner_page.scanner_stop_requested.connect(self.scanner_stop_requested.emit)
+        self._scanner_page.port_changed.connect(self.scanner_port_changed.emit)
+        self._scanner_page.baudrate_changed.connect(self.scanner_baudrate_changed.emit)
+        self._printer_page.refresh_requested.connect(self.printer_refresh_requested.emit)
+        self._printer_page.printer_selected.connect(self.printer_selected.emit)
+        self._theme_page.save_requested.connect(self._save_theme_settings)
+        self._sound_page.save_requested.connect(self._save_sound_settings)
+        self._sound_page.preview_requested.connect(self.sound_preview_requested.emit)
 
-        self.settings_save_requested.emit(
-            SettingsFormData(
-                api_base_url=self._backend_input.text(),
-                device_id=self._device_input.text(),
-                theme_name=self._theme_select.currentText(),
-                sound_enabled=self._sound_enabled.isChecked(),
-                sound_volume=self._sound_volume.value() / 100,
-                sound_ok_file=self._sound_ok.currentText(),
-                sound_warning_file=self._sound_warning.currentText(),
-                sound_error_file=self._sound_error.currentText(),
-                sound_victory_file=self._sound_victory.currentText(),
+    def _show_hub(self) -> None:
+        """Возвращает пользователя на список групп настроек."""
+
+        self._show_page(self._hub_page)
+
+    def _show_page(self, page: QWidget) -> None:
+        """Переключает стек на указанную страницу."""
+
+        self._stack.setCurrentWidget(page)
+
+    def _save_app_settings(self, api_base_url: str, device_id: str) -> None:
+        """Сохраняет backend URL и device ID через общий DTO настроек."""
+
+        state = replace(
+            self._settings_state,
+            api_base_url=api_base_url,
+            device_id=device_id,
+        )
+        self._emit_settings_save(state)
+
+    def _save_theme_settings(self, theme_name: str) -> None:
+        """Сохраняет выбранную тему через общий DTO настроек."""
+
+        self._emit_settings_save(replace(self._settings_state, theme_name=theme_name))
+
+    def _save_sound_settings(
+        self,
+        enabled: bool,
+        volume: float,
+        ok_file: str,
+        warning_file: str,
+        error_file: str,
+        victory_file: str,
+    ) -> None:
+        """Сохраняет выбранные звуки через общий DTO настроек."""
+
+        self._emit_settings_save(
+            replace(
+                self._settings_state,
+                sound_enabled=enabled,
+                sound_volume=volume,
+                sound_ok_file=ok_file,
+                sound_warning_file=warning_file,
+                sound_error_file=error_file,
+                sound_victory_file=victory_file,
             )
         )
 
-    @staticmethod
-    def _apply_sound_combo(combo: QComboBox, files: list[str], selected_file: str) -> None:
-        """Заполняет combo доступными файлами звуков."""
+    def _emit_settings_save(self, state: SettingsUiState) -> None:
+        """Преобразует UI-state в форму сохранения настроек."""
 
-        combo.blockSignals(True)
-        combo.clear()
-        combo.addItems(files)
-        index = combo.findText(selected_file)
-        if index >= 0:
-            combo.setCurrentIndex(index)
-        combo.blockSignals(False)
+        self.settings_save_requested.emit(
+            SettingsFormData(
+                api_base_url=state.api_base_url,
+                device_id=state.device_id,
+                theme_name=state.theme_name,
+                sound_enabled=state.sound_enabled,
+                sound_volume=state.sound_volume,
+                sound_ok_file=state.sound_ok_file,
+                sound_warning_file=state.sound_warning_file,
+                sound_error_file=state.sound_error_file,
+                sound_victory_file=state.sound_victory_file,
+            )
+        )

@@ -162,6 +162,9 @@ class AppWindow(QMainWindow):
         self._main_screen.settings_screen.settings_save_requested.connect(
             self._settings_controller.save_form
         )
+        self._main_screen.settings_screen.sound_preview_requested.connect(
+            self._settings_controller.preview_sound_file
+        )
         self._main_screen.settings_screen.printer_refresh_requested.connect(
             self._printer_controller.refresh
         )

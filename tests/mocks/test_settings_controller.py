@@ -132,3 +132,35 @@ def test_settings_controller_saves_scanner_values(tmp_path) -> None:  # type: ig
     loaded = store.load(AppConfig())
     assert loaded.scanner_port == "COM9"
     assert loaded.scanner_baudrate == 115200
+
+
+def test_settings_controller_previews_sound_file(  # type: ignore[no-untyped-def]
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Проверяет прослушивание выбранного звука."""
+
+    controller, _store = _controller(tmp_path)
+    played: list[str] = []
+    states: list[SettingsUiState] = []
+    controller.state_changed.connect(states.append)
+    monkeypatch.setattr(controller._sound_service, "preview_file", played.append)  # noqa: SLF001
+
+    controller.preview_sound_file("ok_02.mp3")
+
+    assert played == ["ok_02.mp3"]
+    assert states[-1].status_message == "Прослушивание: ok_02.mp3"
+
+
+def test_settings_controller_rejects_missing_sound_file(  # type: ignore[no-untyped-def]
+    tmp_path,
+) -> None:
+    """Проверяет ошибку прослушивания неизвестного файла."""
+
+    controller, _store = _controller(tmp_path)
+    states: list[SettingsUiState] = []
+    controller.state_changed.connect(states.append)
+
+    controller.preview_sound_file("missing.mp3")
+
+    assert states[-1].error_message == "Файл звука не найден"

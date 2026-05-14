@@ -30,6 +30,7 @@ class SoundService:
         """Создает кеш звуковых эффектов."""
 
         self._effects: dict[SoundEvent, QSoundEffect] = {}
+        self._preview_effects: dict[str, QSoundEffect] = {}
         self._enabled = enabled
         self._volume = max(0.0, min(volume, 1.0))
         self._sound_files = {event: event.value for event in SoundEvent}
@@ -47,6 +48,8 @@ class SoundService:
         self._volume = max(0.0, min(volume, 1.0))
         for effect in self._effects.values():
             effect.setVolume(self._volume)
+        for effect in self._preview_effects.values():
+            effect.setVolume(self._volume)
 
     def set_sound_file(self, event: SoundEvent, filename: str) -> None:
         """Меняет файл звука для события и сбрасывает кеш эффекта."""
@@ -59,10 +62,15 @@ class SoundService:
 
         if not self._enabled:
             return
-        effect = self._effects.get(event)
+        self._effect_for_event(event).play()
+
+    def preview_file(self, filename: str) -> None:
+        """Проигрывает выбранный файл звука независимо от общей настройки."""
+
+        effect = self._preview_effects.get(filename)
         if effect is None:
-            effect = self._create_effect(self._sound_files[event], volume=self._volume)
-            self._effects[event] = effect
+            effect = self._create_effect(filename, volume=self._volume)
+            self._preview_effects[filename] = effect
         effect.play()
 
     @staticmethod
@@ -74,6 +82,15 @@ class SoundService:
             for path in files("chestniy_znak_desktop.resources.sounds").iterdir()
             if path.name.endswith(".mp3")
         )
+
+    def _effect_for_event(self, event: SoundEvent) -> QSoundEffect:
+        """Возвращает кешированный эффект для события."""
+
+        effect = self._effects.get(event)
+        if effect is None:
+            effect = self._create_effect(self._sound_files[event], volume=self._volume)
+            self._effects[event] = effect
+        return effect
 
     @staticmethod
     def _create_effect(filename: str, volume: float) -> QSoundEffect:

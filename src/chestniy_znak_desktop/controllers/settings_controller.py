@@ -117,6 +117,15 @@ class SettingsController(QObject):
         self._settings = replace(self._settings, scanner_baudrate=baudrate)
         self._save("Скорость сканера сохранена")
 
+    def preview_sound_file(self, filename: str) -> None:
+        """Проигрывает выбранный звук из настроек."""
+
+        if filename not in SoundService.available_sound_files():
+            self._emit_state(error_message="Файл звука не найден")
+            return
+        self._sound_service.preview_file(filename)
+        self._emit_state(status_message=f"Прослушивание: {filename}")
+
     def _apply_live_settings(self) -> None:
         """Применяет настройки, которые можно изменить без пересоздания API."""
 
