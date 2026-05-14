@@ -68,7 +68,6 @@ class AppWindow(QMainWindow):
         self._auth_controller.state_changed.connect(self._login_screen.apply_state)
         self._auth_controller.authenticated.connect(lambda _user: self.show_main_screen())
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
-        self._login_screen.token_submitted.connect(self._auth_controller.login_with_raw_token)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
@@ -184,6 +183,9 @@ class AppWindow(QMainWindow):
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
+        if self._stack.currentWidget() is self._login_screen:
+            self._auth_controller.login_with_raw_token(code)
+            return
         if self._scan_target == "defect":
             self._defect_controller.on_code_scanned(code)
             return
