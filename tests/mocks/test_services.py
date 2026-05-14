@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
 from chestniy_znak_desktop.api.services.printer_service import PrinterService
@@ -81,6 +82,24 @@ class FakeApiClient:
                 "print_ok": True,
                 "print_error": "",
             }
+        if url.endswith("box-edit/1/open"):
+            return {"ok": True, "reason_code": "edit_opened", "box": _box_payload()}
+        if url.endswith("box-edit/1/close"):
+            return {"ok": True, "reason_code": "edit_closed", "box": _box_payload()}
+        if url.endswith("box-edit/1/items/remove"):
+            return {
+                "ok": True,
+                "reason_code": "item_removed",
+                "box": _box_payload(),
+                "removed": 1,
+            }
+        if url.endswith("box-edit/1/clear"):
+            return {
+                "ok": True,
+                "reason_code": "box_cleared",
+                "box": _box_payload(),
+                "removed": 2,
+            }
         if url.endswith("printer-selection"):
             return {
                 "ok": True,
@@ -102,6 +121,17 @@ class FakeApiClient:
 
         self.last_call = ("PATCH", url, {"json": json})
         return {"ok": True, "reason_code": "updated", "box": _box_payload()}
+
+    def delete(self, url: str) -> dict[str, Any]:
+        """Возвращает payload для DELETE-сценария."""
+
+        self.last_call = ("DELETE", url, {})
+        return {
+            "ok": True,
+            "reason_code": "empty_box_deleted",
+            "box": _box_payload(),
+            "removed": 1,
+        }
 
 
 def _box_payload() -> dict[str, Any]:
@@ -196,3 +226,39 @@ def test_printer_service_print_box_label() -> None:
         "chestniy-znak/packing/printer/boxes/1/print",
         {"json": None, "params": {"device_id": "pc-1"}},
     )
+
+
+def test_box_edit_service_open_edit() -> None:
+    """Проверяет открытие режима редактирования коробки."""
+
+    client = FakeApiClient()
+    result = BoxEditService(client).open_edit(box_id=1, reason="fix")
+    assert result.ok is True
+    assert result.reason_code == "edit_opened"
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/packing/box-edit/1/open",
+        {"json": {"reason": "fix"}, "params": None},
+    )
+
+
+def test_box_edit_service_remove_item() -> None:
+    """Проверяет удаление кода из коробки."""
+
+    client = FakeApiClient()
+    result = BoxEditService(client).remove_item(box_id=1, item_id=10)
+    assert result.removed == 1
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/packing/box-edit/1/items/remove",
+        {"json": {"item_id": 10}, "params": None},
+    )
+
+
+def test_box_edit_service_delete_empty_box() -> None:
+    """Проверяет удаление пустой коробки."""
+
+    client = FakeApiClient()
+    result = BoxEditService(client).delete_empty_box(box_id=1)
+    assert result.reason_code == "empty_box_deleted"
+    assert client.last_call == ("DELETE", "chestniy-znak/packing/box-edit/1/empty", {})

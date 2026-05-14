@@ -90,4 +90,5 @@ class BoxActionResultDto(BaseModel):
     reason_code: str
     error: str | None = None
     box: BoxDetailDto | BoxDto
+    boxes: list[BoxDto] = Field(default_factory=list)
     removed: int | None = None

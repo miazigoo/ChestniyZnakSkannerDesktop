@@ -6,6 +6,7 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
@@ -28,6 +29,7 @@ class AppWindow(QMainWindow):
         auth_controller: AuthController,
         packing_controller: PackingController,
         boxes_controller: BoxesController,
+        box_edit_controller: BoxEditController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
     ) -> None:
@@ -39,6 +41,7 @@ class AppWindow(QMainWindow):
         self._auth_controller = auth_controller
         self._packing_controller = packing_controller
         self._boxes_controller = boxes_controller
+        self._box_edit_controller = box_edit_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
         self._central = QWidget()
@@ -65,6 +68,13 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._boxes_controller.state_changed.connect(self._main_screen.boxes_screen.apply_state)
+        self._box_edit_controller.state_changed.connect(
+            self._main_screen.boxes_screen.apply_edit_state
+        )
+        self._box_edit_controller.box_changed.connect(self._boxes_controller.load_detail)
+        self._box_edit_controller.box_deleted.connect(
+            lambda _box_id: self._boxes_controller.refresh()
+        )
         self._main_screen.boxes_screen.refresh_requested.connect(self._boxes_controller.refresh)
         self._main_screen.boxes_screen.search_requested.connect(self._boxes_controller.set_query)
         self._main_screen.boxes_screen.status_filter_changed.connect(
@@ -79,6 +89,21 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.boxes_screen.print_label_requested.connect(
             self._boxes_controller.print_selected_label
+        )
+        self._main_screen.boxes_screen.edit_open_requested.connect(
+            self._box_edit_controller.open_edit
+        )
+        self._main_screen.boxes_screen.edit_close_requested.connect(
+            self._box_edit_controller.close_edit
+        )
+        self._main_screen.boxes_screen.remove_item_requested.connect(
+            self._box_edit_controller.remove_item
+        )
+        self._main_screen.boxes_screen.clear_box_requested.connect(
+            self._box_edit_controller.clear_box
+        )
+        self._main_screen.boxes_screen.delete_empty_box_requested.connect(
+            self._box_edit_controller.delete_empty_box
         )
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box

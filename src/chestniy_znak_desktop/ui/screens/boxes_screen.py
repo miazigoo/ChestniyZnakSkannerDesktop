@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditUiState
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesUiState
 
 
@@ -28,6 +29,11 @@ class BoxesScreen(QWidget):
     previous_page_requested = Signal()
     box_detail_requested = Signal(int)
     print_label_requested = Signal(int)
+    edit_open_requested = Signal(int)
+    edit_close_requested = Signal(int)
+    remove_item_requested = Signal(int, int)
+    clear_box_requested = Signal(int)
+    delete_empty_box_requested = Signal(int)
 
     def __init__(self) -> None:
         """Создает базовый экран списка коробок."""
@@ -57,6 +63,16 @@ class BoxesScreen(QWidget):
         self._detail_button.clicked.connect(self._emit_selected_box_detail)
         self._print_label_button = QPushButton("Печать этикетки")
         self._print_label_button.clicked.connect(self._emit_print_label)
+        self._edit_open_button = QPushButton("Открыть редактирование")
+        self._edit_open_button.clicked.connect(self._emit_edit_open)
+        self._edit_close_button = QPushButton("Закрыть редактирование")
+        self._edit_close_button.clicked.connect(self._emit_edit_close)
+        self._remove_item_button = QPushButton("Удалить код")
+        self._remove_item_button.clicked.connect(self._emit_remove_item)
+        self._clear_box_button = QPushButton("Очистить коробку")
+        self._clear_box_button.clicked.connect(self._emit_clear_box)
+        self._delete_empty_button = QPushButton("Удалить пустую")
+        self._delete_empty_button.clicked.connect(self._emit_delete_empty)
         self._table = QTableWidget(0, 7)
         self._table.setHorizontalHeaderLabels(
             ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
@@ -65,6 +81,9 @@ class BoxesScreen(QWidget):
         self._detail_title = QLabel("Детали коробки")
         self._detail_status = QLabel("Выберите коробку для просмотра состава")
         self._detail_error = QLabel("")
+        self._edit_status = QLabel("Редактирование не запущено")
+        self._edit_error = QLabel("")
+        self._detail_loaded = False
         self._detail_summary = QLabel("Коробка: -")
         self._detail_items_table = QTableWidget(0, 4)
         self._detail_items_table.setHorizontalHeaderLabels(["ID", "GTIN", "Serial", "Код"])
@@ -83,6 +102,14 @@ class BoxesScreen(QWidget):
         pagination.addWidget(self._print_label_button)
         pagination.addStretch(1)
 
+        edit_actions = QHBoxLayout()
+        edit_actions.addWidget(self._edit_open_button)
+        edit_actions.addWidget(self._edit_close_button)
+        edit_actions.addWidget(self._remove_item_button)
+        edit_actions.addWidget(self._clear_box_button)
+        edit_actions.addWidget(self._delete_empty_button)
+        edit_actions.addStretch(1)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self._title)
         layout.addWidget(self._status_label)
@@ -93,7 +120,10 @@ class BoxesScreen(QWidget):
         layout.addWidget(self._detail_title)
         layout.addWidget(self._detail_status)
         layout.addWidget(self._detail_error)
+        layout.addWidget(self._edit_status)
+        layout.addWidget(self._edit_error)
         layout.addWidget(self._detail_summary)
+        layout.addLayout(edit_actions)
         layout.addWidget(self._detail_items_table)
 
     def apply_state(self, state: BoxesUiState) -> None:
@@ -107,6 +137,7 @@ class BoxesScreen(QWidget):
         self._next_button.setEnabled(not state.is_busy and state.has_more)
         self._detail_button.setEnabled(not state.is_detail_busy and bool(state.rows))
         self._print_label_button.setEnabled(not state.is_action_busy and state.detail is not None)
+        self._set_edit_buttons_enabled(state.detail is not None)
         self._table.setRowCount(len(state.rows))
         for row_index, row in enumerate(state.rows):
             values = [
@@ -123,6 +154,13 @@ class BoxesScreen(QWidget):
         if state.rows and self._table.currentRow() < 0:
             self._table.setCurrentCell(0, 0)
         self._apply_detail(state)
+
+    def apply_edit_state(self, state: BoxEditUiState) -> None:
+        """Обновляет статус действий редактирования коробки."""
+
+        self._edit_status.setText(state.status_message)
+        self._edit_error.setText(state.error_message)
+        self._set_edit_buttons_enabled(not state.is_busy and self._detail_loaded)
 
     def _set_busy(self, is_busy: bool) -> None:
         """Включает или отключает элементы управления на время загрузки."""
@@ -161,10 +199,45 @@ class BoxesScreen(QWidget):
     def _emit_print_label(self) -> None:
         """Публикует запрос повторной печати этикетки выбранной коробки."""
 
-        row = self._table.currentRow()
-        item = self._table.item(row, 0) if row >= 0 else None
-        if item is not None:
-            self.print_label_requested.emit(int(item.text()))
+        box_id = self._selected_box_id()
+        if box_id is not None:
+            self.print_label_requested.emit(box_id)
+
+    def _emit_edit_open(self) -> None:
+        """Публикует запрос открытия режима редактирования."""
+
+        box_id = self._selected_box_id()
+        if box_id is not None:
+            self.edit_open_requested.emit(box_id)
+
+    def _emit_edit_close(self) -> None:
+        """Публикует запрос закрытия режима редактирования."""
+
+        box_id = self._selected_box_id()
+        if box_id is not None:
+            self.edit_close_requested.emit(box_id)
+
+    def _emit_remove_item(self) -> None:
+        """Публикует запрос удаления выбранного кода из коробки."""
+
+        box_id = self._selected_box_id()
+        item_id = self._selected_item_id()
+        if box_id is not None and item_id is not None:
+            self.remove_item_requested.emit(box_id, item_id)
+
+    def _emit_clear_box(self) -> None:
+        """Публикует запрос очистки выбранной коробки."""
+
+        box_id = self._selected_box_id()
+        if box_id is not None:
+            self.clear_box_requested.emit(box_id)
+
+    def _emit_delete_empty(self) -> None:
+        """Публикует запрос удаления пустой коробки."""
+
+        box_id = self._selected_box_id()
+        if box_id is not None:
+            self.delete_empty_box_requested.emit(box_id)
 
     def _apply_detail(self, state: BoxesUiState) -> None:
         """Обновляет панель деталей выбранной коробки."""
@@ -172,9 +245,11 @@ class BoxesScreen(QWidget):
         self._detail_status.setText(state.detail_status_message)
         self._detail_error.setText(state.detail_error_message)
         if state.detail is None:
+            self._detail_loaded = False
             self._detail_summary.setText("Коробка: -")
             self._detail_items_table.setRowCount(0)
             return
+        self._detail_loaded = True
         detail = state.detail
         self._detail_summary.setText(
             (
@@ -193,3 +268,26 @@ class BoxesScreen(QWidget):
                     column_index,
                     QTableWidgetItem(value),
                 )
+
+    def _selected_box_id(self) -> int | None:
+        """Возвращает ID выбранной коробки из таблицы."""
+
+        row = self._table.currentRow()
+        item = self._table.item(row, 0) if row >= 0 else None
+        return int(item.text()) if item is not None else None
+
+    def _selected_item_id(self) -> int | None:
+        """Возвращает ID выбранного кода из таблицы деталей."""
+
+        row = self._detail_items_table.currentRow()
+        item = self._detail_items_table.item(row, 0) if row >= 0 else None
+        return int(item.text()) if item is not None else None
+
+    def _set_edit_buttons_enabled(self, enabled: bool) -> None:
+        """Включает или отключает кнопки редактирования."""
+
+        self._edit_open_button.setEnabled(enabled)
+        self._edit_close_button.setEnabled(enabled)
+        self._remove_item_button.setEnabled(enabled)
+        self._clear_box_button.setEnabled(enabled)
+        self._delete_empty_button.setEnabled(enabled)
