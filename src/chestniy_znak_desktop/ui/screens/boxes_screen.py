@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -222,21 +223,34 @@ class BoxesScreen(QWidget):
 
         box_id = self._selected_box_id()
         item_id = self._selected_item_id()
-        if box_id is not None and item_id is not None:
+        if (
+            box_id is not None
+            and item_id is not None
+            and self._confirm(
+                title="Удалить код",
+                text=f"Удалить код #{item_id} из коробки #{box_id}?",
+            )
+        ):
             self.remove_item_requested.emit(box_id, item_id)
 
     def _emit_clear_box(self) -> None:
         """Публикует запрос очистки выбранной коробки."""
 
         box_id = self._selected_box_id()
-        if box_id is not None:
+        if box_id is not None and self._confirm(
+            title="Очистить коробку",
+            text=f"Удалить все коды из коробки #{box_id}?",
+        ):
             self.clear_box_requested.emit(box_id)
 
     def _emit_delete_empty(self) -> None:
         """Публикует запрос удаления пустой коробки."""
 
         box_id = self._selected_box_id()
-        if box_id is not None:
+        if box_id is not None and self._confirm(
+            title="Удалить пустую коробку",
+            text=f"Удалить пустую коробку #{box_id}?",
+        ):
             self.delete_empty_box_requested.emit(box_id)
 
     def _apply_detail(self, state: BoxesUiState) -> None:
@@ -291,3 +305,15 @@ class BoxesScreen(QWidget):
         self._remove_item_button.setEnabled(enabled)
         self._clear_box_button.setEnabled(enabled)
         self._delete_empty_button.setEnabled(enabled)
+
+    def _confirm(self, title: str, text: str) -> bool:
+        """Запрашивает подтверждение опасного действия."""
+
+        answer = QMessageBox.question(
+            self,
+            title,
+            text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes

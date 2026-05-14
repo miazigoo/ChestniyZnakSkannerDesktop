@@ -8,7 +8,8 @@ from typing import cast
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+import pytest  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     ConnectionState,
@@ -20,6 +21,7 @@ from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     SessionStatus,
 )
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
 
@@ -87,3 +89,17 @@ def test_blocking_overlay_changes_visibility() -> None:
     assert overlay.isVisible() is True
     overlay.set_blocking(False, "")
     assert overlay.isVisible() is False
+
+
+def test_boxes_screen_confirm_accepts_yes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет подтверждение опасного действия в экране коробок."""
+
+    qapp()
+    screen = BoxesScreen()
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
+    )
+
+    assert screen._confirm("Удалить", "Подтвердите") is True  # noqa: SLF001
