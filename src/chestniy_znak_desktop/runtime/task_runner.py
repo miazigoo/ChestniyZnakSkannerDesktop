@@ -7,6 +7,8 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 
+from chestniy_znak_desktop.api.errors import UnauthorizedError
+
 
 class TaskRunner(Protocol):
     """Контракт запуска фоновой задачи."""
@@ -69,3 +71,43 @@ class QtTaskRunner:
         worker.signals.succeeded.connect(on_success)
         worker.signals.failed.connect(on_error)
         self._thread_pool.start(worker)
+
+
+class UnauthorizedAwareTaskRunner:
+    """Перехватывает истекшую API-сессию для всех фоновых API-задач."""
+
+    def __init__(
+        self,
+        base_runner: TaskRunner,
+        on_unauthorized: Callable[[UnauthorizedError], None],
+    ) -> None:
+        """Создает обертку над базовым runner и callback истекшей сессии."""
+
+        self._base_runner = base_runner
+        self._on_unauthorized = on_unauthorized
+
+    def submit(
+        self,
+        task: Callable[[], object],
+        on_success: Callable[[object], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Запускает задачу и централизованно обрабатывает `UnauthorizedError`."""
+
+        self._base_runner.submit(
+            task,
+            on_success,
+            lambda exc: self._handle_error(exc, on_error),
+        )
+
+    def _handle_error(
+        self,
+        exc: Exception,
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Обрабатывает ошибку задачи и делегирует ее контроллеру."""
+
+        if isinstance(exc, UnauthorizedError):
+            self._on_unauthorized(exc)
+            return
+        on_error(exc)

@@ -120,3 +120,19 @@ def test_auth_controller_logout_clears_session() -> None:
     controller.logout()
 
     assert runtime.snapshot.session.status == SessionStatus.UNAUTHENTICATED
+
+
+def test_auth_controller_handles_expired_session() -> None:
+    """Проверяет сброс UI и runtime после истечения сессии."""
+
+    controller, runtime, _service = _controller_pair()
+    controller.login_with_raw_token("abc")
+    unauthenticated_events: list[bool] = []
+    controller.unauthenticated.connect(lambda: unauthenticated_events.append(True))
+
+    controller.handle_session_expired("Сессия истекла")
+
+    assert runtime.snapshot.session.status == SessionStatus.UNAUTHENTICATED
+    assert controller.state.status_message == "Сессия истекла. Войдите снова."
+    assert controller.state.error_message == "Сессия истекла"
+    assert unauthenticated_events == [True]

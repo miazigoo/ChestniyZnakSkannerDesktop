@@ -118,6 +118,18 @@ class AuthController(QObject):
             self._on_logout_failed,
         )
 
+    def handle_session_expired(self, message: str) -> None:
+        """Сбрасывает UI и runtime после истечения backend-сессии."""
+
+        self._runtime_controller.clear_session()
+        self._set_state(
+            AuthUiState(
+                status_message="Сессия истекла. Войдите снова.",
+                error_message=message,
+            )
+        )
+        self.unauthenticated.emit()
+
     def _on_session_restored(self, result: object) -> None:
         """Обрабатывает успешную проверку сохраненной сессии."""
 

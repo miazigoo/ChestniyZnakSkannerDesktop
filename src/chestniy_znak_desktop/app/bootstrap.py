@@ -19,7 +19,7 @@ from chestniy_znak_desktop.controllers.settings_controller import SettingsContro
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
-from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner
+from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundService
 from chestniy_znak_desktop.ui.app_window import AppWindow
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
@@ -59,9 +59,17 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         runtime_controller=runtime_controller,
         task_runner=task_runner,
     )
+    api_task_runner = UnauthorizedAwareTaskRunner(
+        base_runner=task_runner,
+        on_unauthorized=lambda exc: _handle_unauthorized_api_error(
+            api_client,
+            auth_controller,
+            exc,
+        ),
+    )
     packing_controller = PackingController(
         packing_service=PackingService(api_client),
-        task_runner=task_runner,
+        task_runner=api_task_runner,
         device_id=settings.device_id,
         sound_service=sound_service,
     )
@@ -94,3 +102,14 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     settings_controller.publish_state()
     auth_controller.restore_session()
     return window
+
+
+def _handle_unauthorized_api_error(
+    api_client: ApiClient,
+    auth_controller: AuthController,
+    exc: Exception,
+) -> None:
+    """Очищает cookies и переводит приложение на экран авторизации."""
+
+    api_client.clear_cookies()
+    auth_controller.handle_session_expired(str(exc))
