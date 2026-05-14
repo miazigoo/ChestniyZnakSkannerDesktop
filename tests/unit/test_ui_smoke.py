@@ -23,6 +23,12 @@ from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     SessionStatus,
 )
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState  # noqa: E402
+from chestniy_znak_desktop.controllers.boxes_controller import (  # noqa: E402
+    BoxDetailItemUi,
+    BoxDetailUi,
+    BoxRowUi,
+    BoxesUiState,
+)
 from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingBoxUi,
     PackingItemUi,
@@ -81,6 +87,55 @@ def test_boxes_screen_has_backend_status_filters() -> None:
     ]
 
     assert values == ["all", "active", "open", "edit", "closed", "empty"]
+
+
+def test_boxes_screen_shows_rows_and_detail_panel() -> None:
+    """Проверяет современный экран списка и деталей коробок."""
+
+    qapp()
+    screen = BoxesScreen()
+    screen.apply_state(
+        BoxesUiState(
+            total=1,
+            rows=[
+                BoxRowUi(
+                    box_id=77,
+                    order_name="Заказ 77",
+                    sscc="046012345678901234",
+                    filled="2 / 10",
+                    status="Открыта",
+                    operator="Operator",
+                    print_status="Напечатано",
+                )
+            ],
+            selected_box_id=77,
+            detail=BoxDetailUi(
+                box_id=77,
+                order_name="Заказ 77",
+                sscc="046012345678901234",
+                filled=2,
+                capacity=10,
+                status="Открыта",
+                count_in_packing="Да",
+                operator="Operator",
+                print_status="Напечатано",
+                items=[
+                    BoxDetailItemUi(
+                        id=501,
+                        gtin="04601234567890",
+                        serial="SERIAL77",
+                        visible_code="04601234567890SERIAL77",
+                    )
+                ],
+            ),
+            status_message="Коробки загружены",
+            detail_status_message="Коробка #77 загружена",
+        )
+    )
+
+    assert screen._table.rowCount() == 1  # noqa: SLF001
+    assert screen._detail_items_table.rowCount() == 1  # noqa: SLF001
+    assert screen._print_label_button.isEnabled() is True  # noqa: SLF001
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:

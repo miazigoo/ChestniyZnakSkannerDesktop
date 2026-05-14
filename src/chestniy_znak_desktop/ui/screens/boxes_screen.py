@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
+    QFrame,
+    QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -18,6 +24,8 @@ from PySide6.QtWidgets import (
 
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditUiState
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesUiState
+from chestniy_znak_desktop.ui.widgets.box_detail_panel import BoxDetailPanel
+from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
 class BoxesScreen(QWidget):
@@ -37,104 +45,44 @@ class BoxesScreen(QWidget):
     delete_empty_box_requested = Signal(int)
 
     def __init__(self) -> None:
-        """Создает базовый экран списка коробок."""
+        """Создает рабочий экран списка и деталей коробок."""
 
         super().__init__()
-        self._title = QLabel("Список коробок")
+        self.setObjectName("boxesScreen")
+        self._detail_loaded = False
+        self._title = QLabel("Коробки")
         self._status_label = QLabel("Загрузите список коробок")
         self._error_label = QLabel("")
         self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("Поиск по SSCC, заказу или ID")
-        self._search_input.returnPressed.connect(self._emit_search)
-        self._status_filter = QComboBox()
-        self._status_filter.addItem("Все", "all")
-        self._status_filter.addItem("Активные", "active")
-        self._status_filter.addItem("Открытые", "open")
-        self._status_filter.addItem("На редактировании", "edit")
-        self._status_filter.addItem("Закрытые", "closed")
-        self._status_filter.addItem("Пустые", "empty")
-        self._status_filter.currentIndexChanged.connect(self._emit_status_filter)
+        self._status_filter = self._create_status_filter()
         self._search_button = QPushButton("Найти")
-        self._search_button.clicked.connect(self._emit_search)
         self._refresh_button = QPushButton("Обновить")
-        self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._previous_button = QPushButton("Назад")
-        self._previous_button.clicked.connect(self.previous_page_requested.emit)
         self._next_button = QPushButton("Дальше")
-        self._next_button.clicked.connect(self.next_page_requested.emit)
         self._page_label = QLabel("0 / 0")
         self._detail_button = QPushButton("Открыть детали")
-        self._detail_button.clicked.connect(self._emit_selected_box_detail)
         self._print_label_button = QPushButton("Печать этикетки")
-        self._print_label_button.clicked.connect(self._emit_print_label)
         self._edit_open_button = QPushButton("Открыть редактирование")
-        self._edit_open_button.clicked.connect(self._emit_edit_open)
         self._edit_close_button = QPushButton("Закрыть редактирование")
-        self._edit_close_button.clicked.connect(self._emit_edit_close)
         self._remove_item_button = QPushButton("Удалить код")
-        self._remove_item_button.clicked.connect(self._emit_remove_item)
         self._clear_box_button = QPushButton("Очистить коробку")
-        self._clear_box_button.clicked.connect(self._emit_clear_box)
         self._delete_empty_button = QPushButton("Удалить пустую")
-        self._delete_empty_button.clicked.connect(self._emit_delete_empty)
-        self._table = QTableWidget(0, 7)
-        self._table.setHorizontalHeaderLabels(
-            ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
-        )
-        self._table.cellDoubleClicked.connect(self._emit_row_detail)
-        self._detail_title = QLabel("Детали коробки")
-        self._detail_status = QLabel("Выберите коробку для просмотра состава")
-        self._detail_error = QLabel("")
-        self._edit_status = QLabel("Редактирование не запущено")
-        self._edit_error = QLabel("")
-        self._detail_loaded = False
-        self._detail_summary = QLabel("Коробка: -")
-        self._detail_items_table = QTableWidget(0, 4)
-        self._detail_items_table.setHorizontalHeaderLabels(["ID", "GTIN", "Serial", "Код"])
+        self._table = self._create_boxes_table()
+        self._detail_panel = BoxDetailPanel()
+        self._detail_items_table = self._create_detail_items_table()
 
-        filters = QHBoxLayout()
-        filters.addWidget(self._status_filter)
-        filters.addWidget(self._search_input, stretch=1)
-        filters.addWidget(self._search_button)
-        filters.addWidget(self._refresh_button)
-
-        pagination = QHBoxLayout()
-        pagination.addWidget(self._previous_button)
-        pagination.addWidget(self._page_label)
-        pagination.addWidget(self._next_button)
-        pagination.addWidget(self._detail_button)
-        pagination.addWidget(self._print_label_button)
-        pagination.addStretch(1)
-
-        edit_actions = QHBoxLayout()
-        edit_actions.addWidget(self._edit_open_button)
-        edit_actions.addWidget(self._edit_close_button)
-        edit_actions.addWidget(self._remove_item_button)
-        edit_actions.addWidget(self._clear_box_button)
-        edit_actions.addWidget(self._delete_empty_button)
-        edit_actions.addStretch(1)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._title)
-        layout.addWidget(self._status_label)
-        layout.addWidget(self._error_label)
-        layout.addLayout(filters)
-        layout.addWidget(self._table)
-        layout.addLayout(pagination)
-        layout.addWidget(self._detail_title)
-        layout.addWidget(self._detail_status)
-        layout.addWidget(self._detail_error)
-        layout.addWidget(self._edit_status)
-        layout.addWidget(self._edit_error)
-        layout.addWidget(self._detail_summary)
-        layout.addLayout(edit_actions)
-        layout.addWidget(self._detail_items_table)
+        self._configure_controls()
+        self._build_layout()
+        self._apply_styles()
+        self._set_edit_buttons_enabled(False)
 
     def apply_state(self, state: BoxesUiState) -> None:
         """Обновляет таблицу и элементы управления из состояния контроллера."""
 
+        self._sync_filter_controls(state)
         self._status_label.setText(state.status_message)
         self._error_label.setText(state.error_message)
+        self._error_label.setVisible(bool(state.error_message))
         self._page_label.setText(state.page_title)
         self._set_busy(state.is_busy)
         self._previous_button.setEnabled(not state.is_busy and state.has_previous)
@@ -142,6 +90,268 @@ class BoxesScreen(QWidget):
         self._detail_button.setEnabled(not state.is_detail_busy and bool(state.rows))
         self._print_label_button.setEnabled(not state.is_action_busy and state.detail is not None)
         self._set_edit_buttons_enabled(state.detail is not None)
+        self._fill_boxes_table(state)
+        self._select_state_row(state)
+        self._apply_detail(state)
+
+    def apply_edit_state(self, state: BoxEditUiState) -> None:
+        """Обновляет статус действий редактирования коробки."""
+
+        self._detail_panel.set_edit_status(state.status_message, state.error_message)
+        self._set_edit_buttons_enabled(not state.is_busy and self._detail_loaded)
+
+    def _create_status_filter(self) -> QComboBox:
+        """Создает фильтр статуса коробок."""
+
+        status_filter = QComboBox()
+        status_filter.addItem("Все", "all")
+        status_filter.addItem("Активные", "active")
+        status_filter.addItem("Открытые", "open")
+        status_filter.addItem("На редактировании", "edit")
+        status_filter.addItem("Закрытые", "closed")
+        status_filter.addItem("Пустые", "empty")
+        return status_filter
+
+    def _configure_controls(self) -> None:
+        """Настраивает сигналы и objectName для элементов управления."""
+
+        self._title.setObjectName("boxesHeroTitle")
+        self._status_label.setObjectName("boxesStatusText")
+        self._error_label.setObjectName("boxesErrorText")
+        self._page_label.setObjectName("boxesPageLabel")
+        self._status_filter.setObjectName("boxesCombo")
+        self._search_input.setObjectName("boxesSearchInput")
+        self._search_input.setPlaceholderText("Поиск по SSCC, заказу или ID")
+        self._search_input.returnPressed.connect(self._emit_search)
+        self._status_filter.currentIndexChanged.connect(self._emit_status_filter)
+        self._search_button.setObjectName("boxesPrimaryButton")
+        self._refresh_button.setObjectName("boxesSecondaryButton")
+        self._previous_button.setObjectName("boxesSecondaryButton")
+        self._next_button.setObjectName("boxesSecondaryButton")
+        self._detail_button.setObjectName("boxesPrimaryButton")
+        self._print_label_button.setObjectName("boxesPrimaryButton")
+        self._edit_open_button.setObjectName("boxesSecondaryButton")
+        self._edit_close_button.setObjectName("boxesSecondaryButton")
+        self._remove_item_button.setObjectName("boxesDangerButton")
+        self._clear_box_button.setObjectName("boxesDangerButton")
+        self._delete_empty_button.setObjectName("boxesDangerButton")
+        self._search_button.clicked.connect(self._emit_search)
+        self._refresh_button.clicked.connect(self.refresh_requested.emit)
+        self._previous_button.clicked.connect(self.previous_page_requested.emit)
+        self._next_button.clicked.connect(self.next_page_requested.emit)
+        self._detail_button.clicked.connect(self._emit_selected_box_detail)
+        self._print_label_button.clicked.connect(self._emit_print_label)
+        self._edit_open_button.clicked.connect(self._emit_edit_open)
+        self._edit_close_button.clicked.connect(self._emit_edit_close)
+        self._remove_item_button.clicked.connect(self._emit_remove_item)
+        self._clear_box_button.clicked.connect(self._emit_clear_box)
+        self._delete_empty_button.clicked.connect(self._emit_delete_empty)
+
+    def _build_layout(self) -> None:
+        """Собирает современную раскладку экрана коробок."""
+
+        hero = self._create_hero()
+        filters = self._create_filters_panel()
+        list_panel = self._create_list_panel()
+        detail_column = self._create_detail_column()
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setObjectName("boxesSplitter")
+        splitter.addWidget(list_panel)
+        splitter.addWidget(detail_column)
+        splitter.setSizes([820, 520])
+        splitter.setChildrenCollapsible(False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 8)
+        layout.setSpacing(18)
+        layout.addWidget(hero)
+        layout.addWidget(filters)
+        layout.addWidget(splitter, 1)
+
+    def _create_hero(self) -> QFrame:
+        """Создает верхний блок раздела коробок."""
+
+        hero = QFrame()
+        hero.setObjectName("boxesHero")
+        icon = VectorIcon(VectorIconName.BOX, "#66d2c7")
+        subtitle = QLabel(
+            "Контроль открытых и закрытых коробок, повторная печать и edit-mode операции."
+        )
+        subtitle.setObjectName("boxesHeroSubtitle")
+        subtitle.setWordWrap(True)
+        text = QVBoxLayout()
+        text.addWidget(self._title)
+        text.addWidget(subtitle)
+        status_block = QVBoxLayout()
+        status_block.addWidget(self._status_label)
+        status_block.addWidget(self._error_label)
+
+        layout = QHBoxLayout(hero)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(16)
+        layout.addWidget(icon)
+        layout.addLayout(text, 1)
+        layout.addLayout(status_block, 1)
+        return hero
+
+    def _create_filters_panel(self) -> QFrame:
+        """Создает панель фильтров и поиска списка коробок."""
+
+        panel = QFrame()
+        panel.setObjectName("boxesToolbar")
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(18, 14, 18, 14)
+        layout.setSpacing(12)
+        layout.addWidget(self._status_filter)
+        layout.addWidget(self._search_input, 1)
+        layout.addWidget(self._search_button)
+        layout.addWidget(self._refresh_button)
+        return panel
+
+    def _create_list_panel(self) -> QFrame:
+        """Создает левую панель со списком коробок."""
+
+        panel = QFrame()
+        panel.setObjectName("boxesListPanel")
+        header = QHBoxLayout()
+        title = QLabel("Список коробок")
+        title.setObjectName("boxesPanelTitle")
+        header.addWidget(VectorIcon(VectorIconName.TOKEN, "#f3c969"))
+        header.addWidget(title)
+        header.addStretch(1)
+        header.addWidget(self._previous_button)
+        header.addWidget(self._page_label)
+        header.addWidget(self._next_button)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        actions.addWidget(self._detail_button)
+        actions.addWidget(self._print_label_button)
+        actions.addStretch(1)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 20)
+        layout.setSpacing(14)
+        layout.addLayout(header)
+        layout.addWidget(self._table, 1)
+        layout.addLayout(actions)
+        return panel
+
+    def _create_detail_column(self) -> QFrame:
+        """Создает правую колонку деталей и edit-mode действий."""
+
+        panel = QFrame()
+        panel.setObjectName("boxesSideColumn")
+        actions_panel = self._create_edit_actions_panel()
+        items_panel = self._create_detail_items_panel()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(18)
+        layout.addWidget(self._detail_panel)
+        layout.addWidget(actions_panel)
+        layout.addWidget(items_panel, 1)
+        return panel
+
+    def _create_edit_actions_panel(self) -> QFrame:
+        """Создает панель операций редактирования коробки."""
+
+        panel = QFrame()
+        panel.setObjectName("boxesActionsPanel")
+        title = QLabel("Операции")
+        title.setObjectName("boxesPanelTitle")
+        hint = QLabel("Опасные действия требуют подтверждения")
+        hint.setObjectName("boxesMutedText")
+        hint.setWordWrap(True)
+
+        actions_grid = QGridLayout()
+        actions_grid.setHorizontalSpacing(10)
+        actions_grid.setVerticalSpacing(10)
+        actions_grid.addWidget(self._edit_open_button, 0, 0)
+        actions_grid.addWidget(self._edit_close_button, 0, 1)
+        actions_grid.addWidget(self._remove_item_button, 1, 0)
+        actions_grid.addWidget(self._clear_box_button, 1, 1)
+        actions_grid.addWidget(self._delete_empty_button, 2, 0, 1, 2)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        layout.addWidget(title)
+        layout.addWidget(hint)
+        layout.addLayout(actions_grid)
+        return panel
+
+    def _create_detail_items_panel(self) -> QFrame:
+        """Создает панель состава выбранной коробки."""
+
+        panel = QFrame()
+        panel.setObjectName("boxesItemsPanel")
+        title = QLabel("Состав коробки")
+        title.setObjectName("boxesPanelTitle")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 20)
+        layout.setSpacing(14)
+        layout.addWidget(title)
+        layout.addWidget(self._detail_items_table, 1)
+        return panel
+
+    def _create_boxes_table(self) -> QTableWidget:
+        """Создает таблицу списка коробок."""
+
+        table = QTableWidget(0, 7)
+        table.setObjectName("boxesTable")
+        table.setHorizontalHeaderLabels(
+            ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
+        )
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        table.setColumnWidth(0, 72)
+        table.cellDoubleClicked.connect(self._emit_row_detail)
+        table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        return table
+
+    def _create_detail_items_table(self) -> QTableWidget:
+        """Создает таблицу состава выбранной коробки."""
+
+        table = QTableWidget(0, 4)
+        table.setObjectName("boxesItemsTable")
+        table.setHorizontalHeaderLabels(["ID", "GTIN", "Serial", "Код"])
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        table.setColumnWidth(0, 58)
+        return table
+
+    def _sync_filter_controls(self, state: BoxesUiState) -> None:
+        """Синхронизирует фильтры с состоянием контроллера."""
+
+        self._search_input.blockSignals(True)
+        self._search_input.setText(state.query)
+        self._search_input.blockSignals(False)
+        index = self._status_filter.findData(state.status_filter)
+        if index >= 0 and index != self._status_filter.currentIndex():
+            self._status_filter.blockSignals(True)
+            self._status_filter.setCurrentIndex(index)
+            self._status_filter.blockSignals(False)
+
+    def _fill_boxes_table(self, state: BoxesUiState) -> None:
+        """Заполняет таблицу коробок строками из состояния."""
+
         self._table.setRowCount(len(state.rows))
         for row_index, row in enumerate(state.rows):
             values = [
@@ -154,17 +364,24 @@ class BoxesScreen(QWidget):
                 row.print_status,
             ]
             for column_index, value in enumerate(values):
-                self._table.setItem(row_index, column_index, QTableWidgetItem(value))
-        if state.rows and self._table.currentRow() < 0:
-            self._table.setCurrentCell(0, 0)
-        self._apply_detail(state)
+                cell = QTableWidgetItem(value)
+                if column_index == 0:
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._table.setItem(row_index, column_index, cell)
 
-    def apply_edit_state(self, state: BoxEditUiState) -> None:
-        """Обновляет статус действий редактирования коробки."""
+    def _select_state_row(self, state: BoxesUiState) -> None:
+        """Выбирает строку текущей детальной коробки или первую строку."""
 
-        self._edit_status.setText(state.status_message)
-        self._edit_error.setText(state.error_message)
-        self._set_edit_buttons_enabled(not state.is_busy and self._detail_loaded)
+        if not state.rows:
+            return
+        selected_row = 0
+        if state.selected_box_id is not None:
+            for row_index, row in enumerate(state.rows):
+                if row.box_id == state.selected_box_id:
+                    selected_row = row_index
+                    break
+        if self._table.currentRow() < 0 or state.selected_box_id is not None:
+            self._table.setCurrentCell(selected_row, 0)
 
     def _set_busy(self, is_busy: bool) -> None:
         """Включает или отключает элементы управления на время загрузки."""
@@ -259,32 +476,26 @@ class BoxesScreen(QWidget):
     def _apply_detail(self, state: BoxesUiState) -> None:
         """Обновляет панель деталей выбранной коробки."""
 
-        self._detail_status.setText(state.detail_status_message)
-        self._detail_error.setText(state.detail_error_message)
+        self._detail_panel.set_status(
+            state.detail_status_message,
+            state.detail_error_message,
+        )
         if state.detail is None:
             self._detail_loaded = False
-            self._detail_summary.setText("Коробка: -")
+            self._detail_panel.set_empty()
             self._detail_items_table.setRowCount(0)
             return
         self._detail_loaded = True
         detail = state.detail
-        self._detail_summary.setText(
-            (
-                f"Коробка #{detail.box_id} | Заказ: {detail.order_name} | "
-                f"SSCC: {detail.sscc} | {detail.filled}/{detail.capacity} | "
-                f"{detail.status} | Учитывать: {detail.count_in_packing} | "
-                f"Оператор: {detail.operator} | Печать: {detail.print_status}"
-            )
-        )
+        self._detail_panel.set_detail(detail)
         self._detail_items_table.setRowCount(len(detail.items))
         for row_index, item in enumerate(detail.items):
             values = [str(item.id), item.gtin, item.serial, item.visible_code]
             for column_index, value in enumerate(values):
-                self._detail_items_table.setItem(
-                    row_index,
-                    column_index,
-                    QTableWidgetItem(value),
-                )
+                cell = QTableWidgetItem(value)
+                if column_index == 0:
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._detail_items_table.setItem(row_index, column_index, cell)
 
     def _selected_box_id(self) -> int | None:
         """Возвращает ID выбранной коробки из таблицы."""
@@ -320,3 +531,174 @@ class BoxesScreen(QWidget):
             QMessageBox.StandardButton.No,
         )
         return answer == QMessageBox.StandardButton.Yes
+
+    def _apply_styles(self) -> None:
+        """Применяет локальные стили экрана коробок."""
+
+        self.setStyleSheet("""
+            #boxesScreen {
+                background: transparent;
+            }
+            #boxesHero,
+            #boxesToolbar,
+            #boxesListPanel,
+            #boxesDetailPanel,
+            #boxesActionsPanel,
+            #boxesItemsPanel {
+                background: rgba(16, 24, 40, 222);
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 18px;
+            }
+            #boxesHero {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 rgba(31, 48, 76, 238),
+                    stop: 0.58 rgba(18, 32, 48, 235),
+                    stop: 1 rgba(65, 48, 23, 222)
+                );
+            }
+            #boxesHeroTitle {
+                color: #f8fbff;
+                font-size: 25px;
+                font-weight: 850;
+            }
+            #boxesHeroSubtitle,
+            #boxesMutedText {
+                color: rgba(225, 233, 244, 176);
+                font-size: 13px;
+            }
+            #boxesPanelTitle {
+                color: #f8fbff;
+                font-size: 17px;
+                font-weight: 800;
+            }
+            #boxesStatusText {
+                color: rgba(225, 233, 244, 205);
+                font-size: 13px;
+                font-weight: 700;
+                background: transparent;
+            }
+            #boxesErrorText {
+                color: #ffb4ad;
+                border-radius: 12px;
+                padding: 9px 11px;
+                background: rgba(227, 85, 78, 38);
+                font-weight: 750;
+            }
+            #boxesDetailTitle {
+                color: #f8fbff;
+                font-size: 21px;
+                font-weight: 850;
+                background: transparent;
+            }
+            #boxesMetaTitle {
+                color: rgba(225, 233, 244, 132);
+                font-size: 12px;
+                font-weight: 700;
+                background: transparent;
+            }
+            #boxesMetaValue {
+                color: #f8fbff;
+                font-size: 13px;
+                font-weight: 650;
+                background: transparent;
+            }
+            #boxesProgressValue {
+                color: #f3c969;
+                font-size: 18px;
+                font-weight: 850;
+                background: transparent;
+            }
+            #boxesProgressBar {
+                min-height: 14px;
+                max-height: 14px;
+                border: 0;
+                border-radius: 7px;
+                background: rgba(255, 255, 255, 28);
+            }
+            #boxesProgressBar::chunk {
+                border-radius: 7px;
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #f3c969,
+                    stop: 1 #66d2c7
+                );
+            }
+            #boxesPageLabel {
+                color: #f8fbff;
+                min-width: 96px;
+                qproperty-alignment: AlignCenter;
+                font-weight: 800;
+                background: transparent;
+            }
+            #boxesSearchInput,
+            #boxesCombo {
+                min-height: 38px;
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 28);
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 12px;
+                padding: 0 12px;
+                font-weight: 650;
+            }
+            #boxesSearchInput:focus,
+            #boxesCombo:focus {
+                border: 1px solid rgba(102, 210, 199, 190);
+            }
+            #boxesPrimaryButton,
+            #boxesSecondaryButton,
+            #boxesDangerButton {
+                min-height: 38px;
+                border: 0;
+                border-radius: 12px;
+                padding: 0 14px;
+                font-weight: 800;
+                color: #071212;
+            }
+            #boxesPrimaryButton {
+                background: #66d2c7;
+            }
+            #boxesSecondaryButton {
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 42);
+            }
+            #boxesDangerButton {
+                color: #fff4f2;
+                background: rgba(227, 85, 78, 190);
+            }
+            #boxesPrimaryButton:disabled,
+            #boxesSecondaryButton:disabled,
+            #boxesDangerButton:disabled {
+                color: rgba(225, 233, 244, 92);
+                background: rgba(255, 255, 255, 22);
+            }
+            #boxesTable,
+            #boxesItemsTable {
+                gridline-color: rgba(129, 140, 168, 45);
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 18);
+                alternate-background-color: rgba(255, 255, 255, 26);
+                border: 1px solid rgba(129, 140, 168, 55);
+                border-radius: 14px;
+                selection-background-color: rgba(102, 210, 199, 70);
+                selection-color: #f8fbff;
+            }
+            #boxesTable::item,
+            #boxesItemsTable::item {
+                padding: 8px;
+                border-bottom: 1px solid rgba(129, 140, 168, 28);
+            }
+            QHeaderView::section {
+                color: rgba(248, 251, 255, 210);
+                background: rgba(255, 255, 255, 30);
+                border: 0;
+                border-right: 1px solid rgba(129, 140, 168, 45);
+                padding: 9px 10px;
+                font-weight: 800;
+            }
+            QSplitter::handle {
+                background: rgba(129, 140, 168, 35);
+                width: 6px;
+                border-radius: 3px;
+            }
+            """)
