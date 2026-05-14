@@ -1,0 +1,64 @@
+# Python окружение и кеши
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Тесты, типизация, покрытие
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Сборка и артефакты PyInstaller
+build/
+dist/
+*.spec
+
+# Логи, временные файлы и локальные данные приложения
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+logs/
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Переменные окружения и локальные секреты
+.env
+.env.*
+!.env.example
+*.local
+local_settings.py
+
+# IDE и ОС
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Qt/редакторы
+*.autosave
+*.user
+*.user.*
