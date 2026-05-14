@@ -9,6 +9,8 @@ from typing import cast
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest  # noqa: E402
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtGui import QColor, QPixmap  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
@@ -124,6 +126,22 @@ def test_login_screen_shows_token_preview() -> None:
     )
 
     assert screen is not None
+
+
+def test_login_screen_renders_vector_background() -> None:
+    """Проверяет, что login-экран рисует непустой векторный фон."""
+
+    qapp()
+    screen = LoginScreen()
+    screen.resize(1180, 760)
+    pixmap = QPixmap(screen.size())
+    pixmap.fill(Qt.GlobalColor.transparent)
+
+    screen.render(pixmap)
+    sample = QColor(pixmap.toImage().pixel(20, 20))
+
+    assert sample.alpha() > 0
+    assert sample != QColor(Qt.GlobalColor.transparent)
 
 
 def test_runtime_status_bar_accepts_snapshot() -> None:
