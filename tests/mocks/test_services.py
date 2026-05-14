@@ -66,6 +66,26 @@ class FakeApiClient:
                 "device_name": "Device",
                 "warnings": [],
             }
+        if url.endswith("laser/defect"):
+            return {
+                "ok": True,
+                "reason_code": "defect_marked",
+                "error": None,
+                "verify": {
+                    "status": "OK",
+                    "message": "Код найден",
+                    "code": {
+                        "id": 1,
+                        "gtin": "04601234567890",
+                        "serial": "SERIAL",
+                        "visible_code": "010460123456789021SERIAL",
+                        "order_name": "26-0001",
+                        "device_name": "Device",
+                    },
+                    "warnings": [],
+                },
+                "removed_from_box": {"box_id": 1, "sscc": "SSCC", "filled": 0},
+            }
         if url.endswith("boxes/open"):
             return {
                 "ok": True,
@@ -186,6 +206,21 @@ def test_chestniy_znak_service_verify_exists() -> None:
             },
             "params": None,
         },
+    )
+
+
+def test_chestniy_znak_service_mark_defect() -> None:
+    """Проверяет маппинг сервиса отправки кода в брак."""
+
+    client = FakeApiClient()
+    result = ChestniyZnakService(client).mark_defect("code", "desktop-com-defect")
+    assert result.ok is True
+    assert result.removed_from_box is not None
+    assert result.removed_from_box.box_id == 1
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/laser/defect",
+        {"json": {"code": "code", "scanner_id": "desktop-com-defect"}, "params": None},
     )
 
 

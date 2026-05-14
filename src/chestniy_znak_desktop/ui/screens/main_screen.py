@@ -23,6 +23,7 @@ class MainScreen(QWidget):
     """Содержит рабочую навигацию после авторизации."""
 
     logout_requested = Signal()
+    screen_changed = Signal(str)
 
     def __init__(self) -> None:
         """Создает навигацию и регистрирует рабочие экраны."""
@@ -42,11 +43,11 @@ class MainScreen(QWidget):
 
         nav = QVBoxLayout()
         nav.addWidget(self._session_panel)
-        nav.addWidget(self._nav_button("Упаковка", 0))
-        nav.addWidget(self._nav_button("Коробки", 1))
-        nav.addWidget(self._nav_button("Брак", 2))
+        nav.addWidget(self._nav_button("Упаковка", 0, "packing"))
+        nav.addWidget(self._nav_button("Коробки", 1, "boxes"))
+        nav.addWidget(self._nav_button("Брак", 2, "defect"))
         nav.addStretch(1)
-        nav.addWidget(self._nav_button("Настройки", 3))
+        nav.addWidget(self._nav_button("Настройки", 3, "settings"))
 
         layout = QHBoxLayout(self)
         layout.addLayout(nav)
@@ -65,6 +66,12 @@ class MainScreen(QWidget):
         return self._boxes_screen
 
     @property
+    def defect_screen(self) -> DefectScreen:
+        """Возвращает экран брака для подключения контроллера."""
+
+        return self._defect_screen
+
+    @property
     def settings_screen(self) -> SettingsScreen:
         """Возвращает экран настроек для подключения контроллеров."""
 
@@ -75,9 +82,15 @@ class MainScreen(QWidget):
 
         self._session_panel.apply_snapshot(snapshot)
 
-    def _nav_button(self, title: str, index: int) -> QPushButton:
+    def _nav_button(self, title: str, index: int, screen_name: str) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""
 
         button = QPushButton(title)
-        button.clicked.connect(lambda: self._stack.setCurrentIndex(index))
+        button.clicked.connect(lambda: self._show_screen(index, screen_name))
         return button
+
+    def _show_screen(self, index: int, screen_name: str) -> None:
+        """Переключает рабочий экран и публикует выбранный сценарий."""
+
+        self._stack.setCurrentIndex(index)
+        self.screen_changed.emit(screen_name)

@@ -11,12 +11,14 @@ from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.auth_service import AuthService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
 from chestniy_znak_desktop.api.services.printer_service import PrinterService
+from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.session_store import FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
+from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
@@ -91,6 +93,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         task_runner=api_task_runner,
         sound_service=sound_service,
     )
+    defect_controller = DefectController(
+        defect_service=ChestniyZnakService(api_client),
+        task_runner=api_task_runner,
+        sound_service=sound_service,
+    )
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
         initial_port=settings.scanner_port,
@@ -110,6 +117,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         packing_controller=packing_controller,
         boxes_controller=boxes_controller,
         box_edit_controller=box_edit_controller,
+        defect_controller=defect_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )

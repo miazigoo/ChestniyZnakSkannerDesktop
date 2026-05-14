@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -25,7 +24,6 @@ class PackingScreen(QWidget):
     open_box_requested = Signal()
     close_box_requested = Signal()
     count_in_packing_changed = Signal(bool)
-    manual_code_submitted = Signal(str)
 
     def __init__(self) -> None:
         """Создает базовую раскладку экрана упаковки."""
@@ -46,11 +44,6 @@ class PackingScreen(QWidget):
         self._open_box_button.clicked.connect(self.open_box_requested.emit)
         self._close_box_button = QPushButton("Закрыть коробку")
         self._close_box_button.clicked.connect(self.close_box_requested.emit)
-        self._manual_code_input = QLineEdit()
-        self._manual_code_input.setPlaceholderText("Ручной ввод или тестовый скан")
-        self._manual_code_input.returnPressed.connect(self._submit_manual_code)
-        self._manual_submit_button = QPushButton("Отправить код")
-        self._manual_submit_button.clicked.connect(self._submit_manual_code)
         self._items_table = QTableWidget(0, 3)
         self._items_table.setHorizontalHeaderLabels(["GTIN", "Serial", "Код"])
 
@@ -61,10 +54,6 @@ class PackingScreen(QWidget):
         actions.addStretch(1)
         actions.addWidget(self._count_in_packing)
 
-        manual_input = QHBoxLayout()
-        manual_input.addWidget(self._manual_code_input)
-        manual_input.addWidget(self._manual_submit_button)
-
         layout = QVBoxLayout(self)
         layout.addWidget(self._title_label)
         layout.addWidget(self._status_label)
@@ -73,7 +62,6 @@ class PackingScreen(QWidget):
         layout.addWidget(self._box_label)
         layout.addWidget(self._progress_label)
         layout.addLayout(actions)
-        layout.addLayout(manual_input)
         layout.addWidget(self._items_table)
 
     def apply_state(self, state: PackingUiState) -> None:
@@ -106,14 +94,3 @@ class PackingScreen(QWidget):
         self._refresh_button.setEnabled(not is_busy)
         self._open_box_button.setEnabled(not is_busy)
         self._close_box_button.setEnabled(not is_busy)
-        self._manual_code_input.setEnabled(not is_busy)
-        self._manual_submit_button.setEnabled(not is_busy)
-
-    def _submit_manual_code(self) -> None:
-        """Отправляет ручной код как событие скана."""
-
-        code = self._manual_code_input.text().strip()
-        if not code:
-            return
-        self._manual_code_input.clear()
-        self.manual_code_submitted.emit(code)

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from chestniy_znak_desktop.api.client import ApiClient
 from chestniy_znak_desktop.api.models.stats import CatalogStatsDto
-from chestniy_znak_desktop.api.models.verify import VerifyExistsResponseDto, VerifyResponseDto
+from chestniy_znak_desktop.api.models.verify import (
+    DefectResponseDto,
+    VerifyExistsResponseDto,
+    VerifyResponseDto,
+)
 
 
 class ChestniyZnakService:
@@ -50,13 +54,14 @@ class ChestniyZnakService:
         )
         return VerifyExistsResponseDto.model_validate(payload)
 
-    def mark_defect(self, code: str, scanner_id: str) -> dict[str, object]:
+    def mark_defect(self, code: str, scanner_id: str) -> DefectResponseDto:
         """Отправляет отсканированный код в сценарий брака."""
 
-        return self._api_client.post(
+        payload = self._api_client.post(
             "chestniy-znak/laser/defect",
             json={"code": code, "scanner_id": scanner_id},
         )
+        return DefectResponseDto.model_validate(payload)
 
     def stats(self) -> CatalogStatsDto:
         """Получает счетчики справочника ЧЗ."""

@@ -42,3 +42,21 @@ class VerifyExistsResponseDto(BaseModel):
     scan_id: int | None = None
     code: RemoteCodeDto | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class DefectRemovedBoxDto(BaseModel):
+    """Коробка, из которой код был удален при отметке брака."""
+
+    box_id: int
+    sscc: str | None = None
+    filled: int = 0
+
+
+class DefectResponseDto(BaseModel):
+    """Результат отметки кода как брака."""
+
+    ok: bool
+    reason_code: str
+    error: str | None = None
+    verify: VerifyResponseDto | None = None
+    removed_from_box: DefectRemovedBoxDto | None = None

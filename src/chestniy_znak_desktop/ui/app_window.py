@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
+from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
@@ -30,6 +31,7 @@ class AppWindow(QMainWindow):
         packing_controller: PackingController,
         boxes_controller: BoxesController,
         box_edit_controller: BoxEditController,
+        defect_controller: DefectController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
     ) -> None:
@@ -42,8 +44,10 @@ class AppWindow(QMainWindow):
         self._packing_controller = packing_controller
         self._boxes_controller = boxes_controller
         self._box_edit_controller = box_edit_controller
+        self._defect_controller = defect_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
+        self._scan_target = "packing"
         self._central = QWidget()
         self._stack = QStackedWidget()
         self._status_bar = RuntimeStatusBar()
@@ -66,7 +70,9 @@ class AppWindow(QMainWindow):
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
         self._login_screen.token_submitted.connect(self._auth_controller.login_with_raw_token)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
+        self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
         self._boxes_controller.state_changed.connect(self._main_screen.boxes_screen.apply_state)
         self._box_edit_controller.state_changed.connect(
             self._main_screen.boxes_screen.apply_edit_state
@@ -117,10 +123,7 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.count_in_packing_changed.connect(
             self._packing_controller.set_count_in_packing
         )
-        self._main_screen.packing_screen.manual_code_submitted.connect(
-            self._packing_controller.on_code_scanned
-        )
-        self._scanner_controller.code_scanned.connect(self._packing_controller.on_code_scanned)
+        self._scanner_controller.code_scanned.connect(self._handle_scanned_code)
         self._scanner_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_scanner_state
         )
@@ -172,6 +175,20 @@ class AppWindow(QMainWindow):
             self._blocking_overlay.set_blocking(False, "")
             return
         self._blocking_overlay.set_blocking(is_blocking, message)
+
+    def _set_scan_target(self, screen_name: str) -> None:
+        """Сохраняет активный рабочий сценарий для входящих сканов."""
+
+        self._scan_target = screen_name
+
+    def _handle_scanned_code(self, code: str) -> None:
+        """Маршрутизирует код сканера в активный рабочий сценарий."""
+
+        if self._scan_target == "defect":
+            self._defect_controller.on_code_scanned(code)
+            return
+        if self._scan_target == "packing":
+            self._packing_controller.on_code_scanned(code)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Подгоняет blocking overlay под размер центрального виджета."""
