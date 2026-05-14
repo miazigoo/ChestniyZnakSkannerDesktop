@@ -39,6 +39,7 @@ from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingUiState,
 )
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
+from chestniy_znak_desktop.controllers.verify_controller import VerifyUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen  # noqa: E402
@@ -46,6 +47,7 @@ from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E
 from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
 
@@ -201,6 +203,39 @@ def test_defect_screen_shows_processed_code() -> None:
     assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
     assert "Проверить этикетку" in screen._warnings.text()  # noqa: SLF001
     assert "Код отправлен" in screen._result.text()  # noqa: SLF001
+
+
+def test_verify_screen_shows_processed_code() -> None:
+    """Проверяет современный scanner-only экран проверки."""
+
+    qapp()
+    screen = VerifyScreen()
+    screen.apply_runtime_snapshot(
+        RuntimeSnapshot(
+            scanner=ScannerState(
+                status=ScannerStatus.RUNNING,
+                port="/dev/rfcomm0",
+            )
+        )
+    )
+    screen.apply_state(
+        VerifyUiState(
+            status_message="Код обработан",
+            result_message="Код найден",
+            last_visible_code="010460123456789021SERIAL",
+            technical_status="OK",
+            order_name="26-0001",
+            device_name="Device",
+            exists=True,
+            warnings=["Повторная проверка"],
+            log=["010460123456789021SERIAL: Код найден"],
+        )
+    )
+
+    assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
+    assert "Код найден" in screen._result.text()  # noqa: SLF001
+    assert "код найден" in screen._exists.text()  # noqa: SLF001
+    assert "Повторная проверка" in screen._warnings.text()  # noqa: SLF001
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:
