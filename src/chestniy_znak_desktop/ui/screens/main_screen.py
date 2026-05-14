@@ -44,6 +44,12 @@ class MainScreen(QWidget):
         layout.addLayout(nav)
         layout.addWidget(self._stack, stretch=1)
 
+    @property
+    def packing_screen(self) -> PackingScreen:
+        """Возвращает экран упаковки для подключения контроллера."""
+
+        return self._packing_screen
+
     def _nav_button(self, title: str, index: int) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""
 

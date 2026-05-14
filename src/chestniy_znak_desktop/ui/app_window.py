@@ -6,6 +6,7 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
@@ -22,6 +23,7 @@ class AppWindow(QMainWindow):
         app_state: AppState,
         runtime_controller: RuntimeController,
         auth_controller: AuthController,
+        packing_controller: PackingController,
     ) -> None:
         """Создает главное окно и регистрирует стартовые экраны."""
 
@@ -29,6 +31,7 @@ class AppWindow(QMainWindow):
         self._app_state = app_state
         self._runtime_controller = runtime_controller
         self._auth_controller = auth_controller
+        self._packing_controller = packing_controller
         self._central = QWidget()
         self._stack = QStackedWidget()
         self._status_bar = RuntimeStatusBar()
@@ -49,6 +52,22 @@ class AppWindow(QMainWindow):
         self._auth_controller.authenticated.connect(lambda _user: self.show_main_screen())
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
         self._login_screen.token_submitted.connect(self._auth_controller.login_with_raw_token)
+        self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._main_screen.packing_screen.refresh_requested.connect(
+            self._packing_controller.refresh_current_box
+        )
+        self._main_screen.packing_screen.open_box_requested.connect(
+            self._packing_controller.open_box
+        )
+        self._main_screen.packing_screen.close_box_requested.connect(
+            self._packing_controller.close_current_box
+        )
+        self._main_screen.packing_screen.count_in_packing_changed.connect(
+            self._packing_controller.set_count_in_packing
+        )
+        self._main_screen.packing_screen.manual_code_submitted.connect(
+            self._packing_controller.on_code_scanned
+        )
         self.setWindowTitle(app_state.config.app_name)
         self.resize(1180, 760)
 
