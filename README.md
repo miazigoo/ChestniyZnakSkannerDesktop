@@ -41,3 +41,13 @@ python -m flake8
 python -m mypy
 python -m pytest
 ```
+
+## Сборка Windows
+
+```bash
+python scripts/build_windows.py
+```
+
+Сборка использует `packaging/chestniy_znak_desktop.spec`, кладет результат в
+`dist/ChestniyZnakDesktop/` и включает runtime-ресурсы приложения: звуки,
+иконки и Qt-модули для WebSocket/Multimedia.

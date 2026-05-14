@@ -28,6 +28,7 @@ htmlcov/
 build/
 dist/
 *.spec
+!packaging/*.spec
 
 # Логи, временные файлы и локальные данные приложения
 *.log
