@@ -32,6 +32,7 @@ from chestniy_znak_desktop.controllers.boxes_controller import (  # noqa: E402
 from chestniy_znak_desktop.controllers.box_lookup_controller import (  # noqa: E402
     BoxLookupUiState,
 )
+from chestniy_znak_desktop.controllers.defect_controller import DefectUiState  # noqa: E402
 from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingBoxUi,
     PackingItemUi,
@@ -42,6 +43,7 @@ from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E40
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
@@ -168,6 +170,37 @@ def test_box_lookup_screen_shows_scanner_result() -> None:
     assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
     assert "Коробка:" in screen._found.text()  # noqa: SLF001
     assert screen._reset_button.isEnabled() is True  # noqa: SLF001
+
+
+def test_defect_screen_shows_processed_code() -> None:
+    """Проверяет современный scanner-only экран брака."""
+
+    qapp()
+    screen = DefectScreen()
+    screen.apply_runtime_snapshot(
+        RuntimeSnapshot(
+            scanner=ScannerState(
+                status=ScannerStatus.RUNNING,
+                port="/dev/rfcomm0",
+            )
+        )
+    )
+    screen.apply_state(
+        DefectUiState(
+            status_message="Код обработан",
+            result_message="Код отправлен в брак",
+            last_visible_code="010460123456789021SERIAL",
+            order_name="26-0001",
+            device_name="Device",
+            removed_box_message="Удалено из коробки #10 | SSCC | остаток 3",
+            warnings=["Проверить этикетку"],
+            log=["010460123456789021SERIAL: Код отправлен в брак"],
+        )
+    )
+
+    assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
+    assert "Проверить этикетку" in screen._warnings.text()  # noqa: SLF001
+    assert "Код отправлен" in screen._result.text()  # noqa: SLF001
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:

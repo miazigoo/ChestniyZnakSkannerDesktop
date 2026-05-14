@@ -2,61 +2,354 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from chestniy_znak_desktop.controllers.defect_controller import DefectUiState
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
 class DefectScreen(QWidget):
     """Показывает результат сценария брака по скану."""
 
     def __init__(self) -> None:
-        """Создает экран брака с журналом результата."""
+        """Создает scanner-only экран брака с журналом результата."""
 
         super().__init__()
+        self.setObjectName("defectScreen")
         self._title = QLabel("Брак")
         self._status = QLabel("Ожидание скана кода")
         self._scanner_status = QLabel("Сканер: проверяем состояние")
-        self._result = QLabel("")
+        self._result = QLabel("Ожидаем DataMatrix от сканера")
         self._error = QLabel("")
         self._last_code = QLabel("Код: -")
         self._order = QLabel("Заказ: -")
         self._device = QLabel("Устройство: -")
-        self._removed_box = QLabel("")
+        self._removed_box = QLabel("Удаление из коробки: -")
         self._warnings = QLabel("")
         self._log = QTextEdit()
         self._log.setReadOnly(True)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self._title)
-        layout.addWidget(self._status)
-        layout.addWidget(self._scanner_status)
-        layout.addWidget(self._result)
-        layout.addWidget(self._error)
-        layout.addWidget(self._last_code)
-        layout.addWidget(self._order)
-        layout.addWidget(self._device)
-        layout.addWidget(self._removed_box)
-        layout.addWidget(self._warnings)
-        layout.addWidget(self._log)
+
+        self._configure_widgets()
+        self._build_layout()
+        self._apply_styles()
 
     def apply_state(self, state: DefectUiState) -> None:
         """Обновляет экран брака из состояния контроллера."""
 
+        has_error = bool(state.error_message)
         self._status.setText(state.status_message)
-        self._result.setText(state.result_message)
+        self._result.setText(state.result_message or "Ожидаем DataMatrix от сканера")
+        self._result.setProperty("tone", "error" if has_error else "ok")
+        self._result.style().unpolish(self._result)
+        self._result.style().polish(self._result)
         self._error.setText(state.error_message)
-        self._last_code.setText(f"Код: {state.last_visible_code or '-'}")
+        self._error.setVisible(has_error)
+        self._last_code.setText(f"Код: {self._preview(state.last_visible_code)}")
         self._order.setText(f"Заказ: {state.order_name or '-'}")
         self._device.setText(f"Устройство: {state.device_name or '-'}")
-        self._removed_box.setText(state.removed_box_message)
-        self._warnings.setText("; ".join(state.warnings))
+        removed_box = state.removed_box_message or "-"
+        self._removed_box.setText(f"Удаление из коробки: {removed_box}")
+        warnings = "; ".join(state.warnings)
+        self._warnings.setText(f"Предупреждения: {warnings}" if warnings else "")
+        self._warnings.setVisible(bool(warnings))
         self._log.setPlainText("\n".join(state.log))
 
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет подсказку о доступности сканера для брака."""
 
         if snapshot.scanner.is_running:
-            self._scanner_status.setText(f"Сканер готов: {snapshot.scanner.port}")
-            return
-        self._scanner_status.setText("Сканер не запущен. Отправка в брак заблокирована.")
+            self._scanner_status.setText(f"Сканер готов: {snapshot.scanner.port or '-'}")
+            self._scanner_status.setProperty("tone", "active")
+        else:
+            self._scanner_status.setText("Сканер не запущен. Отправка в брак заблокирована.")
+            self._scanner_status.setProperty("tone", "error")
+        self._scanner_status.style().unpolish(self._scanner_status)
+        self._scanner_status.style().polish(self._scanner_status)
+
+    def _configure_widgets(self) -> None:
+        """Настраивает objectName и переносы текста."""
+
+        self._title.setObjectName("defectHeroTitle")
+        self._status.setObjectName("defectStatusText")
+        self._scanner_status.setObjectName("defectScannerStatus")
+        self._result.setObjectName("defectResult")
+        self._error.setObjectName("defectError")
+        self._last_code.setObjectName("defectMetaValue")
+        self._order.setObjectName("defectMetaValue")
+        self._device.setObjectName("defectMetaValue")
+        self._removed_box.setObjectName("defectMetaValue")
+        self._warnings.setObjectName("defectWarning")
+        self._log.setObjectName("defectLog")
+        for label in (
+            self._status,
+            self._result,
+            self._error,
+            self._last_code,
+            self._order,
+            self._device,
+            self._removed_box,
+            self._warnings,
+        ):
+            label.setWordWrap(True)
+        self._error.setVisible(False)
+        self._warnings.setVisible(False)
+
+    def _build_layout(self) -> None:
+        """Собирает визуальную структуру экрана брака."""
+
+        hero = self._create_hero()
+        scanner_card = self._create_scanner_card()
+        result_card = self._create_result_card()
+        meta_panel = self._create_meta_panel()
+        log_panel = self._create_log_panel()
+
+        top_grid = QGridLayout()
+        top_grid.setSpacing(18)
+        top_grid.addWidget(scanner_card, 0, 0)
+        top_grid.addWidget(result_card, 0, 1)
+        top_grid.setColumnStretch(0, 1)
+        top_grid.setColumnStretch(1, 2)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 8)
+        layout.setSpacing(18)
+        layout.addWidget(hero)
+        layout.addLayout(top_grid)
+        layout.addWidget(meta_panel)
+        layout.addWidget(log_panel, 1)
+
+    def _create_hero(self) -> QFrame:
+        """Создает верхний блок сценария брака."""
+
+        hero = QFrame()
+        hero.setObjectName("defectHero")
+        icon = VectorIcon(VectorIconName.WARNING, "#f3c969")
+        subtitle = QLabel(
+            "Сканируйте изделие, которое нужно отправить в брак. "
+            "Код уйдет в backend, а при необходимости будет удален из коробки."
+        )
+        subtitle.setObjectName("defectHeroSubtitle")
+        subtitle.setWordWrap(True)
+        text = QVBoxLayout()
+        text.addWidget(self._title)
+        text.addWidget(subtitle)
+
+        layout = QHBoxLayout(hero)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(16)
+        layout.addWidget(icon)
+        layout.addLayout(text, 1)
+        return hero
+
+    def _create_scanner_card(self) -> QFrame:
+        """Создает карточку источника сканов."""
+
+        card = QFrame()
+        card.setObjectName("defectCard")
+        title = QLabel("Источник данных")
+        title.setObjectName("defectCardTitle")
+        note = QLabel("Ручной ввод отключен, принимаем только сканер")
+        note.setObjectName("defectMutedText")
+        note.setWordWrap(True)
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        layout.addWidget(VectorIcon(VectorIconName.SCANNER, "#8fb8ff"))
+        layout.addWidget(title)
+        layout.addWidget(note)
+        layout.addWidget(self._scanner_status)
+        layout.addStretch(1)
+        return card
+
+    def _create_result_card(self) -> QFrame:
+        """Создает карточку результата отправки в брак."""
+
+        card = QFrame()
+        card.setObjectName("defectResultCard")
+        header = QHBoxLayout()
+        header.addWidget(VectorIcon(VectorIconName.SHIELD, "#66d2c7"))
+        header_text = QVBoxLayout()
+        title = QLabel("Результат обработки")
+        title.setObjectName("defectCardTitle")
+        header_text.addWidget(title)
+        header_text.addWidget(self._status)
+        header.addLayout(header_text, 1)
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(14)
+        layout.addLayout(header)
+        layout.addWidget(self._error)
+        layout.addWidget(self._result)
+        layout.addWidget(self._last_code)
+        layout.addStretch(1)
+        return card
+
+    def _create_meta_panel(self) -> QFrame:
+        """Создает панель деталей обработанного кода."""
+
+        panel = QFrame()
+        panel.setObjectName("defectMetaPanel")
+        title = QLabel("Детали кода")
+        title.setObjectName("defectCardTitle")
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(14)
+        grid.addWidget(self._order, 0, 0)
+        grid.addWidget(self._device, 0, 1)
+        grid.addWidget(self._removed_box, 1, 0, 1, 2)
+        grid.addWidget(self._warnings, 2, 0, 1, 2)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(14)
+        layout.addWidget(title)
+        layout.addLayout(grid)
+        return panel
+
+    def _create_log_panel(self) -> QFrame:
+        """Создает журнал последних отправок в брак."""
+
+        panel = QFrame()
+        panel.setObjectName("defectLogPanel")
+        header = QHBoxLayout()
+        title = QLabel("Журнал брака")
+        title.setObjectName("defectCardTitle")
+        hint = QLabel("Последние результаты отправки кодов")
+        hint.setObjectName("defectMutedText")
+        text = QVBoxLayout()
+        text.addWidget(title)
+        text.addWidget(hint)
+        header.addWidget(VectorIcon(VectorIconName.TOKEN, "#f3c969"))
+        header.addLayout(text, 1)
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 18, 20, 20)
+        layout.setSpacing(14)
+        layout.addLayout(header)
+        layout.addWidget(self._log, 1)
+        return panel
+
+    @staticmethod
+    def _preview(code: str) -> str:
+        """Возвращает компактное отображение кода маркировки."""
+
+        if not code:
+            return "-"
+        compact = code.strip().replace("\n", "")
+        if len(compact) <= 36:
+            return compact
+        return f"{compact[:18]}...{compact[-12:]}"
+
+    def _apply_styles(self) -> None:
+        """Применяет локальные стили экрана брака."""
+
+        self.setStyleSheet("""
+            #defectScreen {
+                background: transparent;
+            }
+            #defectHero,
+            #defectCard,
+            #defectResultCard,
+            #defectMetaPanel,
+            #defectLogPanel {
+                background: rgba(16, 24, 40, 222);
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 18px;
+            }
+            #defectHero {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 rgba(75, 48, 30, 238),
+                    stop: 0.55 rgba(18, 32, 48, 235),
+                    stop: 1 rgba(48, 45, 75, 222)
+                );
+            }
+            #defectHeroTitle {
+                color: #f8fbff;
+                font-size: 25px;
+                font-weight: 850;
+                background: transparent;
+            }
+            #defectHeroSubtitle,
+            #defectMutedText,
+            #defectStatusText {
+                color: rgba(225, 233, 244, 176);
+                font-size: 13px;
+                background: transparent;
+            }
+            #defectCardTitle {
+                color: #f8fbff;
+                font-size: 17px;
+                font-weight: 800;
+                background: transparent;
+            }
+            #defectScannerStatus {
+                border-radius: 12px;
+                padding: 10px 12px;
+                color: #071212;
+                background: #66d2c7;
+                font-size: 13px;
+                font-weight: 850;
+            }
+            #defectScannerStatus[tone="error"] {
+                color: #fff4f2;
+                background: rgba(227, 85, 78, 180);
+            }
+            #defectResult {
+                color: #071212;
+                border-radius: 16px;
+                padding: 16px 18px;
+                background: #f3c969;
+                font-size: 20px;
+                font-weight: 850;
+            }
+            #defectResult[tone="error"] {
+                color: #fff4f2;
+                background: rgba(227, 85, 78, 190);
+            }
+            #defectError {
+                color: #ffb4ad;
+                border-radius: 12px;
+                padding: 10px 12px;
+                background: rgba(227, 85, 78, 38);
+                font-weight: 750;
+            }
+            #defectMetaValue {
+                color: #f8fbff;
+                border-radius: 14px;
+                padding: 12px 14px;
+                background: rgba(255, 255, 255, 28);
+                font-size: 13px;
+                font-weight: 700;
+            }
+            #defectWarning {
+                color: #1f1600;
+                border-radius: 14px;
+                padding: 12px 14px;
+                background: #f3c969;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            #defectLog {
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 18);
+                border: 1px solid rgba(129, 140, 168, 55);
+                border-radius: 14px;
+                padding: 12px;
+                selection-background-color: rgba(243, 201, 105, 80);
+                selection-color: #f8fbff;
+                font-family: monospace;
+                font-size: 13px;
+            }
+            """)
