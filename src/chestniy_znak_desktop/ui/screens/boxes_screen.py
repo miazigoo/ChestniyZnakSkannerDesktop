@@ -27,6 +27,7 @@ class BoxesScreen(QWidget):
     next_page_requested = Signal()
     previous_page_requested = Signal()
     box_detail_requested = Signal(int)
+    print_label_requested = Signal(int)
 
     def __init__(self) -> None:
         """Создает базовый экран списка коробок."""
@@ -54,6 +55,8 @@ class BoxesScreen(QWidget):
         self._page_label = QLabel("0 / 0")
         self._detail_button = QPushButton("Открыть детали")
         self._detail_button.clicked.connect(self._emit_selected_box_detail)
+        self._print_label_button = QPushButton("Печать этикетки")
+        self._print_label_button.clicked.connect(self._emit_print_label)
         self._table = QTableWidget(0, 7)
         self._table.setHorizontalHeaderLabels(
             ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
@@ -77,6 +80,7 @@ class BoxesScreen(QWidget):
         pagination.addWidget(self._page_label)
         pagination.addWidget(self._next_button)
         pagination.addWidget(self._detail_button)
+        pagination.addWidget(self._print_label_button)
         pagination.addStretch(1)
 
         layout = QVBoxLayout(self)
@@ -102,6 +106,7 @@ class BoxesScreen(QWidget):
         self._previous_button.setEnabled(not state.is_busy and state.has_previous)
         self._next_button.setEnabled(not state.is_busy and state.has_more)
         self._detail_button.setEnabled(not state.is_detail_busy and bool(state.rows))
+        self._print_label_button.setEnabled(not state.is_action_busy and state.detail is not None)
         self._table.setRowCount(len(state.rows))
         for row_index, row in enumerate(state.rows):
             values = [
@@ -152,6 +157,14 @@ class BoxesScreen(QWidget):
         if item is None:
             return
         self.box_detail_requested.emit(int(item.text()))
+
+    def _emit_print_label(self) -> None:
+        """Публикует запрос повторной печати этикетки выбранной коробки."""
+
+        row = self._table.currentRow()
+        item = self._table.item(row, 0) if row >= 0 else None
+        if item is not None:
+            self.print_label_requested.emit(int(item.text()))
 
     def _apply_detail(self, state: BoxesUiState) -> None:
         """Обновляет панель деталей выбранной коробки."""

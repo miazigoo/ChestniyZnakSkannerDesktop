@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from chestniy_znak_desktop.api.models.packing import BoxDetailDto, BoxDto, BoxListDto
+from chestniy_znak_desktop.api.models.packing import (
+    BoxDetailDto,
+    BoxDto,
+    BoxListDto,
+    CloseBoxResultDto,
+)
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
+from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
 class ImmediateTaskRunner:
@@ -75,7 +81,47 @@ class FakeBoxesService:
         )
 
 
-def _box() -> BoxDto:
+class FakePrinterService:
+    """Fake backend повторной печати этикеток."""
+
+    def __init__(self) -> None:
+        """Создает fake-сервис со счетчиком вызова."""
+
+        self.last_call: tuple[int, str] | None = None
+        self.error: Exception | None = None
+        self.result_ok = True
+        self.print_ok = True
+
+    def print_box_label(self, box_id: int, device_id: str) -> CloseBoxResultDto:
+        """Возвращает fake результат печати."""
+
+        self.last_call = (box_id, device_id)
+        if self.error is not None:
+            raise self.error
+        return CloseBoxResultDto(
+            ok=self.result_ok,
+            reason_code="printed",
+            box=_box(print_ok=self.print_ok),
+            print_ok=self.print_ok,
+            print_error="" if self.print_ok else "Принтер недоступен",
+        )
+
+
+class FakeSoundService:
+    """Fake sound service для проверки звуков действий."""
+
+    def __init__(self) -> None:
+        """Создает список проигранных событий."""
+
+        self.events: list[SoundEvent] = []
+
+    def play(self, event: SoundEvent) -> None:
+        """Запоминает событие звука."""
+
+        self.events.append(event)
+
+
+def _box(print_ok: bool = True) -> BoxDto:
     """Создает DTO коробки для тестов."""
 
     return BoxDto(
@@ -89,26 +135,36 @@ def _box() -> BoxDto:
         is_closed=False,
         is_edit_mode=False,
         active_user_name="Operator",
-        print_ok=True,
+        print_ok=print_ok,
     )
 
 
-def _controller_pair() -> tuple[BoxesController, FakeBoxesService]:
+def _controller_pair() -> tuple[
+    BoxesController,
+    FakeBoxesService,
+    FakePrinterService,
+    FakeSoundService,
+]:
     """Создает контроллер списка коробок с fake-сервисом."""
 
     service = FakeBoxesService()
+    printer = FakePrinterService()
+    sounds = FakeSoundService()
     controller = BoxesController(
         boxes_service=service,
+        printer_service=printer,
         task_runner=ImmediateTaskRunner(),
+        device_id="pc-1",
         page_limit=1,
+        sound_service=sounds,
     )
-    return controller, service
+    return controller, service, printer, sounds
 
 
 def test_boxes_controller_refresh_loads_rows() -> None:
     """Проверяет загрузку строк таблицы коробок."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
 
     controller.refresh()
 
@@ -122,7 +178,7 @@ def test_boxes_controller_refresh_loads_rows() -> None:
 def test_boxes_controller_filter_resets_page() -> None:
     """Проверяет смену фильтра с загрузкой первой страницы."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
 
     controller.set_status_filter("closed")
 
@@ -133,7 +189,7 @@ def test_boxes_controller_filter_resets_page() -> None:
 def test_boxes_controller_search_resets_page() -> None:
     """Проверяет поиск с загрузкой первой страницы."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
 
     controller.set_query(" 000123 ")
 
@@ -144,7 +200,7 @@ def test_boxes_controller_search_resets_page() -> None:
 def test_boxes_controller_loads_next_page() -> None:
     """Проверяет переход на следующую страницу."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
     controller.refresh()
 
     controller.next_page()
@@ -156,7 +212,7 @@ def test_boxes_controller_loads_next_page() -> None:
 def test_boxes_controller_reports_error() -> None:
     """Проверяет отображение ошибки загрузки."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
     service.error = RuntimeError("Backend недоступен")
 
     controller.refresh()
@@ -168,7 +224,7 @@ def test_boxes_controller_reports_error() -> None:
 def test_boxes_controller_loads_box_detail() -> None:
     """Проверяет загрузку детальной карточки выбранной коробки."""
 
-    controller, _service = _controller_pair()
+    controller, _service, _printer, _sounds = _controller_pair()
 
     controller.load_detail(10)
 
@@ -181,10 +237,38 @@ def test_boxes_controller_loads_box_detail() -> None:
 def test_boxes_controller_reports_detail_error() -> None:
     """Проверяет ошибку загрузки детальной карточки."""
 
-    controller, service = _controller_pair()
+    controller, service, _printer, _sounds = _controller_pair()
     service.error = RuntimeError("Коробка не найдена")
 
     controller.load_detail(10)
 
     assert controller.state.detail_status_message == "Ошибка загрузки коробки"
     assert controller.state.detail_error_message == "Коробка не найдена"
+
+
+def test_boxes_controller_prints_selected_label() -> None:
+    """Проверяет повторную печать этикетки выбранной коробки."""
+
+    controller, _service, printer, sounds = _controller_pair()
+    controller.load_detail(10)
+
+    controller.print_selected_label(10)
+
+    assert printer.last_call == (10, "pc-1")
+    assert controller.state.detail_status_message == "Этикетка отправлена на печать"
+    assert controller.state.detail is not None
+    assert controller.state.detail.print_status == "Напечатано"
+    assert sounds.events[-1] == SoundEvent.OK
+
+
+def test_boxes_controller_reports_print_error() -> None:
+    """Проверяет ошибку повторной печати этикетки."""
+
+    controller, _service, printer, sounds = _controller_pair()
+    printer.error = RuntimeError("Принтер недоступен")
+
+    controller.print_selected_label(10)
+
+    assert controller.state.detail_status_message == "Ошибка печати"
+    assert controller.state.detail_error_message == "Принтер недоступен"
+    assert sounds.events[-1] == SoundEvent.ERROR

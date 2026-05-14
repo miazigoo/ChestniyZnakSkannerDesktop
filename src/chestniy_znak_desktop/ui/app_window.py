@@ -77,6 +77,9 @@ class AppWindow(QMainWindow):
         self._main_screen.boxes_screen.box_detail_requested.connect(
             self._boxes_controller.load_detail
         )
+        self._main_screen.boxes_screen.print_label_requested.connect(
+            self._boxes_controller.print_selected_label
+        )
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box
         )

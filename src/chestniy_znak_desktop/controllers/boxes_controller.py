@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.models.packing import BoxDetailDto, BoxDto, BoxListDto
+from chestniy_znak_desktop.api.models.packing import (
+    BoxDetailDto,
+    BoxDto,
+    BoxListDto,
+    CloseBoxResultDto,
+)
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
+from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
 class BoxesBackend(Protocol):
@@ -25,6 +31,20 @@ class BoxesBackend(Protocol):
 
     def get_box(self, box_id: int) -> BoxDetailDto:
         """Возвращает детальную карточку коробки."""
+
+
+class PrinterBackend(Protocol):
+    """Контракт сервиса повторной печати этикеток."""
+
+    def print_box_label(self, box_id: int, device_id: str) -> CloseBoxResultDto:
+        """Печатает этикетку коробки."""
+
+
+class SoundPlayer(Protocol):
+    """Контракт сервиса звуковой обратной связи."""
+
+    def play(self, event: SoundEvent) -> None:
+        """Проигрывает звук для указанного события."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +101,7 @@ class BoxesUiState:
     selected_box_id: int | None = None
     detail: BoxDetailUi | None = None
     is_detail_busy: bool = False
+    is_action_busy: bool = False
     status_message: str = "Загрузите список коробок"
     error_message: str = ""
     detail_status_message: str = "Выберите коробку для просмотра состава"
@@ -111,15 +132,21 @@ class BoxesController(QObject):
     def __init__(
         self,
         boxes_service: BoxesBackend,
+        printer_service: PrinterBackend,
         task_runner: TaskRunner,
+        device_id: str,
         page_limit: int = 50,
+        sound_service: SoundPlayer | None = None,
         parent: QObject | None = None,
     ) -> None:
         """Создает контроллер списка коробок."""
 
         super().__init__(parent)
         self._boxes_service = boxes_service
+        self._printer_service = printer_service
         self._task_runner = task_runner
+        self._device_id = device_id
+        self._sound_service = sound_service
         self._state = BoxesUiState(limit=page_limit)
 
     @property
@@ -202,6 +229,26 @@ class BoxesController(QObject):
             self._on_detail_error,
         )
 
+    def print_selected_label(self, box_id: int) -> None:
+        """Запускает повторную печать этикетки выбранной коробки."""
+
+        if self._state.is_action_busy:
+            return
+        self._set_state(
+            replace(
+                self._state,
+                selected_box_id=box_id,
+                is_action_busy=True,
+                detail_status_message=f"Печатаем этикетку коробки #{box_id}...",
+                detail_error_message="",
+            )
+        )
+        self._task_runner.submit(
+            lambda: self._printer_service.print_box_label(box_id, self._device_id),
+            self._on_label_printed,
+            self._on_print_error,
+        )
+
     def _load_page(self, offset: int) -> None:
         """Запускает загрузку страницы коробок."""
 
@@ -209,18 +256,12 @@ class BoxesController(QObject):
         query = self._state.query
         limit = self._state.limit
         self._set_state(
-            BoxesUiState(
+            replace(
+                self._state,
                 is_busy=True,
-                status_filter=status_filter,
-                query=query,
-                limit=limit,
                 offset=offset,
-                total=self._state.total,
-                rows=self._state.rows,
-                selected_box_id=self._state.selected_box_id,
-                detail=self._state.detail,
-                detail_status_message=self._state.detail_status_message,
                 status_message="Загружаем коробки...",
+                error_message="",
             )
         )
         self._task_runner.submit(
@@ -240,7 +281,9 @@ class BoxesController(QObject):
         if not isinstance(result, BoxListDto):
             raise TypeError("Ожидался результат BoxListDto")
         self._set_state(
-            BoxesUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 status_filter=self._state.status_filter,
                 query=self._state.query,
                 limit=result.limit,
@@ -248,10 +291,8 @@ class BoxesController(QObject):
                 total=result.total,
                 has_more=result.has_more,
                 rows=[self._box_to_row(box) for box in result.items],
-                selected_box_id=self._state.selected_box_id,
-                detail=self._state.detail,
-                detail_status_message=self._state.detail_status_message,
                 status_message="Коробки загружены",
+                error_message="",
             )
         )
 
@@ -259,17 +300,11 @@ class BoxesController(QObject):
         """Обрабатывает ошибку загрузки списка коробок."""
 
         self._set_state(
-            BoxesUiState(
-                status_filter=self._state.status_filter,
-                query=self._state.query,
-                limit=self._state.limit,
-                offset=self._state.offset,
-                total=self._state.total,
-                has_more=self._state.has_more,
-                rows=self._state.rows,
+            replace(
+                self._state,
+                is_busy=False,
                 selected_box_id=self._state.selected_box_id,
                 detail=self._state.detail,
-                detail_status_message=self._state.detail_status_message,
                 status_message="Ошибка загрузки коробок",
                 error_message=str(exc),
             )
@@ -281,18 +316,13 @@ class BoxesController(QObject):
         if not isinstance(result, BoxDetailDto):
             raise TypeError("Ожидался результат BoxDetailDto")
         self._set_state(
-            BoxesUiState(
-                status_filter=self._state.status_filter,
-                query=self._state.query,
-                limit=self._state.limit,
-                offset=self._state.offset,
-                total=self._state.total,
-                has_more=self._state.has_more,
-                rows=self._state.rows,
+            replace(
+                self._state,
+                is_detail_busy=False,
                 selected_box_id=result.box_id,
                 detail=self._box_detail_to_ui(result),
-                status_message=self._state.status_message,
                 detail_status_message=f"Коробка #{result.box_id} загружена",
+                detail_error_message="",
             )
         )
 
@@ -300,18 +330,45 @@ class BoxesController(QObject):
         """Обрабатывает ошибку загрузки выбранной коробки."""
 
         self._set_state(
-            BoxesUiState(
-                status_filter=self._state.status_filter,
-                query=self._state.query,
-                limit=self._state.limit,
-                offset=self._state.offset,
-                total=self._state.total,
-                has_more=self._state.has_more,
-                rows=self._state.rows,
-                selected_box_id=self._state.selected_box_id,
-                detail=self._state.detail,
-                status_message=self._state.status_message,
+            replace(
+                self._state,
+                is_detail_busy=False,
                 detail_status_message="Ошибка загрузки коробки",
+                detail_error_message=str(exc),
+            )
+        )
+
+    def _on_label_printed(self, result: object) -> None:
+        """Обрабатывает результат повторной печати этикетки."""
+
+        if not isinstance(result, CloseBoxResultDto):
+            raise TypeError("Ожидался результат CloseBoxResultDto")
+        self._play(SoundEvent.OK if result.ok and result.print_ok else SoundEvent.ERROR)
+        error_message = result.error or result.print_error or ""
+        detail = self._update_detail_print_status(result)
+        self._set_state(
+            replace(
+                self._state,
+                is_action_busy=False,
+                detail=detail,
+                detail_status_message=(
+                    "Этикетка отправлена на печать"
+                    if result.ok and result.print_ok
+                    else "Печать не выполнена"
+                ),
+                detail_error_message=error_message,
+            )
+        )
+
+    def _on_print_error(self, exc: Exception) -> None:
+        """Обрабатывает ошибку повторной печати этикетки."""
+
+        self._play(SoundEvent.ERROR)
+        self._set_state(
+            replace(
+                self._state,
+                is_action_busy=False,
+                detail_status_message="Ошибка печати",
                 detail_error_message=str(exc),
             )
         )
@@ -321,6 +378,22 @@ class BoxesController(QObject):
 
         self._state = state
         self.state_changed.emit(state)
+
+    def _play(self, event: SoundEvent) -> None:
+        """Проигрывает звук, если сервис звука подключен."""
+
+        if self._sound_service is not None:
+            self._sound_service.play(event)
+
+    def _update_detail_print_status(self, result: CloseBoxResultDto) -> BoxDetailUi | None:
+        """Обновляет статус печати в уже загруженной детальной карточке."""
+
+        if self._state.detail is None:
+            return None
+        return replace(
+            self._state.detail,
+            print_status=self._print_status(result.box),
+        )
 
     @staticmethod
     def _box_to_row(box: BoxDto) -> BoxRowUi:

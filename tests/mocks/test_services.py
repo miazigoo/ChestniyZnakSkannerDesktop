@@ -73,6 +73,14 @@ class FakeApiClient:
                 "boxes": [],
                 "box": _box_payload(),
             }
+        if url.endswith("printer/boxes/1/print"):
+            return {
+                "ok": True,
+                "reason_code": "printed",
+                "box": _box_payload(),
+                "print_ok": True,
+                "print_error": "",
+            }
         if url.endswith("printer-selection"):
             return {
                 "ok": True,
@@ -175,3 +183,16 @@ def test_printer_service_set_selection() -> None:
     client = FakeApiClient()
     result = PrinterService(client).set_selection(device_id="pc-1", printer_id=1)
     assert result.selected_printer_id == 1
+
+
+def test_printer_service_print_box_label() -> None:
+    """Проверяет повторную печать этикетки коробки."""
+
+    client = FakeApiClient()
+    result = PrinterService(client).print_box_label(box_id=1, device_id="pc-1")
+    assert result.print_ok is True
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/packing/printer/boxes/1/print",
+        {"json": None, "params": {"device_id": "pc-1"}},
+    )

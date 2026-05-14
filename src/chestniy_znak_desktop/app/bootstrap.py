@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 from chestniy_znak_desktop.api.client import ApiClient
 from chestniy_znak_desktop.api.services.auth_service import AuthService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
+from chestniy_znak_desktop.api.services.printer_service import PrinterService
 from chestniy_znak_desktop.api.session_store import FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
@@ -69,6 +70,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         ),
     )
     packing_service = PackingService(api_client)
+    printer_service = PrinterService(api_client)
     packing_controller = PackingController(
         packing_service=packing_service,
         task_runner=api_task_runner,
@@ -77,7 +79,10 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     )
     boxes_controller = BoxesController(
         boxes_service=packing_service,
+        printer_service=printer_service,
         task_runner=api_task_runner,
+        device_id=settings.device_id,
+        sound_service=sound_service,
     )
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
