@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.packing_controller import PackingUiState
+from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 
 
 class PackingScreen(QWidget):
@@ -31,6 +32,7 @@ class PackingScreen(QWidget):
         super().__init__()
         self._title_label = QLabel("Упаковка")
         self._status_label = QLabel("Открытая коробка не найдена")
+        self._scanner_label = QLabel("Сканер: проверяем состояние")
         self._result_label = QLabel("")
         self._error_label = QLabel("")
         self._box_label = QLabel("Коробка: -")
@@ -57,12 +59,15 @@ class PackingScreen(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self._title_label)
         layout.addWidget(self._status_label)
+        layout.addWidget(self._scanner_label)
         layout.addWidget(self._result_label)
         layout.addWidget(self._error_label)
         layout.addWidget(self._box_label)
         layout.addWidget(self._progress_label)
         layout.addLayout(actions)
         layout.addWidget(self._items_table)
+        self._is_busy = False
+        self._scanner_ready = False
 
     def apply_state(self, state: PackingUiState) -> None:
         """Обновляет экран из состояния контроллера упаковки."""
@@ -88,9 +93,20 @@ class PackingScreen(QWidget):
             self._items_table.setItem(row, 1, QTableWidgetItem(item.serial))
             self._items_table.setItem(row, 2, QTableWidgetItem(item.visible_code))
 
+    def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
+        """Обновляет защиту рабочих действий по состоянию сканера."""
+
+        self._scanner_ready = snapshot.scanner.is_running
+        if self._scanner_ready:
+            self._scanner_label.setText(f"Сканер готов: {snapshot.scanner.port}")
+        else:
+            self._scanner_label.setText("Сканер не запущен. Упаковка заблокирована.")
+        self._set_busy(self._is_busy)
+
     def _set_busy(self, is_busy: bool) -> None:
         """Включает или отключает рабочие кнопки на время операции."""
 
+        self._is_busy = is_busy
         self._refresh_button.setEnabled(not is_busy)
-        self._open_box_button.setEnabled(not is_busy)
-        self._close_box_button.setEnabled(not is_busy)
+        self._open_box_button.setEnabled(not is_busy and self._scanner_ready)
+        self._close_box_button.setEnabled(not is_busy and self._scanner_ready)

@@ -63,6 +63,7 @@ class AppWindow(QMainWindow):
         self._blocking_overlay = BlockingOverlay(self._central)
         self._blocking_overlay.retry_requested.connect(self._runtime_controller.retry_connection)
         self._runtime_controller.snapshot_changed.connect(self._status_bar.update_snapshot)
+        self._runtime_controller.snapshot_changed.connect(self._login_screen.apply_runtime_snapshot)
         self._runtime_controller.snapshot_changed.connect(self._main_screen.apply_runtime_snapshot)
         self._runtime_controller.blocking_changed.connect(self._set_work_area_blocking)
         self._auth_controller.state_changed.connect(self._login_screen.apply_state)

@@ -88,6 +88,38 @@ def test_scanner_controller_start_updates_runtime() -> None:
     assert runtime.snapshot.scanner.status == ScannerStatus.RUNNING
 
 
+def test_scanner_controller_autostarts_configured_port() -> None:
+    """Проверяет автозапуск выбранного COM/SPP-порта."""
+
+    runtime = _runtime()
+    worker = FakeScannerWorker()
+    controller = ScannerController(
+        runtime_controller=runtime,
+        scanner_worker=worker,
+        initial_port="COM8",
+    )
+
+    controller.start_if_configured()
+
+    assert worker.last_config is not None
+    assert worker.last_config.port == "COM8"
+    assert runtime.snapshot.scanner.status == ScannerStatus.RUNNING
+
+
+def test_scanner_controller_autostart_without_port_reports_setup() -> None:
+    """Проверяет понятный статус автозапуска без выбранного порта."""
+
+    controller = ScannerController(
+        runtime_controller=_runtime(),
+        scanner_worker=FakeScannerWorker(),
+    )
+
+    controller.start_if_configured()
+
+    assert controller.state.status_message == "Сканер не выбран. Настройте COM/SPP-порт."
+    assert controller.state.is_running is False
+
+
 def test_scanner_controller_reports_missing_port() -> None:
     """Проверяет ошибку запуска без выбранного порта."""
 

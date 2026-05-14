@@ -128,6 +128,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     auth_controller.authenticated.connect(lambda _user: boxes_controller.refresh())
     runtime_controller.start()
     scanner_controller.refresh_ports()
+    scanner_controller.start_if_configured()
     settings_controller.publish_state()
     auth_controller.restore_session()
     return window

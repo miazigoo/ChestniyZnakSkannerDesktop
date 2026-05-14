@@ -81,6 +81,8 @@ class MainScreen(QWidget):
         """Обновляет рабочий экран из общего runtime snapshot."""
 
         self._session_panel.apply_snapshot(snapshot)
+        self._packing_screen.apply_runtime_snapshot(snapshot)
+        self._defect_screen.apply_runtime_snapshot(snapshot)
 
     def _nav_button(self, title: str, index: int, screen_name: str) -> QPushButton:
         """Создает кнопку перехода на экран с указанным индексом."""

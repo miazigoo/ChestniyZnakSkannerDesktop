@@ -144,6 +144,21 @@ class ScannerController(QObject):
             )
         )
 
+    def start_if_configured(self) -> None:
+        """Автоматически запускает сканер, если порт уже выбран."""
+
+        if self._state.selected_port:
+            self.start()
+            return
+        self._set_state(
+            ScannerUiState(
+                ports=self._state.ports,
+                selected_port="",
+                baudrate=self._state.baudrate,
+                status_message="Сканер не выбран. Настройте COM/SPP-порт.",
+            )
+        )
+
     def stop(self) -> None:
         """Останавливает чтение сканера."""
 
