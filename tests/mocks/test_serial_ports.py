@@ -19,6 +19,7 @@ def test_list_serial_ports_maps_pyserial_ports(monkeypatch) -> None:  # type: ig
             SimpleNamespace(device="/dev/ttyUSB0", description="", hwid="USB"),
         ],
     )
+    monkeypatch.setattr(serial_ports, "_rfcomm_device_paths", lambda: [])
 
     ports = serial_ports.list_serial_ports()
     assert ports[0].device == "COM7"
@@ -66,3 +67,23 @@ def test_list_serial_ports_deduplicates_rfcomm(monkeypatch) -> None:  # type: ig
 
     assert len(ports) == 1
     assert ports[0].title == "/dev/rfcomm0 - pyserial rfcomm"
+
+
+def test_list_serial_ports_prefers_rfcomm_for_autostart(  # type: ignore[no-untyped-def]
+    monkeypatch,
+) -> None:
+    """Проверяет приоритет rfcomm, чтобы логин сканером работал локально."""
+
+    monkeypatch.setattr(
+        serial_ports.list_ports,
+        "comports",
+        lambda: [
+            SimpleNamespace(device="/dev/ttyS0", description="n/a", hwid="n/a"),
+            SimpleNamespace(device="/dev/rfcomm0", description="n/a", hwid="n/a"),
+        ],
+    )
+    monkeypatch.setattr(serial_ports, "_rfcomm_device_paths", lambda: [])
+
+    ports = serial_ports.list_serial_ports()
+
+    assert [port.device for port in ports] == ["/dev/rfcomm0", "/dev/ttyS0"]

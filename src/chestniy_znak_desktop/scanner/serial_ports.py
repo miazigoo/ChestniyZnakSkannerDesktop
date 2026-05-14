@@ -32,10 +32,18 @@ def list_serial_ports() -> list[ScannerPort]:
             ),
         )
 
-    return list(ports_by_device.values())
+    return sorted(ports_by_device.values(), key=_port_priority)
 
 
 def _rfcomm_device_paths() -> list[Path]:
     """Возвращает Linux rfcomm-устройства для Bluetooth SPP-сканеров."""
 
     return sorted(Path("/dev").glob("rfcomm*"))
+
+
+def _port_priority(port: ScannerPort) -> int:
+    """Возвращает приоритет автозапуска для найденного serial-порта."""
+
+    if port.device.startswith("/dev/rfcomm"):
+        return 0
+    return 1
