@@ -168,6 +168,7 @@ class AuthController(QObject):
             AuthUiState(
                 status_message="Авторизация не выполнена.",
                 error_message=message,
+                token_preview=self._state.token_preview,
             )
         )
 

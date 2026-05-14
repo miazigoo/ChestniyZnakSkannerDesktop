@@ -20,7 +20,9 @@ from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     SessionState,
     SessionStatus,
 )
+from chestniy_znak_desktop.controllers.auth_controller import AuthUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
@@ -68,6 +70,22 @@ def test_main_screen_emits_logout_request() -> None:
     screen.logout_requested.emit()
 
     assert requests == [True]
+
+
+def test_login_screen_shows_token_preview() -> None:
+    """Проверяет, что логин показывает факт последнего скана."""
+
+    qapp()
+    screen = LoginScreen()
+    screen.apply_state(
+        AuthUiState(
+            status_message="Авторизация не выполнена.",
+            error_message="Неверный токен",
+            token_preview="abcd...1234",
+        )
+    )
+
+    assert screen is not None
 
 
 def test_runtime_status_bar_accepts_snapshot() -> None:

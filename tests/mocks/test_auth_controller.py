@@ -101,6 +101,19 @@ def test_auth_controller_reports_bad_token() -> None:
     assert runtime.snapshot.session.status == SessionStatus.UNKNOWN
 
 
+def test_auth_controller_keeps_token_preview_after_failed_login() -> None:
+    """Проверяет отображение факта скана после ошибки входа."""
+
+    controller, _runtime, service = _controller_pair()
+    service.login_error = UnauthorizedError("Неверный токен")
+
+    controller.login_with_raw_token("abc123456789")
+
+    assert controller.state.status_message == "Авторизация не выполнена."
+    assert controller.state.error_message == "Неверный токен"
+    assert controller.state.token_preview == "abc1...6789"
+
+
 def test_auth_controller_restore_session_failure_marks_unauthenticated() -> None:
     """Проверяет сброс сессии при неуспешном восстановлении."""
 

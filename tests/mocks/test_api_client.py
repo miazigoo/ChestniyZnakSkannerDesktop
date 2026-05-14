@@ -35,5 +35,5 @@ def test_api_client_raises_on_unauthorized(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(httpx.Client, "request", fake_request)
     client = ApiClient(AppConfig(api_base_url="http://test/api/v2/"))
-    with pytest.raises(UnauthorizedError):
+    with pytest.raises(UnauthorizedError, match="Нет сессии"):
         client.get("auth-check")

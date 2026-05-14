@@ -78,7 +78,7 @@ class ApiClient:
 
         response = self._client.request(method, url, **kwargs)
         if response.status_code in {401, 403}:
-            raise UnauthorizedError("Сессия истекла. Войдите снова.")
+            raise UnauthorizedError(self._extract_error_message(response))
         if response.is_error:
             raise ApiError(self._extract_error_message(response))
         self.save_cookies()

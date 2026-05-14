@@ -18,12 +18,14 @@ class LoginScreen(QWidget):
         self._title_label = QLabel("Вход по токену")
         self._status_label = QLabel("Ожидание токена авторизации")
         self._error_label = QLabel("")
+        self._token_preview = QLabel("Последний скан: -")
         self._scan_hint = QLabel("Сканируйте QR-токен авторизации подключенным сканером")
         self._scanner_label = QLabel("Сканер: проверяем состояние")
         layout = QVBoxLayout(self)
         layout.addWidget(self._title_label)
         layout.addWidget(self._status_label)
         layout.addWidget(self._error_label)
+        layout.addWidget(self._token_preview)
         layout.addWidget(self._scan_hint)
         layout.addWidget(self._scanner_label)
         layout.addStretch(1)
@@ -33,6 +35,7 @@ class LoginScreen(QWidget):
 
         self._status_label.setText(state.status_message)
         self._error_label.setText(state.error_message)
+        self._token_preview.setText(f"Последний скан: {state.token_preview or '-'}")
 
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет подсказку о доступности сканера для входа."""
