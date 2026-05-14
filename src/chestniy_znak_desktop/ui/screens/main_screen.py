@@ -59,6 +59,12 @@ class MainScreen(QWidget):
         return self._packing_screen
 
     @property
+    def boxes_screen(self) -> BoxesScreen:
+        """Возвращает экран коробок для подключения контроллера."""
+
+        return self._boxes_screen
+
+    @property
     def settings_screen(self) -> SettingsScreen:
         """Возвращает экран настроек для подключения контроллеров."""
 

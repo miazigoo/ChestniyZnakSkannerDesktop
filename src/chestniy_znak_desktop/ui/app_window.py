@@ -6,6 +6,7 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
@@ -26,6 +27,7 @@ class AppWindow(QMainWindow):
         runtime_controller: RuntimeController,
         auth_controller: AuthController,
         packing_controller: PackingController,
+        boxes_controller: BoxesController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
     ) -> None:
@@ -36,6 +38,7 @@ class AppWindow(QMainWindow):
         self._runtime_controller = runtime_controller
         self._auth_controller = auth_controller
         self._packing_controller = packing_controller
+        self._boxes_controller = boxes_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
         self._central = QWidget()
@@ -61,6 +64,16 @@ class AppWindow(QMainWindow):
         self._login_screen.token_submitted.connect(self._auth_controller.login_with_raw_token)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._boxes_controller.state_changed.connect(self._main_screen.boxes_screen.apply_state)
+        self._main_screen.boxes_screen.refresh_requested.connect(self._boxes_controller.refresh)
+        self._main_screen.boxes_screen.search_requested.connect(self._boxes_controller.set_query)
+        self._main_screen.boxes_screen.status_filter_changed.connect(
+            self._boxes_controller.set_status_filter
+        )
+        self._main_screen.boxes_screen.next_page_requested.connect(self._boxes_controller.next_page)
+        self._main_screen.boxes_screen.previous_page_requested.connect(
+            self._boxes_controller.previous_page
+        )
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box
         )

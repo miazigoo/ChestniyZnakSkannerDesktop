@@ -13,6 +13,7 @@ from chestniy_znak_desktop.api.session_store import FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
@@ -67,11 +68,16 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
             exc,
         ),
     )
+    packing_service = PackingService(api_client)
     packing_controller = PackingController(
-        packing_service=PackingService(api_client),
+        packing_service=packing_service,
         task_runner=api_task_runner,
         device_id=settings.device_id,
         sound_service=sound_service,
+    )
+    boxes_controller = BoxesController(
+        boxes_service=packing_service,
+        task_runner=api_task_runner,
     )
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
@@ -90,6 +96,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         runtime_controller=runtime_controller,
         auth_controller=auth_controller,
         packing_controller=packing_controller,
+        boxes_controller=boxes_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )
@@ -97,6 +104,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: api_client.close())
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
+    auth_controller.authenticated.connect(lambda _user: boxes_controller.refresh())
     runtime_controller.start()
     scanner_controller.refresh_ports()
     settings_controller.publish_state()
