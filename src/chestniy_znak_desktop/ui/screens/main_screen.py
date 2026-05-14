@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Signal
 from PySide6.QtWidgets import (
+    QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
-    QPushButton,
+    QLabel,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -19,7 +21,9 @@ from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScree
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen
+from chestniy_znak_desktop.ui.widgets.main_navigation import MainSidebar, MainWorkspace, NavItem
 from chestniy_znak_desktop.ui.widgets.user_session_panel import UserSessionPanel
+from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIconName
 
 
 class MainScreen(QWidget):
@@ -29,10 +33,18 @@ class MainScreen(QWidget):
     screen_changed = Signal(str)
 
     def __init__(self) -> None:
-        """Создает навигацию и регистрирует рабочие экраны."""
+        """Создает современную навигацию и регистрирует рабочие экраны."""
 
         super().__init__()
+        self.setObjectName("mainScreen")
         self._stack = QStackedWidget()
+        self._stack.setObjectName("mainContentStack")
+        self._stack_effect = QGraphicsOpacityEffect(self._stack)
+        self._stack.setGraphicsEffect(self._stack_effect)
+        self._stack_animation = QPropertyAnimation(self._stack_effect, b"opacity", self)
+        self._stack_animation.setDuration(180)
+        self._stack_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._nav_items: list[NavItem] = []
         self._session_panel = UserSessionPanel()
         self._packing_screen = PackingScreen()
         self._boxes_screen = BoxesScreen()
@@ -41,29 +53,11 @@ class MainScreen(QWidget):
         self._defect_screen = DefectScreen()
         self._settings_screen = SettingsScreen()
         self._diagnostics_screen = DiagnosticsScreen()
-        self._stack.addWidget(self._packing_screen)
-        self._stack.addWidget(self._boxes_screen)
-        self._stack.addWidget(self._box_lookup_screen)
-        self._stack.addWidget(self._verify_screen)
-        self._stack.addWidget(self._defect_screen)
-        self._stack.addWidget(self._settings_screen)
-        self._stack.addWidget(self._diagnostics_screen)
+        self._register_work_screens()
         self._session_panel.logout_requested.connect(self.logout_requested.emit)
-
-        nav = QVBoxLayout()
-        nav.addWidget(self._session_panel)
-        nav.addWidget(self._nav_button("Упаковка", 0, "packing"))
-        nav.addWidget(self._nav_button("Коробки", 1, "boxes"))
-        nav.addWidget(self._nav_button("Поиск коробки", 2, "box_lookup"))
-        nav.addWidget(self._nav_button("Проверка", 3, "verify"))
-        nav.addWidget(self._nav_button("Брак", 4, "defect"))
-        nav.addStretch(1)
-        nav.addWidget(self._nav_button("Настройки", 5, "settings"))
-        nav.addWidget(self._nav_button("Диагностика", 6, "diagnostics"))
-
-        layout = QHBoxLayout(self)
-        layout.addLayout(nav)
-        layout.addWidget(self._stack, stretch=1)
+        self._build_layout()
+        self._apply_style()
+        self._set_active_nav("packing")
 
     @property
     def packing_screen(self) -> PackingScreen:
@@ -122,15 +116,239 @@ class MainScreen(QWidget):
 
         self._show_screen(1, "boxes")
 
-    def _nav_button(self, title: str, index: int, screen_name: str) -> QPushButton:
-        """Создает кнопку перехода на экран с указанным индексом."""
+    def _register_work_screens(self) -> None:
+        """Добавляет рабочие экраны в стек."""
 
-        button = QPushButton(title)
-        button.clicked.connect(lambda: self._show_screen(index, screen_name))
-        return button
+        for screen in (
+            self._packing_screen,
+            self._boxes_screen,
+            self._box_lookup_screen,
+            self._verify_screen,
+            self._defect_screen,
+            self._settings_screen,
+            self._diagnostics_screen,
+        ):
+            self._stack.addWidget(screen)
+
+    def _build_layout(self) -> None:
+        """Собирает боковую панель и рабочую область."""
+
+        sidebar = self._build_sidebar()
+        workspace = MainWorkspace()
+        workspace_layout = QVBoxLayout(workspace)
+        workspace_layout.setContentsMargins(20, 18, 22, 20)
+        workspace_layout.setSpacing(12)
+        workspace_layout.addLayout(self._workspace_header())
+        workspace_layout.addWidget(self._stack, stretch=1)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(14)
+        layout.addWidget(sidebar)
+        layout.addWidget(workspace, stretch=1)
+
+    def _build_sidebar(self) -> MainSidebar:
+        """Создает боковую навигационную панель."""
+
+        sidebar = MainSidebar()
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 18, 16, 18)
+        layout.setSpacing(10)
+
+        brand = QLabel("CZ Desktop")
+        brand.setObjectName("mainBrand")
+        section = QLabel("Рабочее место")
+        section.setObjectName("mainSection")
+        layout.addWidget(brand)
+        layout.addWidget(section)
+        layout.addWidget(self._session_panel)
+        layout.addSpacing(6)
+        for item in self._main_nav_items():
+            layout.addWidget(item)
+        layout.addStretch(1)
+        utility = QLabel("Сервис")
+        utility.setObjectName("mainSection")
+        layout.addWidget(utility)
+        for item in self._utility_nav_items():
+            layout.addWidget(item)
+        return sidebar
+
+    def _workspace_header(self) -> QHBoxLayout:
+        """Создает шапку рабочей области."""
+
+        title = QLabel("Операционный центр")
+        title.setObjectName("workspaceTitle")
+        subtitle = QLabel("Сканер, упаковка, проверка и сервисные действия")
+        subtitle.setObjectName("workspaceSubtitle")
+        title_box = QVBoxLayout()
+        title_box.setContentsMargins(0, 0, 0, 0)
+        title_box.setSpacing(2)
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+
+        accent = QFrame()
+        accent.setObjectName("workspaceAccent")
+        accent.setFixedSize(148, 6)
+
+        header = QHBoxLayout()
+        header.addLayout(title_box)
+        header.addStretch(1)
+        header.addWidget(accent)
+        return header
+
+    def _main_nav_items(self) -> list[NavItem]:
+        """Создает основные пункты навигации."""
+
+        return [
+            self._nav_item("Упаковка", "Текущая коробка", VectorIconName.BOX, 0, "packing"),
+            self._nav_item("Коробки", "Список и детали", VectorIconName.BOX, 1, "boxes"),
+            self._nav_item("Поиск коробки", "SSCC или ID", VectorIconName.SCANNER, 2, "box_lookup"),
+            self._nav_item("Проверка", "DataMatrix", VectorIconName.TOKEN, 3, "verify"),
+            self._nav_item("Брак", "Отметка кодов", VectorIconName.WARNING, 4, "defect"),
+        ]
+
+    def _utility_nav_items(self) -> list[NavItem]:
+        """Создает сервисные пункты навигации."""
+
+        return [
+            self._nav_item("Настройки", "Устройство", VectorIconName.SETTINGS, 5, "settings"),
+            self._nav_item(
+                "Диагностика",
+                "Логи и статус",
+                VectorIconName.DIAGNOSTICS,
+                6,
+                "diagnostics",
+            ),
+        ]
+
+    def _nav_item(
+        self,
+        title: str,
+        subtitle: str,
+        icon_name: VectorIconName,
+        index: int,
+        screen_name: str,
+    ) -> NavItem:
+        """Создает пункт навигации и подключает переход."""
+
+        item = NavItem(title, subtitle, icon_name, index, screen_name)
+        item.clicked.connect(self._show_screen)
+        self._nav_items.append(item)
+        return item
 
     def _show_screen(self, index: int, screen_name: str) -> None:
         """Переключает рабочий экран и публикует выбранный сценарий."""
 
-        self._stack.setCurrentIndex(index)
+        if self._stack.currentIndex() != index:
+            self._stack.setCurrentIndex(index)
+            self._animate_stack()
+        self._set_active_nav(screen_name)
         self.screen_changed.emit(screen_name)
+
+    def _set_active_nav(self, screen_name: str) -> None:
+        """Подсвечивает активный пункт навигации."""
+
+        for item in self._nav_items:
+            item.set_active(item.property("screen_name") == screen_name)
+
+    def _animate_stack(self) -> None:
+        """Запускает мягкую анимацию появления рабочего экрана."""
+
+        self._stack_animation.stop()
+        self._stack_animation.setStartValue(0.55)
+        self._stack_animation.setEndValue(1.0)
+        self._stack_animation.start()
+
+    def _apply_style(self) -> None:
+        """Применяет локальную стилизацию главного экрана."""
+
+        self.setStyleSheet("""
+            #mainScreen {
+                background: transparent;
+            }
+            #mainSidebar {
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 18px;
+            }
+            #mainBrand {
+                color: #ffffff;
+                font-size: 24px;
+                font-weight: 900;
+                padding: 6px 8px 0 8px;
+            }
+            #mainSection {
+                color: rgba(255, 255, 255, 0.56);
+                font-size: 12px;
+                font-weight: 800;
+                padding: 0 8px 4px 8px;
+                text-transform: uppercase;
+            }
+            #userSessionPanel {
+                background: rgba(255, 255, 255, 0.075);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 16px;
+            }
+            #sessionUser {
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 850;
+            }
+            #sessionMeta {
+                color: rgba(236, 244, 247, 0.64);
+                font-size: 12px;
+                font-weight: 600;
+            }
+            #sessionLogout {
+                background: #e0b15e;
+                color: #19160f;
+                border: 0;
+                border-radius: 10px;
+                padding: 8px 12px;
+                font-weight: 850;
+            }
+            #mainNavItem {
+                background: rgba(255, 255, 255, 0.055);
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 14px;
+            }
+            #mainNavItem:hover {
+                background: rgba(255, 255, 255, 0.10);
+                border-color: rgba(86, 199, 184, 0.34);
+            }
+            #mainNavItem[active="true"] {
+                background: rgba(86, 199, 184, 0.18);
+                border-color: rgba(224, 177, 94, 0.72);
+            }
+            #mainNavTitle {
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 850;
+            }
+            #mainNavSubtitle {
+                color: rgba(236, 244, 247, 0.62);
+                font-size: 11px;
+            }
+            #mainWorkspace {
+                background: rgba(15, 18, 24, 0.78);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 18px;
+            }
+            #workspaceTitle {
+                color: #ffffff;
+                font-size: 26px;
+                font-weight: 900;
+            }
+            #workspaceSubtitle {
+                color: rgba(236, 244, 247, 0.64);
+                font-size: 13px;
+                font-weight: 600;
+            }
+            #workspaceAccent {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #56c7b8,
+                    stop:1 #e0b15e
+                );
+                border-radius: 3px;
+            }
+            """)

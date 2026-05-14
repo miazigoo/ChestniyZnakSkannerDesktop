@@ -49,6 +49,20 @@ def test_main_screen_can_be_created() -> None:
     assert screen is not None
 
 
+def test_main_screen_updates_active_navigation() -> None:
+    """Проверяет активное состояние современной навигации."""
+
+    qapp()
+    screen = MainScreen()
+
+    assert len(screen._nav_items) == 7  # noqa: SLF001
+    assert screen._nav_items[0].property("active") is True  # noqa: SLF001
+
+    screen.show_boxes()
+
+    assert screen._nav_items[1].property("active") is True  # noqa: SLF001
+
+
 def test_boxes_screen_has_backend_status_filters() -> None:
     """Проверяет наличие backend-фильтров списка коробок."""
 

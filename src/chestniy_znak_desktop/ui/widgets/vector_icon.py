@@ -17,6 +17,9 @@ class VectorIconName(str, Enum):
     LINK = "link"
     TOKEN = "token"
     WARNING = "warning"
+    BOX = "box"
+    SETTINGS = "settings"
+    DIAGNOSTICS = "diagnostics"
 
 
 class VectorIcon(QWidget):
@@ -53,6 +56,12 @@ class VectorIcon(QWidget):
             self._draw_link(painter, rect)
         elif self._icon_name == VectorIconName.TOKEN:
             self._draw_token(painter, rect)
+        elif self._icon_name == VectorIconName.BOX:
+            self._draw_box(painter, rect)
+        elif self._icon_name == VectorIconName.SETTINGS:
+            self._draw_settings(painter, rect)
+        elif self._icon_name == VectorIconName.DIAGNOSTICS:
+            self._draw_diagnostics(painter, rect)
         else:
             self._draw_warning(painter, rect)
 
@@ -127,3 +136,50 @@ class VectorIcon(QWidget):
             QPointF(rect.center().x(), rect.bottom() - 8),
         )
         painter.drawPoint(QPointF(rect.center().x(), rect.bottom() - 4))
+
+    @staticmethod
+    def _draw_box(painter: QPainter, rect: QRectF) -> None:
+        """Рисует иконку коробки."""
+
+        top = QPainterPath()
+        top.moveTo(rect.left() + 3, rect.top() + 8)
+        top.lineTo(rect.center().x(), rect.top() + 2)
+        top.lineTo(rect.right() - 3, rect.top() + 8)
+        top.lineTo(rect.center().x(), rect.top() + 14)
+        top.closeSubpath()
+        painter.drawPath(top)
+        painter.drawRoundedRect(rect.adjusted(3, 8, -3, -2), 3, 3)
+        painter.drawLine(
+            QPointF(rect.center().x(), rect.top() + 14),
+            QPointF(rect.center().x(), rect.bottom() - 2),
+        )
+
+    @staticmethod
+    def _draw_settings(painter: QPainter, rect: QRectF) -> None:
+        """Рисует иконку настроек."""
+
+        painter.drawEllipse(rect.adjusted(5, 5, -5, -5))
+        painter.drawEllipse(rect.adjusted(10, 10, -10, -10))
+        for x_offset, y_offset in ((12, 0), (12, 24), (0, 12), (24, 12)):
+            painter.drawLine(
+                QPointF(rect.left() + x_offset, rect.top() + y_offset),
+                QPointF(rect.center().x(), rect.center().y()),
+            )
+
+    @staticmethod
+    def _draw_diagnostics(painter: QPainter, rect: QRectF) -> None:
+        """Рисует иконку диагностики."""
+
+        painter.drawRoundedRect(rect.adjusted(2, 3, -2, -3), 4, 4)
+        painter.drawLine(
+            QPointF(rect.left() + 7, rect.bottom() - 8),
+            QPointF(rect.left() + 7, rect.top() + 12),
+        )
+        painter.drawLine(
+            QPointF(rect.center().x(), rect.bottom() - 8),
+            QPointF(rect.center().x(), rect.top() + 7),
+        )
+        painter.drawLine(
+            QPointF(rect.right() - 7, rect.bottom() - 8),
+            QPointF(rect.right() - 7, rect.top() + 15),
+        )
