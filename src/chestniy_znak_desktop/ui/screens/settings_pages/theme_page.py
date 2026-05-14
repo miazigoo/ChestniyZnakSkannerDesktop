@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
+from chestniy_znak_desktop.ui.themes.theme import available_themes, theme_by_name
 
 
 class ThemeSettingsPage(QWidget):
@@ -19,7 +20,8 @@ class ThemeSettingsPage(QWidget):
 
         super().__init__()
         self._theme_select = QComboBox()
-        self._theme_select.addItems(["light", "dark"])
+        for theme in available_themes():
+            self._theme_select.addItem(theme.title, theme.name)
         self._save_button = QPushButton("Сохранить тему")
         self._back_button = QPushButton("Назад к настройкам")
         self._save_button.clicked.connect(self._emit_save)
@@ -35,16 +37,16 @@ class ThemeSettingsPage(QWidget):
     def apply_state(self, state: SettingsUiState) -> None:
         """Устанавливает текущую тему в combo box."""
 
-        theme_index = self._theme_select.findText(state.theme_name)
+        theme_index = self._theme_select.findData(theme_by_name(state.theme_name).name)
         if theme_index >= 0:
             self._theme_select.setCurrentIndex(theme_index)
 
     def value(self) -> str:
         """Возвращает выбранную тему."""
 
-        return self._theme_select.currentText()
+        return str(self._theme_select.currentData() or "light")
 
     def _emit_save(self) -> None:
         """Публикует запрос сохранения темы."""
 
-        self.save_requested.emit(self._theme_select.currentText())
+        self.save_requested.emit(self.value())

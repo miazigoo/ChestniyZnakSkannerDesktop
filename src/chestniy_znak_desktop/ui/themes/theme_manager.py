@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
-from chestniy_znak_desktop.ui.themes.theme import LIGHT_THEME, THEMES, Theme
+from chestniy_znak_desktop.ui.themes.theme import Theme, theme_by_name
 
 
 class ThemeManager(QObject):
@@ -28,7 +28,7 @@ class ThemeManager(QObject):
     def get_theme(self, theme_name: str) -> Theme:
         """Возвращает тему по имени или светлую тему по умолчанию."""
 
-        return THEMES.get(theme_name, LIGHT_THEME)
+        return theme_by_name(theme_name)
 
     def set_theme(self, theme_name: str, app: QApplication | None = None) -> Theme:
         """Меняет текущую тему и при необходимости применяет ее к приложению."""

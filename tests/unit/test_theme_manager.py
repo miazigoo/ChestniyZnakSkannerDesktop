@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from chestniy_znak_desktop.ui.themes.theme import THEMES, available_themes, theme_by_name
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
 
 
@@ -16,6 +17,22 @@ def test_theme_manager_switches_theme_without_app() -> None:
     """Проверяет переключение темы без QApplication."""
 
     manager = ThemeManager("light")
-    selected = manager.set_theme("dark")
-    assert selected.name == "dark"
-    assert manager.current_theme.title == "Темная"
+    selected = manager.set_theme("graphite")
+    assert selected.name == "graphite"
+    assert manager.current_theme.title == "Graphite Pro"
+
+
+def test_available_themes_are_registered() -> None:
+    """Проверяет регистрацию всех тем."""
+
+    names = [theme.name for theme in available_themes()]
+
+    assert names == ["light", "graphite", "pacific", "field", "contrast"]
+    assert set(names) == set(THEMES)
+    assert all("QPushButton" in theme.stylesheet for theme in available_themes())
+
+
+def test_dark_alias_maps_to_graphite() -> None:
+    """Проверяет совместимость со старым значением темной темы."""
+
+    assert theme_by_name("dark").name == "graphite"
