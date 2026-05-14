@@ -23,10 +23,16 @@ from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     SessionStatus,
 )
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState  # noqa: E402
+from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
+    PackingBoxUi,
+    PackingItemUi,
+    PackingUiState,
+)
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
@@ -75,6 +81,51 @@ def test_boxes_screen_has_backend_status_filters() -> None:
     ]
 
     assert values == ["all", "active", "open", "edit", "closed", "empty"]
+
+
+def test_packing_screen_shows_box_progress_and_items() -> None:
+    """Проверяет современный экран упаковки с открытой коробкой."""
+
+    qapp()
+    screen = PackingScreen()
+    screen.apply_runtime_snapshot(
+        RuntimeSnapshot(
+            scanner=ScannerState(
+                status=ScannerStatus.RUNNING,
+                port="/dev/rfcomm0",
+            )
+        )
+    )
+    screen.apply_state(
+        PackingUiState(
+            current_box=PackingBoxUi(
+                box_id=42,
+                order_name="Заказ 100",
+                sscc="046012345678901234",
+                filled=1,
+                capacity=10,
+                count_in_packing=True,
+                is_closed=False,
+                print_ok=False,
+                print_error="",
+                items=[
+                    PackingItemUi(
+                        id=1,
+                        gtin="04601234567890",
+                        serial="ABC123",
+                        visible_code="04601234567890ABC123",
+                    )
+                ],
+            ),
+            status_message="Код добавлен",
+            result_message="OK",
+            last_scanned_code="04601234567890ABC123",
+        )
+    )
+
+    assert screen._progress_bar.value() == 1  # noqa: SLF001
+    assert screen._items_table.rowCount() == 1  # noqa: SLF001
+    assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
 
 
 def test_settings_screen_has_grouped_pages() -> None:
