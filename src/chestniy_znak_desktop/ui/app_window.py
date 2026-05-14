@@ -10,6 +10,7 @@ from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditControl
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.runtime.app_state import AppState
@@ -32,6 +33,7 @@ class AppWindow(QMainWindow):
         boxes_controller: BoxesController,
         box_edit_controller: BoxEditController,
         defect_controller: DefectController,
+        printer_controller: PrinterController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
     ) -> None:
@@ -45,6 +47,7 @@ class AppWindow(QMainWindow):
         self._boxes_controller = boxes_controller
         self._box_edit_controller = box_edit_controller
         self._defect_controller = defect_controller
+        self._printer_controller = printer_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
         self._scan_target = "packing"
@@ -73,6 +76,9 @@ class AppWindow(QMainWindow):
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
+        self._printer_controller.state_changed.connect(
+            self._main_screen.settings_screen.apply_printer_state
+        )
         self._boxes_controller.state_changed.connect(self._main_screen.boxes_screen.apply_state)
         self._box_edit_controller.state_changed.connect(
             self._main_screen.boxes_screen.apply_edit_state
@@ -132,6 +138,12 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.settings_screen.settings_save_requested.connect(
             self._settings_controller.save_form
+        )
+        self._main_screen.settings_screen.printer_refresh_requested.connect(
+            self._printer_controller.refresh
+        )
+        self._main_screen.settings_screen.printer_selected.connect(
+            self._printer_controller.select_printer
         )
         self._main_screen.settings_screen.scanner_ports_refresh_requested.connect(
             self._scanner_controller.refresh_ports

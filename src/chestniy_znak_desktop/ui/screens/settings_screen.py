@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
+from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.controllers.settings_controller import (
     SettingsFormData,
     SettingsUiState,
@@ -30,6 +31,8 @@ class SettingsScreen(QWidget):
     scanner_port_changed = Signal(str)
     scanner_baudrate_changed = Signal(int)
     settings_save_requested = Signal(SettingsFormData)
+    printer_refresh_requested = Signal()
+    printer_selected = Signal(int)
 
     def __init__(self) -> None:
         """Создает базовую форму настроек."""
@@ -54,6 +57,12 @@ class SettingsScreen(QWidget):
         self._start_scanner_button.clicked.connect(self.scanner_start_requested.emit)
         self._stop_scanner_button = QPushButton("Остановить сканер")
         self._stop_scanner_button.clicked.connect(self.scanner_stop_requested.emit)
+        self._printer_select = QComboBox()
+        self._printer_select.currentIndexChanged.connect(self._emit_printer_selected)
+        self._printer_status = QLabel("Принтер не выбран")
+        self._printer_error = QLabel("")
+        self._refresh_printers_button = QPushButton("Обновить принтеры")
+        self._refresh_printers_button.clicked.connect(self.printer_refresh_requested.emit)
         self._theme_select = QComboBox()
         self._theme_select.addItems(["light", "dark"])
         self._sound_enabled = QCheckBox("Звуки включены")
@@ -77,6 +86,11 @@ class SettingsScreen(QWidget):
         layout.addLayout(scanner_actions)
         layout.addWidget(self._scanner_status)
         layout.addWidget(self._scanner_error)
+        layout.addWidget(QLabel("Принтер этикеток"))
+        layout.addWidget(self._printer_select)
+        layout.addWidget(self._refresh_printers_button)
+        layout.addWidget(self._printer_status)
+        layout.addWidget(self._printer_error)
         layout.addWidget(self._theme_select)
         layout.addWidget(self._sound_enabled)
         layout.addWidget(self._save_button)
@@ -120,12 +134,37 @@ class SettingsScreen(QWidget):
         self._start_scanner_button.setEnabled(not state.is_running)
         self._stop_scanner_button.setEnabled(state.is_running)
 
+    def apply_printer_state(self, state: PrinterUiState) -> None:
+        """Обновляет элементы выбора принтера."""
+
+        self._printer_select.blockSignals(True)
+        self._printer_select.clear()
+        self._printer_select.addItem("Принтер не выбран", 0)
+        for printer in state.printers:
+            self._printer_select.addItem(printer.title, printer.id)
+        if state.selected_printer_id is not None:
+            index = self._printer_select.findData(state.selected_printer_id)
+            if index >= 0:
+                self._printer_select.setCurrentIndex(index)
+        self._printer_select.blockSignals(False)
+        self._printer_status.setText(state.status_message)
+        self._printer_error.setText(state.error_message)
+        self._printer_select.setEnabled(not state.is_busy)
+        self._refresh_printers_button.setEnabled(not state.is_busy)
+
     def _emit_baudrate(self, value: str) -> None:
         """Публикует выбранную скорость serial-порта."""
 
         if not value:
             return
         self.scanner_baudrate_changed.emit(int(value))
+
+    def _emit_printer_selected(self, _index: int) -> None:
+        """Публикует выбранный принтер."""
+
+        printer_id = int(self._printer_select.currentData() or 0)
+        if printer_id > 0:
+            self.printer_selected.emit(printer_id)
 
     def _emit_settings_save(self) -> None:
         """Публикует данные формы настроек для сохранения."""

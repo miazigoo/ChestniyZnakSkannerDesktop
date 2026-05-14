@@ -250,6 +250,19 @@ def test_printer_service_set_selection() -> None:
     assert result.selected_printer_id == 1
 
 
+def test_printer_service_get_selection() -> None:
+    """Проверяет получение доступных принтеров."""
+
+    client = FakeApiClient()
+    result = PrinterService(client).get_selection(device_id="pc-1")
+    assert result.printers[0].name == "Zebra"
+    assert client.last_call == (
+        "GET",
+        "chestniy-znak/packing/printer/printers",
+        {"params": {"device_id": "pc-1"}},
+    )
+
+
 def test_printer_service_print_box_label() -> None:
     """Проверяет повторную печать этикетки коробки."""
 

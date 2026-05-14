@@ -20,6 +20,7 @@ from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditControl
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.runtime.app_state import AppState
@@ -88,6 +89,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
         sound_service=sound_service,
     )
+    printer_controller = PrinterController(
+        printer_service=printer_service,
+        task_runner=api_task_runner,
+        device_id=settings.device_id,
+    )
     box_edit_controller = BoxEditController(
         edit_service=BoxEditService(api_client),
         task_runner=api_task_runner,
@@ -118,6 +124,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         boxes_controller=boxes_controller,
         box_edit_controller=box_edit_controller,
         defect_controller=defect_controller,
+        printer_controller=printer_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )
@@ -126,6 +133,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     auth_controller.authenticated.connect(lambda _user: boxes_controller.refresh())
+    auth_controller.authenticated.connect(lambda _user: printer_controller.refresh())
     runtime_controller.start()
     scanner_controller.refresh_ports()
     scanner_controller.start_if_configured()
