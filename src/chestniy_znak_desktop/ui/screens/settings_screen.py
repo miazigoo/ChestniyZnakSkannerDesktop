@@ -15,6 +15,10 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
+from chestniy_znak_desktop.controllers.settings_controller import (
+    SettingsFormData,
+    SettingsUiState,
+)
 
 
 class SettingsScreen(QWidget):
@@ -25,6 +29,7 @@ class SettingsScreen(QWidget):
     scanner_stop_requested = Signal()
     scanner_port_changed = Signal(str)
     scanner_baudrate_changed = Signal(int)
+    settings_save_requested = Signal(SettingsFormData)
 
     def __init__(self) -> None:
         """Создает базовую форму настроек."""
@@ -53,6 +58,10 @@ class SettingsScreen(QWidget):
         self._theme_select.addItems(["light", "dark"])
         self._sound_enabled = QCheckBox("Звуки включены")
         self._sound_enabled.setChecked(True)
+        self._save_button = QPushButton("Сохранить настройки")
+        self._save_button.clicked.connect(self._emit_settings_save)
+        self._settings_status = QLabel("")
+        self._settings_error = QLabel("")
         scanner_actions = QHBoxLayout()
         scanner_actions.addWidget(self._refresh_ports_button)
         scanner_actions.addWidget(self._start_scanner_button)
@@ -70,7 +79,22 @@ class SettingsScreen(QWidget):
         layout.addWidget(self._scanner_error)
         layout.addWidget(self._theme_select)
         layout.addWidget(self._sound_enabled)
+        layout.addWidget(self._save_button)
+        layout.addWidget(self._settings_status)
+        layout.addWidget(self._settings_error)
         layout.addStretch(1)
+
+    def apply_settings_state(self, state: SettingsUiState) -> None:
+        """Обновляет основные поля настроек приложения."""
+
+        self._backend_input.setText(state.api_base_url)
+        self._device_input.setText(state.device_id)
+        theme_index = self._theme_select.findText(state.theme_name)
+        if theme_index >= 0:
+            self._theme_select.setCurrentIndex(theme_index)
+        self._sound_enabled.setChecked(state.sound_enabled)
+        self._settings_status.setText(state.status_message)
+        self._settings_error.setText(state.error_message)
 
     def apply_scanner_state(self, state: ScannerUiState) -> None:
         """Обновляет элементы настроек сканера."""
@@ -102,3 +126,15 @@ class SettingsScreen(QWidget):
         if not value:
             return
         self.scanner_baudrate_changed.emit(int(value))
+
+    def _emit_settings_save(self) -> None:
+        """Публикует данные формы настроек для сохранения."""
+
+        self.settings_save_requested.emit(
+            SettingsFormData(
+                api_base_url=self._backend_input.text(),
+                device_id=self._device_input.text(),
+                theme_name=self._theme_select.currentText(),
+                sound_enabled=self._sound_enabled.isChecked(),
+            )
+        )

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
+from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
@@ -26,6 +27,7 @@ class AppWindow(QMainWindow):
         auth_controller: AuthController,
         packing_controller: PackingController,
         scanner_controller: ScannerController,
+        settings_controller: SettingsController,
     ) -> None:
         """Создает главное окно и регистрирует стартовые экраны."""
 
@@ -35,6 +37,7 @@ class AppWindow(QMainWindow):
         self._auth_controller = auth_controller
         self._packing_controller = packing_controller
         self._scanner_controller = scanner_controller
+        self._settings_controller = settings_controller
         self._central = QWidget()
         self._stack = QStackedWidget()
         self._status_bar = RuntimeStatusBar()
@@ -75,6 +78,12 @@ class AppWindow(QMainWindow):
         self._scanner_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_scanner_state
         )
+        self._settings_controller.state_changed.connect(
+            self._main_screen.settings_screen.apply_settings_state
+        )
+        self._main_screen.settings_screen.settings_save_requested.connect(
+            self._settings_controller.save_form
+        )
         self._main_screen.settings_screen.scanner_ports_refresh_requested.connect(
             self._scanner_controller.refresh_ports
         )
@@ -87,8 +96,14 @@ class AppWindow(QMainWindow):
         self._main_screen.settings_screen.scanner_port_changed.connect(
             self._scanner_controller.set_selected_port
         )
+        self._main_screen.settings_screen.scanner_port_changed.connect(
+            self._settings_controller.set_scanner_port
+        )
         self._main_screen.settings_screen.scanner_baudrate_changed.connect(
             self._scanner_controller.set_baudrate
+        )
+        self._main_screen.settings_screen.scanner_baudrate_changed.connect(
+            self._settings_controller.set_scanner_baudrate
         )
         self.setWindowTitle(app_state.config.app_name)
         self.resize(1180, 760)

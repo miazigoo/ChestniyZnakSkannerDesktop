@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtWidgets import QApplication
 
 from chestniy_znak_desktop.api.client import ApiClient
@@ -13,6 +15,7 @@ from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
+from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
@@ -27,8 +30,15 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
 
     qt_app.setApplicationName(config.app_name)
     qt_app.setOrganizationName(config.organization_name)
-    settings = SettingsStore.from_config(config).load(defaults=config)
-    ThemeManager(settings.theme_name).apply(qt_app)
+    settings_store = SettingsStore.from_config(config)
+    settings = settings_store.load(defaults=config)
+    config = replace(
+        config,
+        api_base_url=settings.api_base_url,
+        device_id=settings.device_id,
+    )
+    theme_manager = ThemeManager(settings.theme_name)
+    theme_manager.apply(qt_app)
     state = AppState(config=config)
     connection_monitor = ConnectionMonitor(websocket_url=config.websocket_url)
     runtime_controller = RuntimeController(
@@ -60,12 +70,20 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         initial_port=settings.scanner_port,
         initial_baudrate=settings.scanner_baudrate,
     )
+    settings_controller = SettingsController(
+        settings_store=settings_store,
+        initial_settings=settings,
+        theme_manager=theme_manager,
+        sound_service=sound_service,
+        qt_app=qt_app,
+    )
     window = AppWindow(
         app_state=state,
         runtime_controller=runtime_controller,
         auth_controller=auth_controller,
         packing_controller=packing_controller,
         scanner_controller=scanner_controller,
+        settings_controller=settings_controller,
     )
     window.destroyed.connect(lambda _obj: runtime_controller.stop())
     window.destroyed.connect(lambda _obj: api_client.close())
@@ -73,5 +91,6 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     runtime_controller.start()
     scanner_controller.refresh_ports()
+    settings_controller.publish_state()
     auth_controller.restore_session()
     return window
