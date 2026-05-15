@@ -76,8 +76,9 @@ class ApiClient:
     def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         """Отправляет HTTP-запрос и обрабатывает типовые ошибки backend."""
 
+        kwargs = self._with_csrf_header(method, kwargs)
         response = self._client.request(method, url, **kwargs)
-        if response.status_code in {401, 403}:
+        if response.status_code == 401:
             raise UnauthorizedError(self._extract_error_message(response))
         if response.is_error:
             raise ApiError(self._extract_error_message(response))
@@ -86,6 +87,30 @@ class ApiClient:
         if not isinstance(payload, dict):
             raise ApiError("Backend вернул неожиданный формат ответа")
         return payload
+
+    def _with_csrf_header(self, method: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Добавляет CSRF-заголовок для небезопасных HTTP-методов."""
+
+        if method.upper() not in {"POST", "PATCH", "PUT", "DELETE"}:
+            return kwargs
+        csrf_token = self._csrf_token()
+        if not csrf_token:
+            return kwargs
+        headers = dict(kwargs.get("headers") or {})
+        headers.setdefault("X-CSRFToken", csrf_token)
+        kwargs["headers"] = headers
+        return kwargs
+
+    def _csrf_token(self) -> str:
+        """Возвращает CSRF-токен из cookies текущей сессии."""
+
+        token = self._client.cookies.get("csrftoken")
+        if token:
+            return token
+        for cookie in self._cookie_jar:
+            if cookie.name == "csrftoken" and cookie.value is not None:
+                return cookie.value
+        return ""
 
     @staticmethod
     def _extract_error_message(response: httpx.Response) -> str:
