@@ -252,6 +252,9 @@ class AppWindow(QMainWindow):
     def _handle_screen_changed(self, screen_name: str) -> None:
         """Обновляет активный сценарий и подтягивает актуальные данные экрана."""
 
+        previous_screen = self._scan_target
+        if previous_screen != screen_name:
+            self._clear_inactive_screen_data(previous_screen)
         self._set_scan_target(screen_name)
         if self._suppress_next_screen_refresh:
             self._suppress_next_screen_refresh = False
@@ -279,6 +282,18 @@ class AppWindow(QMainWindow):
             self._settings_controller.publish_state()
             self._printer_controller.refresh()
             self._scanner_controller.refresh_ports()
+
+    def _clear_inactive_screen_data(self, screen_name: str) -> None:
+        """Освобождает данные экранов, которые больше не активны."""
+
+        if screen_name == "boxes":
+            self._boxes_controller.clear_loaded_data()
+            return
+        if screen_name == "box_lookup":
+            self._box_lookup_controller.clear_state()
+            return
+        if screen_name == "defect":
+            self._defect_controller.clear_state()
 
     def _open_found_box(self, box_id: int) -> None:
         """Открывает найденную коробку в рабочем экране коробок."""

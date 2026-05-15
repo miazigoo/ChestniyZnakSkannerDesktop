@@ -243,6 +243,18 @@ class BoxesController(QObject):
             )
         )
 
+    def clear_loaded_data(self) -> None:
+        """Очищает загруженный список и детали, сохраняя фильтры."""
+
+        self._set_state(
+            BoxesUiState(
+                status_filter=self._state.status_filter,
+                query=self._state.query,
+                limit=self._state.limit,
+                status_message="Список будет загружен при входе в экран",
+            )
+        )
+
     def print_selected_label(self, box_id: int) -> None:
         """Запускает повторную печать этикетки выбранной коробки."""
 

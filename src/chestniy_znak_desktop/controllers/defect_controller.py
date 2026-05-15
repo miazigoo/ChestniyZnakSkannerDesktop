@@ -89,6 +89,11 @@ class DefectController(QObject):
             self._on_error,
         )
 
+    def clear_state(self) -> None:
+        """Полностью очищает данные экрана брака."""
+
+        self._set_state(DefectUiState())
+
     def _on_defect_marked(self, result: object) -> None:
         """Обрабатывает результат отметки брака."""
 

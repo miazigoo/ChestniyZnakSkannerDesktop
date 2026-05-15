@@ -119,6 +119,19 @@ def test_box_lookup_controller_reports_not_found() -> None:
     assert sounds.events == [SoundEvent.ERROR]
 
 
+def test_box_lookup_controller_clear_state_drops_log() -> None:
+    """Проверяет очистку состояния поиска при уходе с экрана."""
+
+    controller, _service, _sounds = _controller_pair()
+    controller.on_code_scanned("(00)123456789012345678")
+
+    controller.clear_state()
+
+    assert controller.state.found_box_id is None
+    assert controller.state.last_scanned_code == ""
+    assert controller.state.log == []
+
+
 def test_box_lookup_controller_reports_backend_error() -> None:
     """Проверяет ошибку backend-сценария поиска."""
 

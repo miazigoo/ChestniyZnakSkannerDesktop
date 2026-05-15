@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 
@@ -16,6 +17,12 @@ def configure_logging(log_dir: Path) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(log_file, encoding="utf-8"),
+            TimedRotatingFileHandler(
+                log_file,
+                when="H",
+                interval=1,
+                backupCount=23,
+                encoding="utf-8",
+            ),
         ],
     )

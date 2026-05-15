@@ -106,6 +106,11 @@ class BoxLookupController(QObject):
 
         self._set_state(BoxLookupUiState(log=self._state.log))
 
+    def clear_state(self) -> None:
+        """Полностью очищает данные экрана поиска коробки."""
+
+        self._set_state(BoxLookupUiState())
+
     def _find_box(self, code: str) -> BoxLookupResult:
         """Ищет коробку по всем кандидатам из скана."""
 

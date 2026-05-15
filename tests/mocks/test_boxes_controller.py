@@ -262,6 +262,22 @@ def test_boxes_controller_clear_detail_resets_selected_box() -> None:
     assert controller.state.detail_status_message == "Коробка удалена"
 
 
+def test_boxes_controller_clear_loaded_data_keeps_filters() -> None:
+    """Проверяет очистку загруженных данных без сброса фильтров."""
+
+    controller, service, _printer, _sounds = _controller_pair()
+    controller.set_query("000123")
+    controller.load_detail(10)
+
+    controller.clear_loaded_data()
+
+    assert service.last_call == ("all", "000123", 1, 0)
+    assert controller.state.query == "000123"
+    assert controller.state.rows == []
+    assert controller.state.detail is None
+    assert controller.state.status_message == "Список будет загружен при входе в экран"
+
+
 def test_boxes_controller_refresh_clears_missing_selected_box() -> None:
     """Проверяет сброс карточки, если выбранной коробки нет в списке."""
 

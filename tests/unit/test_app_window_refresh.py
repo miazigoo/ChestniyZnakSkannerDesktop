@@ -64,6 +64,7 @@ class FakeBoxesController:
         self.refresh_count = 0
         self.loaded_details: list[int] = []
         self.clear_messages: list[str] = []
+        self.clear_loaded_count = 0
 
     def refresh(self) -> None:
         """Запоминает обновление списка."""
@@ -80,6 +81,25 @@ class FakeBoxesController:
 
         self.clear_messages.append(message)
 
+    def clear_loaded_data(self) -> None:
+        """Запоминает очистку загруженного списка."""
+
+        self.clear_loaded_count += 1
+
+
+class FakeClearableController:
+    """Fake контроллер с очисткой состояния экрана."""
+
+    def __init__(self) -> None:
+        """Создает счетчик очисток."""
+
+        self.clear_count = 0
+
+    def clear_state(self) -> None:
+        """Запоминает очистку состояния."""
+
+        self.clear_count += 1
+
 
 class FakeWindow:
     """Минимальное окно для вызова методов AppWindow без полного UI."""
@@ -92,6 +112,7 @@ class FakeWindow:
         self._stack = FakeStack(self._main_screen)
         self._suppress_next_screen_refresh = False
         self._refreshes: list[str] = []
+        self._cleared: list[str] = []
 
     def _set_scan_target(self, screen_name: str) -> None:
         """Запоминает активный экран."""
@@ -103,6 +124,12 @@ class FakeWindow:
 
         self._refreshes.append(screen_name)
 
+    def _clear_inactive_screen_data(self, screen_name: str) -> None:
+        """Запоминает очистку покинутого экрана."""
+
+        if screen_name in {"boxes", "box_lookup", "defect"}:
+            self._cleared.append(screen_name)
+
 
 def test_screen_change_refreshes_selected_screen() -> None:
     """Проверяет автообновление при обычном переходе."""
@@ -113,6 +140,19 @@ def test_screen_change_refreshes_selected_screen() -> None:
 
     assert window._scan_target == "boxes"
     assert window._refreshes == ["boxes"]
+    assert window._cleared == []
+
+
+def test_screen_change_clears_previous_heavy_screen() -> None:
+    """Проверяет очистку данных при уходе с тяжелого экрана."""
+
+    window = FakeWindow()
+    window._scan_target = "box_lookup"
+
+    AppWindow._handle_screen_changed(window, "packing")  # type: ignore[arg-type]
+
+    assert window._scan_target == "packing"
+    assert window._cleared == ["box_lookup"]
 
 
 def test_screen_change_can_suppress_refresh_for_service_actions() -> None:
@@ -168,6 +208,27 @@ def test_box_deleted_clears_detail_and_refreshes_list() -> None:
 
     assert boxes_controller.clear_messages == ["Коробка удалена"]
     assert boxes_controller.refresh_count == 1
+
+
+def test_clear_inactive_screen_data_clears_screen_controllers() -> None:
+    """Проверяет очистку контроллеров при уходе с экранов."""
+
+    boxes_controller = FakeBoxesController()
+    lookup_controller = FakeClearableController()
+    defect_controller = FakeClearableController()
+    window = SimpleNamespace(
+        _boxes_controller=boxes_controller,
+        _box_lookup_controller=lookup_controller,
+        _defect_controller=defect_controller,
+    )
+
+    AppWindow._clear_inactive_screen_data(window, "boxes")  # type: ignore[arg-type]
+    AppWindow._clear_inactive_screen_data(window, "box_lookup")  # type: ignore[arg-type]
+    AppWindow._clear_inactive_screen_data(window, "defect")  # type: ignore[arg-type]
+
+    assert boxes_controller.clear_loaded_count == 1
+    assert lookup_controller.clear_count == 1
+    assert defect_controller.clear_count == 1
 
 
 def test_settings_screen_refreshes_device_sources() -> None:

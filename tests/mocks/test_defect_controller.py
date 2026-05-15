@@ -127,6 +127,19 @@ def test_defect_controller_reports_rejected_scan() -> None:
     assert sounds.events == [SoundEvent.WARNING]
 
 
+def test_defect_controller_clear_state_drops_log() -> None:
+    """Проверяет очистку состояния брака при уходе с экрана."""
+
+    controller, _service, _sounds = _controller_pair()
+    controller.on_code_scanned("CODE")
+
+    controller.clear_state()
+
+    assert controller.state.last_visible_code == ""
+    assert controller.state.result_message == ""
+    assert controller.state.log == []
+
+
 def test_defect_controller_reports_backend_error() -> None:
     """Проверяет ошибку backend-сценария брака."""
 
