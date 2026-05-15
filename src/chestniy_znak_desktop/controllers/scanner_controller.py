@@ -80,7 +80,7 @@ class ScannerController(QObject):
         ports = serial_ports.list_serial_ports()
         selected_port = self._state.selected_port
         if not selected_port and ports:
-            selected_port = ports[0].device
+            selected_port = self._auto_selected_port(ports)
         self._set_state(
             ScannerUiState(
                 ports=ports,
@@ -212,3 +212,12 @@ class ScannerController(QObject):
 
         self._state = state
         self.state_changed.emit(state)
+
+    @staticmethod
+    def _auto_selected_port(ports: list[ScannerPort]) -> str:
+        """Возвращает порт для автоподстановки, пропуская системные ttyS."""
+
+        for port in ports:
+            if port.auto_selectable:
+                return port.device
+        return ""

@@ -86,13 +86,15 @@ def test_list_serial_ports_prefers_rfcomm_for_autostart(  # type: ignore[no-unty
 
     ports = serial_ports.list_serial_ports()
 
-    assert [port.device for port in ports] == ["/dev/rfcomm0"]
+    assert [port.device for port in ports] == ["/dev/rfcomm0", "/dev/ttyS0"]
+    assert ports[0].auto_selectable is True
+    assert ports[1].auto_selectable is False
 
 
-def test_list_serial_ports_skips_phantom_linux_ttys(  # type: ignore[no-untyped-def]
+def test_list_serial_ports_marks_phantom_linux_ttys_manual(  # type: ignore[no-untyped-def]
     monkeypatch,
 ) -> None:
-    """Проверяет фильтрацию фантомных ttyS, которые дают I/O error."""
+    """Проверяет ручной режим фантомных ttyS, которые дают I/O error."""
 
     monkeypatch.setattr(
         serial_ports.list_ports,
@@ -110,4 +112,6 @@ def test_list_serial_ports_skips_phantom_linux_ttys(  # type: ignore[no-untyped-
 
     ports = serial_ports.list_serial_ports()
 
-    assert [port.device for port in ports] == ["/dev/ttyUSB0"]
+    assert [port.device for port in ports] == ["/dev/ttyUSB0", "/dev/ttyS3"]
+    assert ports[0].auto_selectable is True
+    assert ports[1].auto_selectable is False

@@ -67,6 +67,32 @@ def test_scanner_refresh_selects_first_port(monkeypatch) -> None:  # type: ignor
     assert controller.state.ports[0].title == "COM7 - Bluetooth SPP"
 
 
+def test_scanner_refresh_skips_manual_only_ports(  # type: ignore[no-untyped-def]
+    monkeypatch,
+) -> None:
+    """Проверяет, что системные ttyS не выбираются автоматически."""
+
+    monkeypatch.setattr(
+        serial_ports,
+        "list_serial_ports",
+        lambda: [
+            ScannerPort(
+                device="/dev/ttyS3",
+                description="Linux system serial port",
+                auto_selectable=False,
+            )
+        ],
+    )
+    controller = ScannerController(
+        runtime_controller=_runtime(), scanner_worker=FakeScannerWorker()
+    )
+
+    controller.refresh_ports()
+
+    assert controller.state.selected_port == ""
+    assert controller.state.ports[0].device == "/dev/ttyS3"
+
+
 def test_scanner_controller_start_updates_runtime() -> None:
     """Проверяет запуск сканера и runtime status."""
 

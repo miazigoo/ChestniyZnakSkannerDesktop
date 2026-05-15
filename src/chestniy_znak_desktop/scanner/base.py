@@ -26,6 +26,7 @@ class ScannerPort:
     device: str
     description: str
     hwid: str = ""
+    auto_selectable: bool = True
 
     @property
     def title(self) -> str:

@@ -14,16 +14,19 @@ def list_serial_ports() -> list[ScannerPort]:
 
     ports_by_device: dict[str, ScannerPort] = {}
     for port in list_ports.comports():
-        if _is_phantom_linux_ttys(
-            device=str(port.device),
+        device = str(port.device)
+        description = str(port.description or port.device)
+        hwid = str(port.hwid or "")
+        is_phantom_ttys = _is_phantom_linux_ttys(
+            device=device,
             description=str(port.description or ""),
-            hwid=str(port.hwid or ""),
-        ):
-            continue
+            hwid=hwid,
+        )
         scanner_port = ScannerPort(
-            device=str(port.device),
-            description=str(port.description or port.device),
-            hwid=str(port.hwid or ""),
+            device=device,
+            description="Linux system serial port" if is_phantom_ttys else description,
+            hwid=hwid,
+            auto_selectable=not is_phantom_ttys,
         )
         ports_by_device[scanner_port.device] = scanner_port
 
@@ -62,4 +65,6 @@ def _port_priority(port: ScannerPort) -> int:
 
     if port.device.startswith("/dev/rfcomm"):
         return 0
+    if not port.auto_selectable:
+        return 9
     return 1
