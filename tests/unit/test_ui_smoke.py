@@ -33,6 +33,9 @@ from chestniy_znak_desktop.controllers.box_lookup_controller import (  # noqa: E
     BoxLookupUiState,
 )
 from chestniy_znak_desktop.controllers.defect_controller import DefectUiState  # noqa: E402
+from chestniy_znak_desktop.controllers.diagnostics_controller import (  # noqa: E402
+    DiagnosticsUiState,
+)
 from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingBoxUi,
     PackingItemUi,
@@ -45,6 +48,7 @@ from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen  # noqa: E402
@@ -236,6 +240,45 @@ def test_verify_screen_shows_processed_code() -> None:
     assert "Код найден" in screen._result.text()  # noqa: SLF001
     assert "код найден" in screen._exists.text()  # noqa: SLF001
     assert "Повторная проверка" in screen._warnings.text()  # noqa: SLF001
+
+
+def test_diagnostics_screen_shows_runtime_and_logs() -> None:
+    """Проверяет современный экран диагностики."""
+
+    qapp()
+    screen = DiagnosticsScreen()
+    screen.apply_state(
+        DiagnosticsUiState(
+            api_base_url="http://backend/api/v2/",
+            websocket_url="ws://backend/ws/",
+            device_id="pc-1",
+            data_dir="/tmp/app",
+            log_file="/tmp/app/desktop.log",
+            log_text="line one\nline two",
+            status_message="Логи обновлены",
+        )
+    )
+    screen.apply_runtime_snapshot(
+        RuntimeSnapshot(
+            connection=ConnectionState(
+                status=ConnectionStatus.CONNECTED,
+                message="Соединение активно",
+            ),
+            session=SessionState(
+                status=SessionStatus.AUTHENTICATED,
+                user_name="Operator",
+            ),
+            scanner=ScannerState(
+                status=ScannerStatus.RUNNING,
+                port="/dev/rfcomm0",
+                message="Сканер читает порт",
+            ),
+        )
+    )
+
+    assert "backend" in screen._backend_value.text()  # noqa: SLF001
+    assert "connected" in screen._connection_value.text()  # noqa: SLF001
+    assert "line two" in screen._log_view.toPlainText()  # noqa: SLF001
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:
