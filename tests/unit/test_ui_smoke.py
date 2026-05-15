@@ -333,6 +333,7 @@ def test_settings_screen_has_grouped_pages() -> None:
     screen = SettingsScreen()
 
     assert screen._stack.count() == 6  # noqa: SLF001
+    assert screen._theme_page._theme_select.count() == 10  # noqa: SLF001
 
 
 def test_settings_screen_emits_sound_preview() -> None:

@@ -76,6 +76,14 @@ def _stylesheet(palette: ThemePalette) -> str:
             width: 28px;
         }}
 
+        QComboBox QAbstractItemView {{
+            background: {palette.panel};
+            color: {palette.text};
+            border: 1px solid {palette.border};
+            selection-background-color: {palette.selection_bg};
+            selection-color: {palette.selection_text};
+        }}
+
         QPushButton {{
             background: {palette.button_bg};
             color: {palette.button_text};
@@ -99,6 +107,31 @@ def _stylesheet(palette: ThemePalette) -> str:
             background: {palette.panel_alt};
             color: {palette.muted};
             border-color: {palette.border};
+        }}
+
+        QToolTip {{
+            background: {palette.panel};
+            color: {palette.text};
+            border: 1px solid {palette.border};
+            border-radius: 6px;
+            padding: 6px 8px;
+        }}
+
+        QMenu {{
+            background: {palette.panel};
+            color: {palette.text};
+            border: 1px solid {palette.border};
+            padding: 6px;
+        }}
+
+        QMenu::item {{
+            padding: 7px 16px;
+            border-radius: 6px;
+        }}
+
+        QMenu::item:selected {{
+            background: {palette.selection_bg};
+            color: {palette.selection_text};
         }}
 
         QCheckBox {{
@@ -130,6 +163,19 @@ def _stylesheet(palette: ThemePalette) -> str:
             height: 18px;
             margin: -6px 0;
             border-radius: 9px;
+            background: {palette.accent};
+        }}
+
+        QProgressBar {{
+            min-height: 10px;
+            border: 0;
+            border-radius: 5px;
+            background: {palette.panel_alt};
+            color: {palette.text};
+        }}
+
+        QProgressBar::chunk {{
+            border-radius: 5px;
             background: {palette.accent};
         }}
 
@@ -166,14 +212,43 @@ def _stylesheet(palette: ThemePalette) -> str:
             min-height: 32px;
         }}
 
+        QScrollBar::handle:vertical:hover {{
+            background: {palette.accent};
+        }}
+
         QScrollBar::add-line:vertical,
         QScrollBar::sub-line:vertical {{
             height: 0;
         }}
 
+        QScrollBar:horizontal {{
+            background: {palette.panel};
+            height: 12px;
+            margin: 0;
+        }}
+
+        QScrollBar::handle:horizontal {{
+            background: {palette.border};
+            border-radius: 6px;
+            min-width: 32px;
+        }}
+
+        QScrollBar::handle:horizontal:hover {{
+            background: {palette.accent};
+        }}
+
+        QScrollBar::add-line:horizontal,
+        QScrollBar::sub-line:horizontal {{
+            width: 0;
+        }}
+
         QStackedWidget {{
             background: {palette.window};
             border: 0;
+        }}
+
+        QSplitter::handle {{
+            background: {palette.border};
         }}
 
         QMessageBox {{
@@ -311,15 +386,148 @@ CONTRAST_THEME = Theme(
     ),
 )
 
+HARBOR_THEME = Theme(
+    name="harbor",
+    title="Harbor Steel",
+    stylesheet=_stylesheet(
+        ThemePalette(
+            window="#101820",
+            panel="#172331",
+            panel_alt="#223244",
+            text="#f4f8fb",
+            muted="#a9bac8",
+            border="#3b5165",
+            input_bg="#0b1219",
+            button_bg="#5bd1c8",
+            button_text="#071617",
+            button_hover="#78e5dc",
+            accent="#f0b24f",
+            accent_soft="#42321c",
+            danger="#ff7166",
+            selection_bg="#2f6671",
+            selection_text="#ffffff",
+            overlay_rgba="rgba(16, 24, 32, 238)",
+        )
+    ),
+)
+
+EMBER_THEME = Theme(
+    name="ember",
+    title="Ember Signal",
+    stylesheet=_stylesheet(
+        ThemePalette(
+            window="#191817",
+            panel="#232120",
+            panel_alt="#312d29",
+            text="#fbf6ef",
+            muted="#c7bdb0",
+            border="#4b4038",
+            input_bg="#11100f",
+            button_bg="#e06f3f",
+            button_text="#180b06",
+            button_hover="#f18653",
+            accent="#64d2c2",
+            accent_soft="#173f3a",
+            danger="#ff6b6b",
+            selection_bg="#614d33",
+            selection_text="#fff8ec",
+            overlay_rgba="rgba(25, 24, 23, 238)",
+        )
+    ),
+)
+
+ALPINE_THEME = Theme(
+    name="alpine",
+    title="Alpine Frost",
+    stylesheet=_stylesheet(
+        ThemePalette(
+            window="#eef4f2",
+            panel="#ffffff",
+            panel_alt="#dfe9e5",
+            text="#14211d",
+            muted="#52645e",
+            border="#bfcec8",
+            input_bg="#fbfffd",
+            button_bg="#1d7f6e",
+            button_text="#ffffff",
+            button_hover="#176859",
+            accent="#356bb3",
+            accent_soft="#dce8f8",
+            danger="#b42318",
+            selection_bg="#c7e8de",
+            selection_text="#10241f",
+            overlay_rgba="rgba(238, 244, 242, 232)",
+        )
+    ),
+)
+
+MIDNIGHT_THEME = Theme(
+    name="midnight",
+    title="Midnight Console",
+    stylesheet=_stylesheet(
+        ThemePalette(
+            window="#0d1117",
+            panel="#141a22",
+            panel_alt="#202938",
+            text="#f1f5f9",
+            muted="#a9b6c7",
+            border="#344256",
+            input_bg="#070b10",
+            button_bg="#7dd3fc",
+            button_text="#07131c",
+            button_hover="#a7e3ff",
+            accent="#facc15",
+            accent_soft="#3e3410",
+            danger="#fb7185",
+            selection_bg="#264766",
+            selection_text="#ffffff",
+            overlay_rgba="rgba(13, 17, 23, 240)",
+        )
+    ),
+)
+
+RUBY_THEME = Theme(
+    name="ruby",
+    title="Ruby Trace",
+    stylesheet=_stylesheet(
+        ThemePalette(
+            window="#f7f3f5",
+            panel="#ffffff",
+            panel_alt="#ece3e7",
+            text="#25171d",
+            muted="#6c5962",
+            border="#d2c0c8",
+            input_bg="#fffafd",
+            button_bg="#a53860",
+            button_text="#ffffff",
+            button_hover="#842d4d",
+            accent="#0f8b8d",
+            accent_soft="#d8f0ef",
+            danger="#b42318",
+            selection_bg="#efd3dd",
+            selection_text="#27131c",
+            overlay_rgba="rgba(247, 243, 245, 232)",
+        )
+    ),
+)
+
 THEME_LIST = (
     LIGHT_THEME,
     GRAPHITE_THEME,
     PACIFIC_THEME,
     FIELD_THEME,
     CONTRAST_THEME,
+    HARBOR_THEME,
+    EMBER_THEME,
+    ALPINE_THEME,
+    MIDNIGHT_THEME,
+    RUBY_THEME,
 )
 THEMES = {theme.name: theme for theme in THEME_LIST}
-THEME_ALIASES = {"dark": "graphite"}
+THEME_ALIASES = {
+    "dark": "graphite",
+    "default": "light",
+}
 
 
 def available_themes() -> tuple[Theme, ...]:

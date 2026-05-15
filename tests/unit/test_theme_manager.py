@@ -27,12 +27,33 @@ def test_available_themes_are_registered() -> None:
 
     names = [theme.name for theme in available_themes()]
 
-    assert names == ["light", "graphite", "pacific", "field", "contrast"]
+    assert names == [
+        "light",
+        "graphite",
+        "pacific",
+        "field",
+        "contrast",
+        "harbor",
+        "ember",
+        "alpine",
+        "midnight",
+        "ruby",
+    ]
     assert set(names) == set(THEMES)
     assert all("QPushButton" in theme.stylesheet for theme in available_themes())
+    assert all("QProgressBar" in theme.stylesheet for theme in available_themes())
 
 
 def test_dark_alias_maps_to_graphite() -> None:
     """Проверяет совместимость со старым значением темной темы."""
 
     assert theme_by_name("dark").name == "graphite"
+
+
+def test_theme_titles_are_unique() -> None:
+    """Проверяет, что в списке нет дублей названий тем."""
+
+    titles = [theme.title for theme in available_themes()]
+
+    assert len(titles) == 10
+    assert len(titles) == len(set(titles))
