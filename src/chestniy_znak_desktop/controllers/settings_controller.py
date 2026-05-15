@@ -91,6 +91,7 @@ class SettingsController(QObject):
         if not device_id:
             self._emit_state(error_message="Device ID не может быть пустым")
             return
+        message = self._save_message_for(form_data, api_base_url, device_id)
         self._settings = replace(
             self._settings,
             api_base_url=api_base_url,
@@ -104,7 +105,6 @@ class SettingsController(QObject):
             sound_victory_file=form_data.sound_victory_file,
         )
         self._apply_live_settings()
-        message = "Настройки сохранены. Backend и Device ID применятся после перезапуска."
         self._save(message)
         self.settings_saved.emit(message)
 
@@ -152,6 +152,34 @@ class SettingsController(QObject):
         self._sound_service.set_sound_file(
             SoundEvent.VICTORY,
             self._settings.sound_victory_file,
+        )
+
+    def _save_message_for(
+        self,
+        form_data: SettingsFormData,
+        api_base_url: str,
+        device_id: str,
+    ) -> str:
+        """Возвращает понятный текст для модалки сохранения."""
+
+        if api_base_url != self._settings.api_base_url or device_id != self._settings.device_id:
+            return "Настройки сохранены. Backend и Device ID применятся после перезапуска."
+        if self._sound_settings_changed(form_data):
+            return "Звуковые настройки сохранены и применены."
+        if form_data.theme_name != self._settings.theme_name:
+            return "Настройки сохранены. Тема применена."
+        return "Настройки сохранены."
+
+    def _sound_settings_changed(self, form_data: SettingsFormData) -> bool:
+        """Проверяет, менялись ли настройки звука."""
+
+        return (
+            form_data.sound_enabled != self._settings.sound_enabled
+            or form_data.sound_volume != self._settings.sound_volume
+            or form_data.sound_ok_file != self._settings.sound_ok_file
+            or form_data.sound_warning_file != self._settings.sound_warning_file
+            or form_data.sound_error_file != self._settings.sound_error_file
+            or form_data.sound_victory_file != self._settings.sound_victory_file
         )
 
     def _save(self, status_message: str) -> None:

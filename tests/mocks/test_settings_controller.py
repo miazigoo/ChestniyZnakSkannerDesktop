@@ -100,6 +100,58 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
     ]
 
 
+def test_settings_controller_reports_sound_save_message(  # type: ignore[no-untyped-def]
+    tmp_path,
+) -> None:
+    """Проверяет понятную модалку при сохранении звука."""
+
+    controller, _store = _controller(tmp_path)
+    saved_messages: list[str] = []
+    controller.settings_saved.connect(saved_messages.append)
+
+    controller.save_form(
+        SettingsFormData(
+            api_base_url="http://backend/api/v2/",
+            device_id="pc-1",
+            theme_name="light",
+            sound_enabled=True,
+            sound_volume=0.6,
+            sound_ok_file="ok_02.mp3",
+            sound_warning_file="other.mp3",
+            sound_error_file="error.mp3",
+            sound_victory_file="victory.mp3",
+        )
+    )
+
+    assert saved_messages == ["Звуковые настройки сохранены и применены."]
+
+
+def test_settings_controller_reports_generic_save_message(  # type: ignore[no-untyped-def]
+    tmp_path,
+) -> None:
+    """Проверяет нейтральную модалку при сохранении без изменений."""
+
+    controller, _store = _controller(tmp_path)
+    saved_messages: list[str] = []
+    controller.settings_saved.connect(saved_messages.append)
+
+    controller.save_form(
+        SettingsFormData(
+            api_base_url="http://backend/api/v2/",
+            device_id="pc-1",
+            theme_name="light",
+            sound_enabled=True,
+            sound_volume=0.85,
+            sound_ok_file="ok_02.mp3",
+            sound_warning_file="other.mp3",
+            sound_error_file="error.mp3",
+            sound_victory_file="victory.mp3",
+        )
+    )
+
+    assert saved_messages == ["Настройки сохранены."]
+
+
 def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """Проверяет валидацию пустого backend URL."""
 
