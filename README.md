@@ -44,10 +44,163 @@ python -m pytest
 
 ## Сборка Windows
 
-```bash
-python scripts/build_windows.py
+Windows-сборку нужно выполнять на Windows с Windows Python. PyInstaller не
+собирает корректный `.exe` из Linux/Docker Linux-окружения, потому что для
+PySide6 нужны Windows wheels и Windows Qt DLL.
+
+### Требования
+
+- Windows 10/11 x64 или Windows Server x64.
+- Python 3.11 x64. При установке включить `Add python.exe to PATH`.
+- Доступ к интернету для установки зависимостей через `pip`.
+- PowerShell от обычного пользователя. Администратор не нужен.
+- Опционально: Microsoft Visual C++ Redistributable 2015-2022 x64, если на
+  целевом ПК еще не стоит runtime для приложений на C++.
+
+Проверка Python:
+
+```powershell
+py -3.11 --version
+py -3.11 -c "import struct; print(struct.calcsize('P') * 8)"
+```
+
+Вторая команда должна вывести `64`.
+
+### Подготовка проекта
+
+Открыть PowerShell в корне проекта:
+
+```powershell
+cd C:\path\to\ChestniyZnakDescktop
+```
+
+Создать виртуальное окружение:
+
+```powershell
+py -3.11 -m venv .venv
+```
+
+Обновить `pip`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -U pip setuptools wheel
+```
+
+Поставить зависимости для сборки:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[build]"
+```
+
+Для полной локальной проверки перед сборкой можно поставить dev-зависимости:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,build]"
+.\.venv\Scripts\python.exe -m pytest
+```
+
+### Сборка
+
+Запустить сборку:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_windows.py
+```
+
+Результат появится здесь:
+
+```text
+dist\ChestniyZnakDesktop\ChestniyZnakDesktop.exe
 ```
 
 Сборка использует `packaging/chestniy_znak_desktop.spec`, кладет результат в
 `dist/ChestniyZnakDesktop/` и включает runtime-ресурсы приложения: звуки,
 иконки и Qt-модули для WebSocket/Multimedia.
+
+### Проверка собранного приложения
+
+Запустить из PowerShell:
+
+```powershell
+.\dist\ChestniyZnakDesktop\ChestniyZnakDesktop.exe
+```
+
+Проверить:
+
+- открывается экран авторизации;
+- QR логина читается HID-сканером или COM/SPP-сканером;
+- в настройках виден нужный COM-порт, например `COM3`;
+- WebSocket соединение активно;
+- звук проигрывается при успешной отправке автоскана-бокса в коробку;
+- экран автоупаковки показывает вкладки `Локальный бокс` и `Текущая коробка`.
+
+Папка пользовательских настроек на Windows:
+
+```text
+C:\Users\<user>\.chestniy_znak_desktop\
+```
+
+Там хранятся настройки, cookies и логи приложения.
+
+### Передача на рабочий ПК
+
+Копировать нужно всю папку:
+
+```text
+dist\ChestniyZnakDesktop\
+```
+
+Не копировать только один `.exe`, потому что рядом лежат Qt DLL, Python DLL,
+модули PySide6 и ресурсы приложения.
+
+### Чистая пересборка
+
+Если нужно пересобрать с нуля:
+
+```powershell
+Remove-Item -Recurse -Force build, dist
+.\.venv\Scripts\python.exe scripts\build_windows.py
+```
+
+### Частые проблемы
+
+`py -3.11` не найден:
+
+- Python 3.11 не установлен или не добавлен Python Launcher.
+- Установить Python 3.11 x64 с python.org.
+
+`running scripts is disabled`:
+
+- Не обязательно активировать `.venv`; команды выше вызывают
+  `.\.venv\Scripts\python.exe` напрямую.
+- Если все же нужна активация:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+.\.venv\Scripts\Activate.ps1
+```
+
+Антивирус ругается на `.exe`:
+
+- Для внутренних PyInstaller-сборок это бывает.
+- Добавить папку сборки в исключения или подписать бинарник корпоративным
+  сертификатом, если он есть.
+
+COM-порт не виден:
+
+- Проверить `Диспетчер устройств -> Порты COM и LPT`.
+- Проверить драйвер USB-COM адаптера.
+- Проверить, что порт не занят другой программой.
+- HID-сканер можно использовать без COM-порта, но для надежного промышленного
+  сценария предпочтительнее COM/SPP.
+
+Приложение не стартует после переноса:
+
+- Запускать `.exe` из папки `dist\ChestniyZnakDesktop\`.
+- Не удалять соседние `.dll`, `_internal` и ресурсные файлы.
+- Запустить из PowerShell, чтобы увидеть возможный текст ошибки.
+
+### Что коммитить после сборки
+
+Папки `build/` и `dist/` не коммитятся. Это артефакты сборки, они уже
+исключены в `.gitignore`.
