@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QDialog,
@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 
-class SvgBackdrop(QWidget):
-    """Рисует декоративный SVG-фон внутри модалки."""
+class SvgBackdrop(QLabel):
+    """Показывает декоративный SVG-фон внутри модалки."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Создает виджет с встроенным SVG-фоном."""
@@ -25,13 +25,20 @@ class SvgBackdrop(QWidget):
         super().__init__(parent)
         self.setObjectName("settingsSavedSvgBackdrop")
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._renderer = QSvgRenderer(self._svg_markup().encode("utf-8"), self)
+        self.setScaledContents(True)
+        self.setPixmap(self._render_svg(width=860, height=360))
 
-    def paintEvent(self, _event) -> None:  # type: ignore[no-untyped-def]
-        """Рисует SVG на всю область виджета."""
+    @classmethod
+    def _render_svg(cls, width: int, height: int) -> QPixmap:
+        """Рендерит SVG в pixmap один раз, без тяжелых repaint-операций."""
 
-        painter = QPainter(self)
-        self._renderer.render(painter, self.rect())
+        renderer = QSvgRenderer(cls._svg_markup().encode("utf-8"))
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        return pixmap
 
     @staticmethod
     def _svg_markup() -> str:

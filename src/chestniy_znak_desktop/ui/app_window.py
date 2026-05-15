@@ -86,7 +86,7 @@ class AppWindow(QMainWindow):
         self._login_screen = LoginScreen()
         self._main_screen = MainScreen()
         self._close_box_dialogs: list[CloseBoxDialog] = []
-        self._settings_saved_dialogs: list[SettingsSavedDialog] = []
+        self._settings_saved_dialog: SettingsSavedDialog | None = None
         self._close_progress_dialog: CloseBoxProgressDialog | None = None
         self._stack.addWidget(self._login_screen)
         self._stack.addWidget(self._main_screen)
@@ -389,8 +389,10 @@ class AppWindow(QMainWindow):
     def _show_settings_saved_dialog(self, message: str) -> None:
         """Показывает модалку успешного сохранения настроек."""
 
+        if self._settings_saved_dialog is not None:
+            self._settings_saved_dialog.accept()
         dialog = SettingsSavedDialog(message, self)
-        self._settings_saved_dialogs.append(dialog)
+        self._settings_saved_dialog = dialog
         dialog.finished.connect(
             lambda _code, dialog=dialog: self._forget_settings_saved_dialog(dialog)
         )
@@ -399,8 +401,8 @@ class AppWindow(QMainWindow):
     def _forget_settings_saved_dialog(self, dialog: SettingsSavedDialog) -> None:
         """Удаляет закрытую модалку сохранения настроек из списка."""
 
-        if dialog in self._settings_saved_dialogs:
-            self._settings_saved_dialogs.remove(dialog)
+        if self._settings_saved_dialog is dialog:
+            self._settings_saved_dialog = None
 
     def _show_packing_without_refresh(self) -> None:
         """Показывает упаковку перед быстрым действием без автообновления."""

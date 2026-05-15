@@ -526,6 +526,8 @@ def test_settings_saved_dialog_has_svg_backdrop_and_ok_button() -> None:
     ok_button = dialog.findChild(QPushButton, "settingsSavedButton")
 
     assert backdrop is not None
+    assert backdrop.pixmap() is not None
+    assert backdrop.pixmap().isNull() is False
     assert ok_button is not None
     assert ok_button.text() == "OK"
     assert dialog.minimumWidth() >= 700
