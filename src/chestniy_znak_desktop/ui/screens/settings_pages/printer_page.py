@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidg
 
 from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    apply_combo_popup_style,
     create_back_button,
     create_card,
     create_form_row,
@@ -29,6 +30,7 @@ class PrinterSettingsPage(QWidget):
         self.setObjectName("settingsPage")
         self._printer_select = QComboBox()
         self._printer_select.setObjectName("settingsCombo")
+        apply_combo_popup_style(self._printer_select)
         self._printer_status = QLabel("Принтер не выбран")
         self._printer_status.setObjectName("settingsStatusText")
         self._printer_error = QLabel("")

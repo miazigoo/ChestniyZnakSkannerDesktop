@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    apply_combo_popup_style,
     create_back_button,
     create_card,
     create_form_row,
@@ -54,6 +55,7 @@ class SoundSettingsPage(QWidget):
             self._sound_victory,
         ):
             combo.setObjectName("settingsCombo")
+            apply_combo_popup_style(combo)
         self._save_button = QPushButton("Сохранить")
         self._save_button.setObjectName("settingsPrimaryButton")
         self._back_button = create_back_button()

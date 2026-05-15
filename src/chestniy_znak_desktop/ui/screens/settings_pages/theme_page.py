@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, 
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    apply_combo_popup_style,
     create_back_button,
     create_card,
     create_form_row,
@@ -29,6 +30,7 @@ class ThemeSettingsPage(QWidget):
         self.setObjectName("settingsPage")
         self._theme_select = QComboBox()
         self._theme_select.setObjectName("settingsCombo")
+        apply_combo_popup_style(self._theme_select)
         for theme in available_themes():
             self._theme_select.addItem(theme.title, theme.name)
         self._save_button = QPushButton("Сохранить")

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBox
 
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    apply_combo_popup_style,
     create_back_button,
     create_card,
     create_form_row,
@@ -32,10 +33,12 @@ class ScannerSettingsPage(QWidget):
         self.setObjectName("settingsPage")
         self._scanner_port = QComboBox()
         self._scanner_port.setObjectName("settingsCombo")
+        apply_combo_popup_style(self._scanner_port)
         self._scanner_port.setEditable(True)
         self._scanner_port.currentTextChanged.connect(self.port_changed.emit)
         self._scanner_baudrate = QComboBox()
         self._scanner_baudrate.setObjectName("settingsCombo")
+        apply_combo_popup_style(self._scanner_baudrate)
         self._scanner_baudrate.addItems(["9600", "19200", "38400", "57600", "115200"])
         self._scanner_baudrate.currentTextChanged.connect(self._emit_baudrate)
         self._scanner_status = QLabel("Сканер не запущен")
