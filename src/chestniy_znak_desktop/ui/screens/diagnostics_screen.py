@@ -46,7 +46,6 @@ class DiagnosticsScreen(QWidget):
 
         self._configure_widgets()
         self._build_layout()
-        self._apply_styles()
 
     def apply_state(self, state: DiagnosticsUiState) -> None:
         """Обновляет статическую диагностику и логи."""
@@ -260,91 +259,3 @@ class DiagnosticsScreen(QWidget):
         value.setWordWrap(True)
         grid.addWidget(title_label, row, 0)
         grid.addWidget(value, row, 1)
-
-    def _apply_styles(self) -> None:
-        """Применяет локальные стили экрана диагностики."""
-
-        self.setStyleSheet("""
-            #diagnosticsScreen {
-                background: transparent;
-            }
-            #diagnosticsHero,
-            #diagnosticsPanel,
-            #diagnosticsLogsPanel {
-                background: rgba(16, 24, 40, 222);
-                border: 1px solid rgba(129, 140, 168, 70);
-                border-radius: 18px;
-            }
-            #diagnosticsHero {
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 rgba(28, 54, 72, 238),
-                    stop: 0.56 rgba(18, 32, 48, 235),
-                    stop: 1 rgba(44, 47, 74, 222)
-                );
-            }
-            #diagnosticsHeroTitle {
-                color: #f8fbff;
-                font-size: 25px;
-                font-weight: 850;
-                background: transparent;
-            }
-            #diagnosticsHeroSubtitle,
-            #diagnosticsMutedText,
-            #diagnosticsStatusText {
-                color: rgba(225, 233, 244, 176);
-                font-size: 13px;
-                background: transparent;
-            }
-            #diagnosticsPanelTitle {
-                color: #f8fbff;
-                font-size: 17px;
-                font-weight: 800;
-                background: transparent;
-            }
-            #diagnosticsMetaTitle {
-                color: rgba(225, 233, 244, 132);
-                font-size: 12px;
-                font-weight: 700;
-                background: transparent;
-            }
-            #diagnosticsMetaValue {
-                color: #f8fbff;
-                border-radius: 14px;
-                padding: 11px 13px;
-                background: rgba(255, 255, 255, 28);
-                font-size: 13px;
-                font-weight: 700;
-            }
-            #diagnosticsErrorText {
-                color: #ffb4ad;
-                border-radius: 12px;
-                padding: 9px 11px;
-                background: rgba(227, 85, 78, 38);
-                font-weight: 750;
-            }
-            #diagnosticsPrimaryButton {
-                min-height: 38px;
-                border: 0;
-                border-radius: 12px;
-                padding: 0 14px;
-                color: #071212;
-                background: #66d2c7;
-                font-weight: 800;
-            }
-            #diagnosticsPrimaryButton:disabled {
-                color: rgba(225, 233, 244, 92);
-                background: rgba(255, 255, 255, 22);
-            }
-            #diagnosticsLog {
-                color: #f8fbff;
-                background: rgba(255, 255, 255, 18);
-                border: 1px solid rgba(129, 140, 168, 55);
-                border-radius: 14px;
-                padding: 12px;
-                selection-background-color: rgba(102, 210, 199, 70);
-                selection-color: #f8fbff;
-                font-family: monospace;
-                font-size: 13px;
-            }
-            """)

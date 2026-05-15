@@ -104,7 +104,6 @@ class LoginScreen(QWidget):
             "#95d5b2",
         )
         self._build_layout()
-        self._apply_local_style()
 
     def apply_state(self, state: AuthUiState) -> None:
         """Обновляет экран из состояния контроллера авторизации."""
@@ -179,71 +178,6 @@ class LoginScreen(QWidget):
         root.setSpacing(26)
         root.addLayout(hero, stretch=6)
         root.addWidget(panel, stretch=5)
-
-    def _apply_local_style(self) -> None:
-        """Применяет локальные стили login-экрана поверх общей темы."""
-
-        self.setStyleSheet("""
-            #loginHeroTitle {
-                color: #ffffff;
-                font-size: 46px;
-                font-weight: 800;
-                letter-spacing: 0px;
-            }
-            #loginHeroSubtitle {
-                color: #b9f7ef;
-                font-size: 22px;
-                font-weight: 700;
-            }
-            #loginHeroDescription {
-                color: rgba(255, 255, 255, 0.80);
-                font-size: 16px;
-                line-height: 136%;
-            }
-            #loginStatusBadge {
-                color: #071217;
-                background: #e0b15e;
-                border-radius: 14px;
-                padding: 7px 12px;
-                font-weight: 800;
-            }
-            #loginPanel {
-                background: rgba(12, 18, 24, 0.82);
-                border: 1px solid rgba(255, 255, 255, 0.16);
-                border-radius: 18px;
-            }
-            #loginPanelTitle {
-                color: #ffffff;
-                font-size: 28px;
-                font-weight: 800;
-            }
-            #loginPanelHint, #loginStatusValue {
-                color: rgba(236, 244, 247, 0.76);
-                font-size: 14px;
-            }
-            #loginPrimaryStatus {
-                color: #ffffff;
-                font-size: 17px;
-                font-weight: 700;
-                padding: 8px 0;
-            }
-            #loginError {
-                color: #ff9a8d;
-                font-size: 15px;
-                font-weight: 700;
-                min-height: 22px;
-            }
-            #loginStatusRow {
-                background: rgba(255, 255, 255, 0.07);
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 14px;
-            }
-            #loginStatusTitle {
-                color: #ffffff;
-                font-weight: 800;
-                font-size: 14px;
-            }
-            """)
 
     def _draw_gradient_background(self, painter: QPainter) -> None:
         """Рисует глубокий градиентный фон."""

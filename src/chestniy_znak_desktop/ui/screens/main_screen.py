@@ -56,7 +56,6 @@ class MainScreen(QWidget):
         self._register_work_screens()
         self._session_panel.logout_requested.connect(self.logout_requested.emit)
         self._build_layout()
-        self._apply_style()
         self._set_active_nav("packing")
 
     @property
@@ -258,97 +257,3 @@ class MainScreen(QWidget):
         self._stack_animation.setStartValue(0.55)
         self._stack_animation.setEndValue(1.0)
         self._stack_animation.start()
-
-    def _apply_style(self) -> None:
-        """Применяет локальную стилизацию главного экрана."""
-
-        self.setStyleSheet("""
-            #mainScreen {
-                background: transparent;
-            }
-            #mainSidebar {
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 18px;
-            }
-            #mainBrand {
-                color: #ffffff;
-                font-size: 24px;
-                font-weight: 900;
-                padding: 6px 8px 0 8px;
-            }
-            #mainSection {
-                color: rgba(255, 255, 255, 0.56);
-                font-size: 12px;
-                font-weight: 800;
-                padding: 0 8px 4px 8px;
-                text-transform: uppercase;
-            }
-            #userSessionPanel {
-                background: rgba(255, 255, 255, 0.075);
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 16px;
-            }
-            #sessionUser {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 850;
-            }
-            #sessionMeta {
-                color: rgba(236, 244, 247, 0.64);
-                font-size: 12px;
-                font-weight: 600;
-            }
-            #sessionLogout {
-                background: #e0b15e;
-                color: #19160f;
-                border: 0;
-                border-radius: 10px;
-                padding: 8px 12px;
-                font-weight: 850;
-            }
-            #mainNavItem {
-                background: rgba(255, 255, 255, 0.055);
-                border: 1px solid rgba(255, 255, 255, 0.09);
-                border-radius: 14px;
-            }
-            #mainNavItem:hover {
-                background: rgba(255, 255, 255, 0.10);
-                border-color: rgba(86, 199, 184, 0.34);
-            }
-            #mainNavItem[active="true"] {
-                background: rgba(86, 199, 184, 0.18);
-                border-color: rgba(224, 177, 94, 0.72);
-            }
-            #mainNavTitle {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 850;
-            }
-            #mainNavSubtitle {
-                color: rgba(236, 244, 247, 0.62);
-                font-size: 11px;
-            }
-            #mainWorkspace {
-                background: rgba(15, 18, 24, 0.78);
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 18px;
-            }
-            #workspaceTitle {
-                color: #ffffff;
-                font-size: 26px;
-                font-weight: 900;
-            }
-            #workspaceSubtitle {
-                color: rgba(236, 244, 247, 0.64);
-                font-size: 13px;
-                font-weight: 600;
-            }
-            #workspaceAccent {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #56c7b8,
-                    stop:1 #e0b15e
-                );
-                border-radius: 3px;
-            }
-            """)

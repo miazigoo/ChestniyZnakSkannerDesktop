@@ -334,9 +334,8 @@ def test_settings_screen_has_grouped_pages() -> None:
 
     assert screen._stack.count() == 6  # noqa: SLF001
     assert screen._theme_page._theme_select.count() == 10  # noqa: SLF001
-    popup_style = screen._theme_page._theme_select.view().styleSheet()  # noqa: SLF001
-    assert "#202938" in popup_style
-    assert "#66d2c7" in popup_style
+    popup = screen._theme_page._theme_select.view()  # noqa: SLF001
+    assert popup.objectName() == "settingsComboPopup"
 
 
 def test_settings_screen_emits_sound_preview() -> None:

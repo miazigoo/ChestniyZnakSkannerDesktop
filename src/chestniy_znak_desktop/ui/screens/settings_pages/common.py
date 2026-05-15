@@ -14,38 +14,11 @@ from PySide6.QtWidgets import (
 
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
-SETTINGS_COMBO_POPUP_QSS = """
-    QAbstractItemView {
-        color: #f8fbff;
-        background: #202938;
-        border: 1px solid rgba(129, 140, 168, 110);
-        border-radius: 10px;
-        padding: 6px;
-        outline: 0;
-        selection-color: #071212;
-        selection-background-color: #66d2c7;
-    }
-    QAbstractItemView::item {
-        min-height: 30px;
-        padding: 7px 10px;
-        border-radius: 8px;
-    }
-    QAbstractItemView::item:hover {
-        color: #071212;
-        background: #8fb8ff;
-    }
-    QAbstractItemView::item:selected {
-        color: #071212;
-        background: #66d2c7;
-    }
-"""
-
 
 def apply_combo_popup_style(combo: QComboBox) -> None:
-    """Применяет читаемый стиль popup-списка combo box."""
+    """Назначает objectName popup-списку combo box для theme QSS."""
 
     combo.view().setObjectName("settingsComboPopup")
-    combo.view().setStyleSheet(SETTINGS_COMBO_POPUP_QSS)
 
 
 def create_page_header(

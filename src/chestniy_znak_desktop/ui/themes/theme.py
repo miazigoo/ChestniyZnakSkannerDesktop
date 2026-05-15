@@ -36,6 +36,482 @@ class ThemePalette:
     overlay_rgba: str
 
 
+def _custom_object_styles(palette: ThemePalette) -> str:
+    """Генерирует QSS для objectName-виджетов рабочих экранов."""
+
+    hero_background = (
+        "qlineargradient("
+        "x1: 0, y1: 0, x2: 1, y2: 1, "
+        f"stop: 0 {palette.panel_alt}, "
+        f"stop: 0.58 {palette.panel}, "
+        f"stop: 1 {palette.accent_soft}"
+        ")"
+    )
+    accent_background = (
+        "qlineargradient("
+        "x1: 0, y1: 0, x2: 1, y2: 0, "
+        f"stop: 0 {palette.accent}, "
+        f"stop: 1 {palette.button_bg}"
+        ")"
+    )
+    return f"""
+        #mainScreen,
+        #packingScreen,
+        #boxesScreen,
+        #boxLookupScreen,
+        #verifyScreen,
+        #defectScreen,
+        #diagnosticsScreen,
+        #settingsScreen,
+        #settingsPage,
+        #settingsStack {{
+            background: transparent;
+        }}
+
+        #mainSidebar,
+        #mainWorkspace,
+        #userSessionPanel,
+        #loginPanel,
+        #packingCard,
+        #packingScanCard,
+        #packingActionsPanel,
+        #packingTablePanel,
+        #boxesToolbar,
+        #boxesListPanel,
+        #boxesDetailPanel,
+        #boxesActionsPanel,
+        #boxesItemsPanel,
+        #lookupCard,
+        #lookupResultCard,
+        #lookupLogPanel,
+        #verifyCard,
+        #verifyResultCard,
+        #verifyMetaPanel,
+        #verifyLogPanel,
+        #defectCard,
+        #defectResultCard,
+        #defectMetaPanel,
+        #defectLogPanel,
+        #diagnosticsPanel,
+        #diagnosticsLogsPanel,
+        #settingsCard {{
+            background: {palette.panel};
+            border: 1px solid {palette.border};
+            border-radius: 18px;
+        }}
+
+        #packingHero,
+        #boxesHero,
+        #lookupHero,
+        #verifyHero,
+        #defectHero,
+        #diagnosticsHero,
+        #settingsPageHeader {{
+            background: {hero_background};
+            border: 1px solid {palette.border};
+            border-radius: 18px;
+        }}
+
+        #mainBrand,
+        #workspaceTitle,
+        #loginHeroTitle,
+        #loginPanelTitle,
+        #packingHeroTitle,
+        #boxesHeroTitle,
+        #lookupHeroTitle,
+        #verifyHeroTitle,
+        #defectHeroTitle,
+        #diagnosticsHeroTitle,
+        #settingsPageTitle {{
+            color: {palette.text};
+            font-weight: 900;
+            background: transparent;
+        }}
+
+        #workspaceTitle,
+        #packingHeroTitle,
+        #boxesHeroTitle,
+        #lookupHeroTitle,
+        #verifyHeroTitle,
+        #defectHeroTitle,
+        #diagnosticsHeroTitle,
+        #settingsPageTitle {{
+            font-size: 25px;
+        }}
+
+        #loginHeroTitle {{
+            font-size: 46px;
+        }}
+
+        #loginHeroSubtitle {{
+            color: {palette.accent};
+            font-size: 22px;
+            font-weight: 800;
+            background: transparent;
+        }}
+
+        #mainSection,
+        #workspaceSubtitle,
+        #sessionMeta,
+        #loginHeroDescription,
+        #loginPanelHint,
+        #loginStatusValue,
+        #packingHeroSubtitle,
+        #packingMutedText,
+        #boxesHeroSubtitle,
+        #boxesMutedText,
+        #lookupHeroSubtitle,
+        #lookupMutedText,
+        #lookupLastCode,
+        #verifyHeroSubtitle,
+        #verifyMutedText,
+        #verifyStatusText,
+        #defectHeroSubtitle,
+        #defectMutedText,
+        #defectStatusText,
+        #diagnosticsHeroSubtitle,
+        #diagnosticsMutedText,
+        #diagnosticsStatusText,
+        #settingsPageSubtitle,
+        #settingsMutedText,
+        #settingsStatusText {{
+            color: {palette.muted};
+            background: transparent;
+        }}
+
+        #packingCardTitle,
+        #boxesPanelTitle,
+        #lookupCardTitle,
+        #verifyCardTitle,
+        #defectCardTitle,
+        #diagnosticsPanelTitle,
+        #settingsCardTitle,
+        #sessionUser,
+        #loginStatusTitle,
+        #loginPrimaryStatus {{
+            color: {palette.text};
+            font-weight: 800;
+            background: transparent;
+        }}
+
+        #workspaceAccent {{
+            background: {accent_background};
+            border-radius: 3px;
+        }}
+
+        #mainNavItem,
+        #loginStatusRow,
+        #settingsFormRow {{
+            background: {palette.panel_alt};
+            border: 1px solid {palette.border};
+            border-radius: 14px;
+        }}
+
+        #mainNavItem:hover,
+        #settingsHubButton:hover {{
+            border-color: {palette.accent};
+            background: {palette.accent_soft};
+        }}
+
+        #mainNavItem[active="true"] {{
+            background: {palette.accent_soft};
+            border-color: {palette.accent};
+        }}
+
+        #mainNavTitle,
+        #settingsFormLabel {{
+            color: {palette.text};
+            font-weight: 800;
+            background: transparent;
+        }}
+
+        #mainNavSubtitle {{
+            color: {palette.muted};
+            font-size: 11px;
+            background: transparent;
+        }}
+
+        #sessionLogout,
+        #packingPrimaryButton,
+        #boxesPrimaryButton,
+        #lookupPrimaryButton,
+        #diagnosticsPrimaryButton,
+        #settingsPrimaryButton {{
+            min-height: 38px;
+            border: 0;
+            border-radius: 12px;
+            padding: 0 14px;
+            color: {palette.button_text};
+            background: {palette.button_bg};
+            font-weight: 800;
+        }}
+
+        #packingSecondaryButton,
+        #boxesSecondaryButton,
+        #lookupSecondaryButton,
+        #settingsSecondaryButton {{
+            min-height: 38px;
+            border: 0;
+            border-radius: 12px;
+            padding: 0 14px;
+            color: {palette.text};
+            background: {palette.panel_alt};
+            font-weight: 800;
+        }}
+
+        #packingDangerButton,
+        #boxesDangerButton,
+        #settingsDangerButton {{
+            min-height: 38px;
+            border: 0;
+            border-radius: 12px;
+            padding: 0 14px;
+            color: {palette.selection_text};
+            background: {palette.danger};
+            font-weight: 800;
+        }}
+
+        #packingPrimaryButton:disabled,
+        #packingSecondaryButton:disabled,
+        #packingDangerButton:disabled,
+        #boxesPrimaryButton:disabled,
+        #boxesSecondaryButton:disabled,
+        #boxesDangerButton:disabled,
+        #lookupSecondaryButton:disabled,
+        #diagnosticsPrimaryButton:disabled,
+        #settingsPrimaryButton:disabled,
+        #settingsSecondaryButton:disabled,
+        #settingsDangerButton:disabled {{
+            color: {palette.muted};
+            background: {palette.panel_alt};
+        }}
+
+        #packingBadge,
+        #loginStatusBadge,
+        #packingScannerStatus,
+        #lookupScannerStatus,
+        #verifyScannerStatus,
+        #defectScannerStatus {{
+            border-radius: 12px;
+            padding: 9px 12px;
+            color: {palette.button_text};
+            background: {palette.button_bg};
+            font-weight: 850;
+        }}
+
+        #packingBadge[tone="idle"] {{
+            color: {palette.text};
+            background: {palette.panel_alt};
+        }}
+
+        #packingBadge[tone="closed"],
+        #verifyWarning,
+        #defectWarning {{
+            color: {palette.button_text};
+            background: {palette.accent};
+        }}
+
+        #packingScannerStatus[tone="error"],
+        #lookupScannerStatus[tone="error"],
+        #verifyScannerStatus[tone="error"],
+        #defectScannerStatus[tone="error"] {{
+            color: {palette.selection_text};
+            background: {palette.danger};
+        }}
+
+        #packingScanTitle,
+        #boxesDetailTitle,
+        #lookupFoundBox,
+        #verifyResult,
+        #defectResult {{
+            color: {palette.text};
+            border-radius: 16px;
+            padding: 16px 18px;
+            background: {palette.panel_alt};
+            font-size: 20px;
+            font-weight: 850;
+        }}
+
+        #lookupFoundBox[tone="found"],
+        #verifyResult[tone="ok"] {{
+            color: {palette.button_text};
+            background: {palette.button_bg};
+        }}
+
+        #verifyResult[tone="error"],
+        #defectResult[tone="error"] {{
+            color: {palette.selection_text};
+            background: {palette.danger};
+        }}
+
+        #packingResult,
+        #boxesStatusText,
+        #lookupStatusTitle,
+        #diagnosticsStatusText {{
+            color: {palette.muted};
+            font-weight: 700;
+            background: transparent;
+        }}
+
+        #loginError,
+        #packingError,
+        #boxesErrorText,
+        #lookupError,
+        #verifyError,
+        #defectError,
+        #diagnosticsErrorText,
+        #settingsErrorText {{
+            color: {palette.danger};
+            border-radius: 12px;
+            padding: 9px 11px;
+            background: {palette.accent_soft};
+            font-weight: 750;
+        }}
+
+        #packingMetaTitle,
+        #boxesMetaTitle,
+        #diagnosticsMetaTitle {{
+            color: {palette.muted};
+            font-size: 12px;
+            font-weight: 700;
+            background: transparent;
+        }}
+
+        #packingMetaValue,
+        #boxesMetaValue,
+        #verifyMetaValue,
+        #defectMetaValue,
+        #diagnosticsMetaValue {{
+            color: {palette.text};
+            border-radius: 14px;
+            padding: 11px 13px;
+            background: {palette.panel_alt};
+            font-weight: 700;
+        }}
+
+        #packingProgressValue,
+        #boxesProgressValue {{
+            color: {palette.accent};
+            font-size: 18px;
+            font-weight: 850;
+            background: transparent;
+        }}
+
+        #packingProgressBar,
+        #boxesProgressBar {{
+            min-height: 14px;
+            max-height: 14px;
+            border: 0;
+            border-radius: 7px;
+            background: {palette.panel_alt};
+        }}
+
+        #packingProgressBar::chunk,
+        #boxesProgressBar::chunk {{
+            border-radius: 7px;
+            background: {palette.accent};
+        }}
+
+        #boxesPageLabel {{
+            color: {palette.text};
+            min-width: 96px;
+            qproperty-alignment: AlignCenter;
+            font-weight: 800;
+            background: transparent;
+        }}
+
+        #boxesSearchInput,
+        #boxesCombo,
+        #settingsInput,
+        #settingsCombo {{
+            min-height: 38px;
+            color: {palette.text};
+            background: {palette.input_bg};
+            border: 1px solid {palette.border};
+            border-radius: 12px;
+            padding: 0 12px;
+            font-weight: 650;
+        }}
+
+        #packingCheckBox,
+        #settingsCheckBox {{
+            color: {palette.text};
+            font-weight: 700;
+            background: transparent;
+        }}
+
+        #packingItemsTable,
+        #boxesTable,
+        #boxesItemsTable,
+        #lookupLog,
+        #verifyLog,
+        #defectLog,
+        #diagnosticsLog {{
+            color: {palette.text};
+            background: {palette.input_bg};
+            alternate-background-color: {palette.panel_alt};
+            border: 1px solid {palette.border};
+            border-radius: 14px;
+            selection-background-color: {palette.selection_bg};
+            selection-color: {palette.selection_text};
+        }}
+
+        #lookupLog,
+        #verifyLog,
+        #defectLog,
+        #diagnosticsLog {{
+            font-family: monospace;
+            font-size: 13px;
+        }}
+
+        #settingsHubButton {{
+            min-height: 86px;
+            border: 1px solid {palette.border};
+            border-radius: 18px;
+            padding: 18px 20px;
+            color: {palette.text};
+            background: {palette.panel};
+            font-size: 17px;
+            font-weight: 850;
+            text-align: left;
+        }}
+
+        #settingsSlider {{
+            min-height: 34px;
+            background: transparent;
+        }}
+
+        #settingsInlinePicker,
+        #boxesSideColumn {{
+            background: transparent;
+            border: 0;
+        }}
+
+        #settingsComboPopup {{
+            color: {palette.text};
+            background: {palette.panel};
+            border: 1px solid {palette.border};
+            border-radius: 10px;
+            padding: 6px;
+            outline: 0;
+            selection-color: {palette.selection_text};
+            selection-background-color: {palette.selection_bg};
+        }}
+
+        #settingsComboPopup::item {{
+            min-height: 30px;
+            padding: 7px 10px;
+            border-radius: 8px;
+        }}
+
+        #settingsComboPopup::item:hover,
+        #settingsComboPopup::item:selected {{
+            color: {palette.button_text};
+            background: {palette.button_bg};
+        }}
+    """
+
+
 def _stylesheet(palette: ThemePalette) -> str:
     """Генерирует общий QSS для виджетов приложения."""
 
@@ -254,6 +730,8 @@ def _stylesheet(palette: ThemePalette) -> str:
         QMessageBox {{
             background: {palette.panel};
         }}
+
+        {_custom_object_styles(palette)}
 
         #blockingOverlay {{
             background: {palette.overlay_rgba};
