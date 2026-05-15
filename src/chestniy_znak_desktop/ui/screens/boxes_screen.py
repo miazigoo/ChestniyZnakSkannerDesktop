@@ -314,6 +314,7 @@ class BoxesScreen(QWidget):
         table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         table.setColumnWidth(0, 72)
+        table.cellClicked.connect(self._emit_row_detail)
         table.cellDoubleClicked.connect(self._emit_row_detail)
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         return table

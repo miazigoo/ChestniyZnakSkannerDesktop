@@ -210,6 +210,36 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
     assert screen._print_label_button.isEnabled() is True  # noqa: SLF001
 
 
+def test_boxes_screen_loads_detail_on_single_click() -> None:
+    """Проверяет запрос деталей коробки по одному клику строки."""
+
+    qapp()
+    screen = BoxesScreen()
+    requested: list[int] = []
+    screen.box_detail_requested.connect(requested.append)
+    screen.apply_state(
+        BoxesUiState(
+            total=1,
+            rows=[
+                BoxRowUi(
+                    box_id=77,
+                    order_name="Заказ 77",
+                    sscc="046012345678901234",
+                    filled="2 / 10",
+                    status="Открыта",
+                    operator="Operator",
+                    print_status="Напечатано",
+                )
+            ],
+            status_message="Коробки загружены",
+        )
+    )
+
+    screen._table.cellClicked.emit(0, 0)  # noqa: SLF001
+
+    assert requested == [77]
+
+
 def test_box_lookup_screen_shows_scanner_result() -> None:
     """Проверяет современный scanner-only экран поиска коробки."""
 
