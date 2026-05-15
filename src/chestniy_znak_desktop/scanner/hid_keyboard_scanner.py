@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QWidget,
 )
+from shiboken6 import isValid
 
 from chestniy_znak_desktop.domain.scanner_normalizer import GS
 
@@ -77,11 +78,11 @@ class HidKeyboardScanner(QObject):
 
         if not self._is_running:
             return
+        self._is_running = False
         self._refresh_timer.stop()
         self._remove_widget_filters()
         self._idle_timer.stop()
         self._buffer.clear()
-        self._is_running = False
         self.stopped.emit()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
@@ -159,18 +160,58 @@ class HidKeyboardScanner(QObject):
     def _refresh_widget_filters(self) -> None:
         """Устанавливает фильтр на корневой виджет и его дочерние виджеты."""
 
-        if self._root_widget is None:
+        if self._root_widget is None or not self._is_valid_widget(self._root_widget):
+            self._filtered_widgets = {
+                widget for widget in self._filtered_widgets if self._is_valid_widget(widget)
+            }
             return
-        widgets = {self._root_widget, *self._root_widget.findChildren(QWidget)}
+        try:
+            widgets = {self._root_widget, *self._root_widget.findChildren(QWidget)}
+        except RuntimeError:
+            self._filtered_widgets.clear()
+            return
+        widgets = {widget for widget in widgets if self._is_valid_widget(widget)}
+        active_widgets = self._filtered_widgets & widgets
         for widget in widgets - self._filtered_widgets:
-            widget.installEventFilter(self)
+            if self._install_filter(widget):
+                active_widgets.add(widget)
         for widget in self._filtered_widgets - widgets:
-            widget.removeEventFilter(self)
-        self._filtered_widgets = widgets
+            self._remove_filter(widget)
+        self._filtered_widgets = active_widgets
 
     def _remove_widget_filters(self) -> None:
         """Удаляет фильтр со всех ранее зарегистрированных виджетов."""
 
         for widget in list(self._filtered_widgets):
-            widget.removeEventFilter(self)
+            self._remove_filter(widget)
         self._filtered_widgets.clear()
+
+    def _install_filter(self, widget: QWidget) -> bool:
+        """Безопасно устанавливает event filter на живой QWidget."""
+
+        if not self._is_valid_widget(widget):
+            return False
+        try:
+            widget.installEventFilter(self)
+        except RuntimeError:
+            return False
+        return True
+
+    def _remove_filter(self, widget: QWidget) -> None:
+        """Безопасно снимает event filter с живого QWidget."""
+
+        if not self._is_valid_widget(widget):
+            return
+        try:
+            widget.removeEventFilter(self)
+        except RuntimeError:
+            return
+
+    @staticmethod
+    def _is_valid_widget(widget: QWidget) -> bool:
+        """Проверяет, что Python-wrapper еще связан с живым Qt-объектом."""
+
+        try:
+            return bool(isValid(widget))
+        except RuntimeError:
+            return False

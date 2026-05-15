@@ -11,6 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QEvent, Qt  # noqa: E402
 from PySide6.QtGui import QKeyEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication, QLineEdit, QWidget  # noqa: E402
+from shiboken6 import delete as shiboken_delete  # noqa: E402
 
 from chestniy_znak_desktop.domain.scanner_normalizer import GS  # noqa: E402
 from chestniy_znak_desktop.scanner.hid_keyboard_scanner import (  # noqa: E402
@@ -129,6 +130,21 @@ def test_hid_keyboard_scanner_installs_filter_on_bound_widgets() -> None:
 
     assert root in scanner._filtered_widgets  # noqa: SLF001
     assert child in scanner._filtered_widgets  # noqa: SLF001
+
+    scanner.stop()
+    assert scanner._filtered_widgets == set()  # noqa: SLF001
+
+
+def test_hid_keyboard_scanner_ignores_deleted_filtered_widgets() -> None:
+    """Проверяет безопасную остановку после удаления дочернего QWidget."""
+
+    qapp()
+    child = QWidget()
+    scanner = HidKeyboardScanner()
+
+    shiboken_delete(child)
+    scanner._is_running = True  # noqa: SLF001
+    scanner._filtered_widgets.add(child)  # noqa: SLF001
 
     scanner.stop()
     assert scanner._filtered_widgets == set()  # noqa: SLF001
