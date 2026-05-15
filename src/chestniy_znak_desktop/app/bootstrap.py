@@ -32,6 +32,7 @@ from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
 from chestniy_znak_desktop.scanner.hid_keyboard_scanner import HidKeyboardScanner
+from chestniy_znak_desktop.services.auto_pack_ws_verifier import AutoPackWsVerifier
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.services.log_service import LogService
 from chestniy_znak_desktop.ui.app_window import AppWindow
@@ -89,6 +90,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     packing_service = PackingService(api_client)
     printer_service = PrinterService(api_client)
     chz_service = ChestniyZnakService(api_client)
+    auto_pack_ws_verifier = AutoPackWsVerifier(connection_monitor=connection_monitor)
     packing_controller = PackingController(
         packing_service=packing_service,
         task_runner=api_task_runner,
@@ -102,6 +104,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         settings_store=settings_store,
         settings_defaults=config,
         device_id=settings.device_id,
+        ws_verify_service=auto_pack_ws_verifier,
         sound_service=sound_service,
     )
     boxes_controller = BoxesController(

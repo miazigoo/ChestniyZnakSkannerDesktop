@@ -83,6 +83,14 @@ class ConnectionMonitor(QObject):
         self._socket.abort()
         self._open_socket()
 
+    def send_json(self, payload: dict[str, object]) -> bool:
+        """Отправляет JSON-сообщение через активный WebSocket."""
+
+        if self._socket.state() != QAbstractSocket.SocketState.ConnectedState:
+            return False
+        message = json.dumps(payload, ensure_ascii=False)
+        return self._socket.sendTextMessage(message) > 0
+
     def _open_socket(self) -> None:
         """Открывает WebSocket и переводит монитор в состояние подключения."""
 

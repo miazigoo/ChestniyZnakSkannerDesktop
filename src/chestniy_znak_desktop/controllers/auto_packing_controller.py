@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
@@ -51,6 +51,21 @@ class AutoPackingVerifier(Protocol):
         allow_duplicate: bool = True,
     ) -> VerifyExistsResponseDto:
         """Проверяет код по backend перед добавлением в локальный бокс."""
+
+
+class AutoPackingWsVerifier(Protocol):
+    """Контракт WS-сервиса быстрой проверки автоскана."""
+
+    verified: Any
+    failed: Any
+
+    def verify_exists(
+        self,
+        code: str,
+        scanner_id: str,
+        allow_duplicate: bool = True,
+    ) -> str | None:
+        """Отправляет проверку кода по WebSocket."""
 
 
 class SoundPlayer(Protocol):
@@ -112,6 +127,7 @@ class AutoPackingController(QObject):
         settings_defaults: AppConfig,
         device_id: str,
         scanner_id: str = "desktop-com",
+        ws_verify_service: AutoPackingWsVerifier | None = None,
         sound_service: SoundPlayer | None = None,
         parent: QObject | None = None,
     ) -> None:
@@ -125,12 +141,16 @@ class AutoPackingController(QObject):
         self._settings_defaults = settings_defaults
         self._device_id = device_id
         self._scanner_id = scanner_id
+        self._ws_verify_service = ws_verify_service
         self._sound_service = sound_service
         self._scan_queue: list[str] = []
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
         )
+        if self._ws_verify_service is not None:
+            self._ws_verify_service.verified.connect(self._on_ws_verify_result)
+            self._ws_verify_service.failed.connect(self._on_ws_verify_error)
 
     @property
     def state(self) -> AutoPackingUiState:
@@ -183,7 +203,6 @@ class AutoPackingController(QObject):
 
         if self._state.is_busy:
             return
-        self._play(SoundEvent.WARNING)
         self._set_state(
             replace(
                 self._state,
@@ -201,7 +220,6 @@ class AutoPackingController(QObject):
             return
         items = list(self._state.pending_items)
         removed = items.pop(row)
-        self._play(SoundEvent.WARNING)
         self._set_state(
             replace(
                 self._state,
@@ -219,7 +237,6 @@ class AutoPackingController(QObject):
             self._enqueue_scan(code)
             return
         if self._state.current_box is None:
-            self._play(SoundEvent.WARNING)
             self._set_state(
                 replace(
                     self._state,
@@ -230,7 +247,6 @@ class AutoPackingController(QObject):
             )
             return
         if self._state.is_pending_full:
-            self._play(SoundEvent.WARNING)
             self._set_state(
                 replace(
                     self._state,
@@ -240,7 +256,21 @@ class AutoPackingController(QObject):
                 )
             )
             return
-        self._set_busy("Проверяем код перед автоскана-боксом...", code)
+        self._set_busy("Проверяем код по WebSocket...", code)
+        if self._ws_verify_service is not None:
+            request_id = self._ws_verify_service.verify_exists(
+                code=code,
+                scanner_id=self._scanner_id,
+                allow_duplicate=True,
+            )
+            if request_id:
+                return
+        self._verify_code_http(code)
+
+    def _verify_code_http(self, code: str) -> None:
+        """Проверяет код через HTTP, если WS недоступен или не ответил."""
+
+        self._set_busy("Проверяем код через HTTP...", code)
         self._task_runner.submit(
             lambda: self._verify_service.verify_exists(
                 code=code,
@@ -251,12 +281,26 @@ class AutoPackingController(QObject):
             self._on_error,
         )
 
+    def _on_ws_verify_result(
+        self,
+        _request_id: str,
+        raw_code: str,
+        result: object,
+    ) -> None:
+        """Принимает успешный ответ проверки автоскана по WS."""
+
+        self._on_verify_result(result, raw_code)
+
+    def _on_ws_verify_error(self, _request_id: str, raw_code: str, _error: str) -> None:
+        """Возвращается к HTTP-проверке при ошибке WS."""
+
+        self._verify_code_http(raw_code)
+
     def _on_verify_result(self, result: object, raw_code: str) -> None:
         """Обрабатывает проверку кода и при заполнении отправляет пачку."""
 
         verify = self._expect(result, VerifyExistsResponseDto)
         if not verify.ok or not verify.exists or verify.code is None:
-            self._play(SoundEvent.ERROR)
             self._set_state(
                 replace(
                     self._state,
@@ -271,7 +315,6 @@ class AutoPackingController(QObject):
 
         order_key = (verify.code.order_dnp_name or verify.order_name or "").strip()
         if not order_key or order_key == "Не привязан":
-            self._play(SoundEvent.ERROR)
             self._set_state(
                 replace(
                     self._state,
@@ -285,7 +328,6 @@ class AutoPackingController(QObject):
             return
 
         if any(item.code_id == verify.code.id for item in self._state.pending_items):
-            self._play(SoundEvent.WARNING)
             self._set_state(
                 replace(
                     self._state,
@@ -300,7 +342,6 @@ class AutoPackingController(QObject):
 
         current_order = self._state.pending_items[0].order_key if self._state.pending_items else ""
         if current_order and current_order != order_key:
-            self._play(SoundEvent.ERROR)
             self._set_state(
                 replace(
                     self._state,
@@ -332,7 +373,6 @@ class AutoPackingController(QObject):
             last_scanned_code=raw_code,
         )
         self._set_state(next_state)
-        self._play(SoundEvent.OK)
         if next_state.is_pending_full:
             self._submit_pending_batch()
             return
@@ -360,7 +400,6 @@ class AutoPackingController(QObject):
         """Обрабатывает результат атомарного добавления пачки."""
 
         batch = self._expect(result, ScanBatchToBoxResultDto)
-        self._play(SoundEvent.OK if batch.ok else SoundEvent.ERROR)
         if not batch.ok:
             message = batch.error or batch.reason_code
             self._set_state(
@@ -384,6 +423,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._play(SoundEvent.OK)
         self._process_next_queued_scan()
 
     def _on_current_box_loaded(self, result: object) -> None:
@@ -415,7 +455,6 @@ class AutoPackingController(QObject):
         """Обрабатывает открытие коробки."""
 
         opened = self._expect(result, OpenBoxResultDto)
-        self._play(SoundEvent.OK if opened.ok else SoundEvent.WARNING)
         self._set_state(
             replace(
                 self._state,
@@ -433,7 +472,6 @@ class AutoPackingController(QObject):
     def _on_error(self, exc: Exception) -> None:
         """Обрабатывает ошибку backend-сценария."""
 
-        self._play(SoundEvent.ERROR)
         self._set_state(
             replace(
                 self._state,

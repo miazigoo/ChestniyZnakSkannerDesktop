@@ -86,6 +86,48 @@ class FakeSoundService:
         self.events.append(event)
 
 
+class FakeSignal:
+    """Минимальная замена Qt Signal для fake WS-сервиса."""
+
+    def __init__(self) -> None:
+        """Создает пустой список подписчиков."""
+
+        self._callbacks: list[Callable[..., None]] = []
+
+    def connect(self, callback: Callable[..., None]) -> None:
+        """Подписывает callback на событие."""
+
+        self._callbacks.append(callback)
+
+    def emit(self, *args: object) -> None:
+        """Вызывает всех подписчиков с переданными аргументами."""
+
+        for callback in self._callbacks:
+            callback(*args)
+
+
+class FakeWsVerifyService:
+    """Fake WebSocket-проверка автоскана."""
+
+    def __init__(self) -> None:
+        """Создает fake-сервис с сигналами ответа."""
+
+        self.verified = FakeSignal()
+        self.failed = FakeSignal()
+        self.calls: list[str] = []
+
+    def verify_exists(
+        self,
+        code: str,
+        scanner_id: str,
+        allow_duplicate: bool = True,
+    ) -> str | None:
+        """Запоминает WS-запрос и возвращает request_id."""
+
+        self.calls.append(code)
+        return f"ws-{len(self.calls)}"
+
+
 class FakePackingService:
     """Fake backend коробок для автоупаковки."""
 
@@ -267,6 +309,83 @@ def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
     assert controller.state.current_box.filled == 2
 
 
+def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
+    """Проверяет, что автоскан отправляет проверку через WebSocket."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    ws_verifier = FakeWsVerifyService()
+    sounds = FakeSoundService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        ws_verify_service=ws_verifier,
+        sound_service=sounds,
+    )
+    controller.open_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+
+    assert ws_verifier.calls == ["CODE1"]
+    assert verifier.calls == []
+    assert controller.state.is_busy is True
+
+    result = VerifyExistsResponseDto(
+        ok=True,
+        exists=True,
+        status="ok",
+        message="Код найден",
+        order_name="26-0001/0001",
+        code=RemoteCodeDto(
+            id=1,
+            gtin="04646151697261",
+            serial="SERIAL1",
+            visible_code="CODE1",
+            order_dnp_name="26-0001/0001",
+        ),
+    )
+    ws_verifier.verified.emit("ws-1", "CODE1", result)
+
+    assert controller.state.pending_count == 1
+    assert sounds.events == []
+
+
+def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
+    """Проверяет HTTP fallback при ошибке WS-проверки."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    ws_verifier = FakeWsVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        ws_verify_service=ws_verifier,
+    )
+    controller.open_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+    ws_verifier.failed.emit("ws-1", "CODE1", "timeout")
+
+    assert verifier.calls == ["CODE1"]
+    assert controller.state.pending_count == 1
+
+
 def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None:
     """Проверяет локальный запрет разных заказов в одном боксе."""
 
@@ -303,4 +422,4 @@ def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None
     assert controller.state.pending_count == 1
     assert service.batch_calls == []
     assert "одного заказа" in controller.state.error_message
-    assert sounds.events[-1] == SoundEvent.ERROR
+    assert sounds.events == []
