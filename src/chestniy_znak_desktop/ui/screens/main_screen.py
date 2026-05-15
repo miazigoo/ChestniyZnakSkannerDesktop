@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -23,6 +24,7 @@ from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScree
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen
+from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import AdaptiveScrollArea
 from chestniy_znak_desktop.ui.widgets.main_navigation import MainSidebar, MainWorkspace, NavItem
 from chestniy_znak_desktop.ui.widgets.user_session_panel import UserSessionPanel
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIconName
@@ -48,6 +50,10 @@ class MainScreen(QWidget):
         self._stack_animation.setDuration(180)
         self._stack_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._nav_items: list[NavItem] = []
+        self._is_compact = False
+        self._sidebar: MainSidebar | None = None
+        self._root_layout: QHBoxLayout | None = None
+        self._workspace_layout: QVBoxLayout | None = None
         self._session_panel = UserSessionPanel()
         self._packing_screen = PackingScreen()
         self._boxes_screen = BoxesScreen()
@@ -130,7 +136,8 @@ class MainScreen(QWidget):
             self._settings_screen,
             self._diagnostics_screen,
         ):
-            self._stack.addWidget(screen)
+            wrapper = AdaptiveScrollArea(screen, f"{screen.objectName()}Scroll")
+            self._stack.addWidget(wrapper)
 
     def _build_layout(self) -> None:
         """Собирает боковую панель и рабочую область."""
@@ -138,21 +145,25 @@ class MainScreen(QWidget):
         sidebar = self._build_sidebar()
         workspace = MainWorkspace()
         workspace_layout = QVBoxLayout(workspace)
+        self._workspace_layout = workspace_layout
         workspace_layout.setContentsMargins(20, 18, 22, 20)
         workspace_layout.setSpacing(12)
         workspace_layout.addLayout(self._workspace_header())
         workspace_layout.addWidget(self._stack, stretch=1)
 
         layout = QHBoxLayout(self)
+        self._root_layout = layout
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(14)
         layout.addWidget(sidebar)
         layout.addWidget(workspace, stretch=1)
+        self._apply_responsive_mode()
 
     def _build_sidebar(self) -> MainSidebar:
         """Создает боковую навигационную панель."""
 
         sidebar = MainSidebar()
+        self._sidebar = sidebar
         shell_layout = QVBoxLayout(sidebar)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
@@ -189,6 +200,34 @@ class MainScreen(QWidget):
         scroll_area.setWidget(content)
         shell_layout.addWidget(scroll_area)
         return sidebar
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Обновляет плотность интерфейса при изменении размера окна."""
+
+        super().resizeEvent(event)
+        self._apply_responsive_mode()
+
+    def _apply_responsive_mode(self) -> None:
+        """Подбирает отступы и ширину сайдбара под доступный размер."""
+
+        is_compact = self.width() < 1060 or self.height() < 700
+        if is_compact == self._is_compact:
+            return
+        self._is_compact = is_compact
+        if self._sidebar is not None:
+            self._sidebar.set_compact(is_compact)
+        if self._root_layout is not None:
+            margin = 8 if is_compact else 14
+            spacing = 10 if is_compact else 14
+            self._root_layout.setContentsMargins(margin, margin, margin, margin)
+            self._root_layout.setSpacing(spacing)
+        if self._workspace_layout is not None:
+            if is_compact:
+                self._workspace_layout.setContentsMargins(14, 12, 14, 14)
+                self._workspace_layout.setSpacing(10)
+            else:
+                self._workspace_layout.setContentsMargins(20, 18, 22, 20)
+                self._workspace_layout.setSpacing(12)
 
     def _workspace_header(self) -> QHBoxLayout:
         """Создает шапку рабочей области."""

@@ -64,8 +64,16 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #diagnosticsScreen,
         #settingsScreen,
         #settingsPage,
-        #settingsStack {{
+        #settingsStack,
+        #packingScreenScroll,
+        #boxesScreenScroll,
+        #boxLookupScreenScroll,
+        #verifyScreenScroll,
+        #defectScreenScroll,
+        #settingsScreenScroll,
+        #diagnosticsScreenScroll {{
             background: transparent;
+            border: 0;
         }}
 
         #mainWorkspace,

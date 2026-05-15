@@ -193,6 +193,7 @@ class AppWindow(QMainWindow):
         self._main_screen.settings_screen.scanner_baudrate_changed.connect(
             self._settings_controller.set_scanner_baudrate
         )
+        self.setMinimumSize(QSize(640, 460))
         self.setWindowTitle(app_state.config.app_name)
         self._resize_to_available_screen(QSize(1180, 760))
 
@@ -255,8 +256,10 @@ class AppWindow(QMainWindow):
 
         screen = self.screen()
         available = screen.availableGeometry()
-        width = min(preferred_size.width(), max(900, available.width() - 80))
-        height = min(preferred_size.height(), max(620, available.height() - 80))
+        width = min(preferred_size.width(), max(640, available.width() - 40))
+        height = min(preferred_size.height(), max(460, available.height() - 40))
+        width = min(width, available.width())
+        height = min(height, available.height())
         self.resize(width, height)
         self.move(
             available.x() + max(0, (available.width() - width) // 2),

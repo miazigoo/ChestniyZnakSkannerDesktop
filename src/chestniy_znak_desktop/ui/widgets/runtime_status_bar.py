@@ -17,6 +17,8 @@ class RuntimeStatusBar(QWidget):
         self._connection_label = QLabel("Связь: остановлена")
         self._session_label = QLabel("Сессия: неизвестно")
         self._scanner_label = QLabel("Сканер: остановлен")
+        for label in (self._connection_label, self._session_label, self._scanner_label):
+            label.setWordWrap(True)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 6, 12, 6)
         layout.addWidget(self._connection_label)

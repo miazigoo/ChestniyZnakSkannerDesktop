@@ -58,7 +58,7 @@ class LoginScreen(QWidget):
 
         super().__init__()
         self.setObjectName("loginScreen")
-        self.setMinimumSize(860, 560)
+        self.setMinimumSize(640, 460)
         self._title_label = QLabel("Честный знак")
         self._title_label.setObjectName("loginHeroTitle")
         self._subtitle_label = QLabel("Desktop-клиент оператора")

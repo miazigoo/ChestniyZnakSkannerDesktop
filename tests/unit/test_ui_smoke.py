@@ -52,6 +52,9 @@ from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScree
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen  # noqa: E402
+from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import (  # noqa: E402
+    AdaptiveScrollArea,
+)
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
 
@@ -93,7 +96,19 @@ def test_main_screen_does_not_force_tall_window() -> None:
     qapp()
     screen = MainScreen()
 
-    assert screen.minimumSizeHint().height() <= 760
+    assert screen.minimumSizeHint().height() <= 640
+
+
+def test_main_work_screens_are_scrollable() -> None:
+    """Проверяет, что рабочие экраны завернуты в адаптивный скролл."""
+
+    qapp()
+    screen = MainScreen()
+
+    wrappers = screen.findChildren(AdaptiveScrollArea)
+
+    assert len(wrappers) == 7
+    assert all(wrapper.minimumSizeHint().height() <= 240 for wrapper in wrappers)
 
 
 def test_main_sidebar_keeps_navigation_compact() -> None:
@@ -107,6 +122,20 @@ def test_main_sidebar_keeps_navigation_compact() -> None:
     assert scroll_area is not None
     assert screen._session_panel.minimumHeight() == 124  # noqa: SLF001
     assert all(item.minimumHeight() == 58 for item in screen._nav_items)  # noqa: SLF001
+
+
+def test_main_screen_switches_to_compact_mode() -> None:
+    """Проверяет компактный режим главного экрана на небольшом окне."""
+
+    qapp()
+    screen = MainScreen()
+    screen.resize(900, 620)
+    screen.show()
+    qapp().processEvents()
+
+    assert screen._is_compact is True  # noqa: SLF001
+    assert screen._sidebar is not None  # noqa: SLF001
+    assert screen._sidebar.width() == 214  # noqa: SLF001
 
 
 def test_boxes_screen_has_backend_status_filters() -> None:
@@ -414,6 +443,16 @@ def test_login_screen_shows_token_preview() -> None:
     )
 
     assert screen is not None
+
+
+def test_login_screen_has_compact_minimum_size() -> None:
+    """Проверяет, что логин не требует большой монитор."""
+
+    qapp()
+    screen = LoginScreen()
+
+    assert screen.minimumWidth() <= 640
+    assert screen.minimumHeight() <= 460
 
 
 def test_login_screen_renders_vector_background() -> None:
