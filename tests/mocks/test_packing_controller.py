@@ -56,6 +56,7 @@ class FakePackingService:
 
         self.current_box_result: BoxDetailDto | None = None
         self.last_scan: tuple[int, str, str] | None = None
+        self.close_result: CloseBoxResultDto | None = None
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает fake текущую коробку."""
@@ -85,6 +86,8 @@ class FakePackingService:
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
         """Возвращает fake результат закрытия коробки."""
 
+        if self.close_result is not None:
+            return self.close_result
         return CloseBoxResultDto(
             ok=True,
             reason_code="box_closed",
@@ -170,12 +173,42 @@ def test_packing_controller_close_box_clears_current_box() -> None:
     """Проверяет закрытие коробки."""
 
     controller, _service, sounds = _controller_pair()
+    events = []
+    controller.close_completed.connect(events.append)
     controller.open_box()
     controller.close_current_box()
 
     assert controller.state.current_box is None
     assert controller.state.status_message == "Коробка закрыта"
     assert sounds.events[-1] == SoundEvent.VICTORY
+    assert events[-1].ok is True
+    assert events[-1].is_full is True
+
+
+def test_packing_controller_close_failed_keeps_current_box() -> None:
+    """Проверяет, что ошибка закрытия оставляет коробку активной."""
+
+    controller, service, sounds = _controller_pair()
+    events = []
+    service.close_result = CloseBoxResultDto(
+        ok=False,
+        reason_code="printer_unavailable",
+        error="Принтер недоступен",
+        box=_box(filled=5, capacity=20, is_closed=False),
+        print_ok=False,
+        print_error="Нет связи с принтером",
+    )
+    controller.close_completed.connect(events.append)
+
+    controller.open_box()
+    controller.close_current_box()
+
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 5
+    assert controller.state.status_message == "Коробка не закрыта"
+    assert sounds.events[-1] == SoundEvent.ERROR
+    assert events[-1].ok is False
+    assert events[-1].error_message == "Принтер недоступен"
 
 
 def test_packing_controller_refresh_current_box_with_items() -> None:

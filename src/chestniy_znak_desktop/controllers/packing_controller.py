@@ -83,10 +83,28 @@ class PackingUiState:
     count_in_packing: bool = True
 
 
+@dataclass(frozen=True, slots=True)
+class CloseBoxUiEvent:
+    """Итог закрытия коробки для пользовательской модалки."""
+
+    ok: bool
+    box_id: int
+    sscc: str
+    filled: int
+    capacity: int
+    is_full: bool
+    title: str
+    message: str
+    error_message: str = ""
+    print_ok: bool | None = None
+    print_error: str = ""
+
+
 class PackingController(QObject):
     """Связывает экран упаковки, backend и сканер."""
 
     state_changed = Signal(PackingUiState)
+    close_completed = Signal(CloseBoxUiEvent)
 
     def __init__(
         self,
@@ -145,14 +163,14 @@ class PackingController(QObject):
         if self._state.is_busy or self._state.current_box is None:
             return
         box_id = self._state.current_box.box_id
-        self._set_busy("Закрываем коробку...")
+        self._set_busy("Закрываем коробку и ждем печать этикетки...")
         self._task_runner.submit(
             lambda: self._packing_service.close_box(
                 box_id=box_id,
                 device_id=self._device_id,
             ),
             self._on_box_closed,
-            self._on_error,
+            self._on_close_error,
         )
 
     def set_count_in_packing(self, enabled: bool) -> None:
@@ -253,13 +271,36 @@ class PackingController(QObject):
         closed = self._expect(result, CloseBoxResultDto)
         self._play(SoundEvent.VICTORY if closed.ok else SoundEvent.ERROR)
         message = closed.error or closed.print_error or closed.reason_code
+        event = self._close_event(closed)
         self._set_state(
             PackingUiState(
-                current_box=None,
+                current_box=None if closed.ok else self._box_to_ui(closed.box),
                 status_message="Коробка закрыта" if closed.ok else "Коробка не закрыта",
                 result_message=message,
                 error_message="" if closed.ok else message,
                 count_in_packing=self._state.count_in_packing,
+            )
+        )
+        self.close_completed.emit(event)
+
+    def _on_close_error(self, exc: Exception) -> None:
+        """Обрабатывает ошибку закрытия коробки и публикует модалку."""
+
+        current_box = self._state.current_box
+        self._on_error(exc)
+        if current_box is None:
+            return
+        self.close_completed.emit(
+            CloseBoxUiEvent(
+                ok=False,
+                box_id=current_box.box_id,
+                sscc=current_box.sscc,
+                filled=current_box.filled,
+                capacity=current_box.capacity,
+                is_full=current_box.filled >= current_box.capacity,
+                title="Коробка не закрыта",
+                message="Не удалось закрыть коробку",
+                error_message=str(exc),
             )
         )
 
@@ -302,6 +343,36 @@ class PackingController(QObject):
 
         if self._sound_service is not None:
             self._sound_service.play(event)
+
+    @staticmethod
+    def _close_event(result: CloseBoxResultDto) -> CloseBoxUiEvent:
+        """Преобразует backend-результат закрытия в UI-событие."""
+
+        box = result.box
+        is_full = box.filled >= box.capacity
+        print_error = result.print_error or ""
+        if result.ok and result.print_ok is False and print_error:
+            title = "Коробка закрыта, печать с ошибкой"
+            message = print_error
+        elif result.ok:
+            title = "Коробка закрыта"
+            message = f"Коробка #{box.box_id} закрыта"
+        else:
+            title = "Коробка не закрыта"
+            message = result.error or print_error or "Не удалось закрыть коробку"
+        return CloseBoxUiEvent(
+            ok=result.ok,
+            box_id=box.box_id,
+            sscc=box.sscc or "",
+            filled=box.filled,
+            capacity=box.capacity,
+            is_full=is_full,
+            title=title,
+            message=message,
+            error_message="" if result.ok else message,
+            print_ok=result.print_ok,
+            print_error=print_error,
+        )
 
     @staticmethod
     def _box_detail_to_ui(detail: BoxDetailDto) -> PackingBoxUi:

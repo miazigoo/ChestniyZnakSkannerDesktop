@@ -20,7 +20,7 @@ from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupCon
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
-from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent, PackingController
 from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
@@ -34,6 +34,7 @@ from chestniy_znak_desktop.services.scanner_command_service import (
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay
+from chestniy_znak_desktop.ui.widgets.close_box_dialog import CloseBoxDialog
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar
 
 
@@ -78,6 +79,7 @@ class AppWindow(QMainWindow):
         self._status_bar = RuntimeStatusBar()
         self._login_screen = LoginScreen()
         self._main_screen = MainScreen()
+        self._close_box_dialogs: list[CloseBoxDialog] = []
         self._stack.addWidget(self._login_screen)
         self._stack.addWidget(self._main_screen)
         layout = QVBoxLayout(self._central)
@@ -97,6 +99,7 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._set_scan_target)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._packing_controller.close_completed.connect(self._handle_box_close_completed)
         self._box_lookup_controller.state_changed.connect(
             self._main_screen.box_lookup_screen.apply_state
         )
@@ -163,7 +166,7 @@ class AppWindow(QMainWindow):
             self._packing_controller.open_box
         )
         self._main_screen.packing_screen.close_box_requested.connect(
-            self._packing_controller.close_current_box
+            self._request_close_current_box
         )
         self._main_screen.packing_screen.count_in_packing_changed.connect(
             self._packing_controller.set_count_in_packing
@@ -245,6 +248,59 @@ class AppWindow(QMainWindow):
         self._main_screen.show_boxes()
         self._boxes_controller.load_detail(box_id)
 
+    def _request_close_current_box(self) -> None:
+        """Запрашивает закрытие коробки с подтверждением неполного заполнения."""
+
+        self._main_screen.show_packing()
+        state = self._packing_controller.state
+        box = state.current_box
+        if state.is_busy:
+            self._show_message("Операция выполняется", state.status_message)
+            return
+        if box is None:
+            self._show_message("Коробка не открыта", "Сначала откройте коробку.")
+            return
+        if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
+            return
+        self._packing_controller.close_current_box()
+
+    def _confirm_incomplete_box(self, filled: int, capacity: int) -> bool:
+        """Просит подтверждение закрытия неполной коробки."""
+
+        answer = QMessageBox.question(
+            self,
+            "Закрыть неполную коробку?",
+            (
+                "Коробка заполнена не полностью.\n\n"
+                f"Заполнение: {filled} / {capacity}\n\n"
+                "Закрыть коробку и отправить этикетку на печать?"
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def _show_message(self, title: str, text: str) -> None:
+        """Показывает короткое информационное сообщение."""
+
+        QMessageBox.information(self, title, text)
+
+    def _handle_box_close_completed(self, event: CloseBoxUiEvent) -> None:
+        """Показывает результат закрытия и открывает следующую коробку."""
+
+        dialog = CloseBoxDialog(event, self)
+        self._close_box_dialogs.append(dialog)
+        dialog.finished.connect(lambda _code, dialog=dialog: self._forget_close_dialog(dialog))
+        dialog.open()
+        if event.ok:
+            self._packing_controller.open_box()
+
+    def _forget_close_dialog(self, dialog: CloseBoxDialog) -> None:
+        """Удаляет закрытую модалку из списка активных окон."""
+
+        if dialog in self._close_box_dialogs:
+            self._close_box_dialogs.remove(dialog)
+
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
@@ -278,7 +334,7 @@ class AppWindow(QMainWindow):
         if command == ScannerCommand.OPEN_NEW_BOX:
             self._packing_controller.open_box()
             return True
-        self._packing_controller.close_current_box()
+        self._request_close_current_box()
         return True
 
     @staticmethod

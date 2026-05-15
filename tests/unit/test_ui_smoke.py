@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest  # noqa: E402
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox, QScrollArea  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QScrollArea  # noqa: E402
 
 from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     ConnectionState,
@@ -37,6 +37,7 @@ from chestniy_znak_desktop.controllers.diagnostics_controller import (  # noqa: 
     DiagnosticsUiState,
 )
 from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
+    CloseBoxUiEvent,
     PackingBoxUi,
     PackingItemUi,
     PackingUiState,
@@ -59,6 +60,7 @@ from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import (  # noqa: E40
     AdaptiveScrollArea,
 )
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
+from chestniy_znak_desktop.ui.widgets.close_box_dialog import CloseBoxDialog  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
 
 
@@ -395,6 +397,31 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
     assert screen._progress_bar.value() == 1  # noqa: SLF001
     assert screen._items_table.rowCount() == 1  # noqa: SLF001
     assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
+
+
+def test_close_box_dialog_uses_android_assets() -> None:
+    """Проверяет модалку результата закрытия коробки с картинкой."""
+
+    qapp()
+    dialog = CloseBoxDialog(
+        CloseBoxUiEvent(
+            ok=True,
+            box_id=42,
+            sscc="046012345678901234",
+            filled=10,
+            capacity=10,
+            is_full=True,
+            title="Коробка закрыта",
+            message="Коробка #42 закрыта",
+            print_ok=True,
+        )
+    )
+
+    image = dialog.findChild(QLabel, "closeBoxDialogImage")
+
+    assert image is not None
+    assert image.pixmap() is not None
+    assert image.pixmap().isNull() is False
 
 
 def test_settings_screen_has_grouped_pages() -> None:

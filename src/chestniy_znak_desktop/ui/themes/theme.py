@@ -563,6 +563,50 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             border: 1px solid {palette.border};
         }}
 
+        #closeBoxDialog {{
+            background: {palette.panel};
+        }}
+
+        #closeBoxDialogImage {{
+            background: {palette.panel_alt};
+            border: 1px solid {palette.border};
+            border-radius: 16px;
+            padding: 8px;
+        }}
+
+        #closeBoxDialogTitle {{
+            color: {palette.text};
+            font-size: 22px;
+            font-weight: 900;
+            background: transparent;
+        }}
+
+        #closeBoxDialogMessage {{
+            color: {palette.text};
+            font-size: 15px;
+            font-weight: 750;
+            background: transparent;
+        }}
+
+        #closeBoxDialogDetails {{
+            color: {palette.muted};
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: {palette.panel_alt};
+            font-weight: 650;
+        }}
+
+        #closeBoxDialogButton {{
+            min-width: 112px;
+            min-height: 38px;
+            border: 0;
+            border-radius: 12px;
+            padding: 0 16px;
+            color: {palette.button_text};
+            background: {palette.button_bg};
+            font-weight: 850;
+        }}
+
         #settingsSlider {{
             min-height: 34px;
             background: transparent;
