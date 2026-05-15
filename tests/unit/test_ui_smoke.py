@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPixmap  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
+    QCheckBox,
     QLabel,
     QMessageBox,
     QProgressBar,
@@ -340,6 +341,25 @@ def test_verify_screen_shows_processed_code() -> None:
     assert "Код найден" in screen._result.text()  # noqa: SLF001
     assert "код найден" in screen._exists.text()  # noqa: SLF001
     assert "Повторная проверка" in screen._warnings.text()  # noqa: SLF001
+
+
+def test_verify_screen_emits_duplicate_check_toggle() -> None:
+    """Проверяет переключатель учета дублей на экране проверки."""
+
+    qapp()
+    screen = VerifyScreen()
+    changed: list[bool] = []
+    screen.duplicate_check_changed.connect(changed.append)
+
+    screen.apply_state(VerifyUiState(check_duplicates=True))
+    checkbox = screen.findChild(QCheckBox, "verifyDuplicateCheck")
+
+    assert checkbox is not None
+    assert checkbox.isChecked() is True
+
+    checkbox.setChecked(False)
+
+    assert changed == [False]
 
 
 def test_diagnostics_screen_shows_runtime_and_logs() -> None:

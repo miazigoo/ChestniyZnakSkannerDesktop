@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -20,6 +22,8 @@ from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconN
 class VerifyScreen(QWidget):
     """Показывает результат проверки кода по скану."""
 
+    duplicate_check_changed = Signal(bool)
+
     def __init__(self) -> None:
         """Создает scanner-only экран проверки кода."""
 
@@ -28,6 +32,7 @@ class VerifyScreen(QWidget):
         self._title = QLabel("Проверка DataMatrix")
         self._status = QLabel("Ожидание скана кода")
         self._scanner_status = QLabel("Сканер: проверяем состояние")
+        self._duplicate_check = QCheckBox("Учитывать дубликаты")
         self._result = QLabel("Ожидаем DataMatrix от сканера")
         self._error = QLabel("")
         self._last_code = QLabel("Код: -")
@@ -56,6 +61,7 @@ class VerifyScreen(QWidget):
         self._last_code.setText(f"Код: {self._preview(state.last_visible_code)}")
         self._technical_status.setText(f"Статус: {state.technical_status or '-'}")
         self._exists.setText(f"Наличие: {self._exists_text(state.exists)}")
+        self._sync_duplicate_check(state.check_duplicates)
         self._order.setText(f"Заказ: {state.order_name or '-'}")
         self._device.setText(f"Устройство: {state.device_name or '-'}")
         warnings = "; ".join(state.warnings)
@@ -81,6 +87,7 @@ class VerifyScreen(QWidget):
         self._title.setObjectName("verifyHeroTitle")
         self._status.setObjectName("verifyStatusText")
         self._scanner_status.setObjectName("verifyScannerStatus")
+        self._duplicate_check.setObjectName("verifyDuplicateCheck")
         self._result.setObjectName("verifyResult")
         self._error.setObjectName("verifyError")
         self._last_code.setObjectName("verifyMetaValue")
@@ -104,6 +111,7 @@ class VerifyScreen(QWidget):
             label.setWordWrap(True)
         self._error.setVisible(False)
         self._warnings.setVisible(False)
+        self._duplicate_check.toggled.connect(self.duplicate_check_changed.emit)
 
     def _build_layout(self) -> None:
         """Собирает визуальную структуру экрана проверки."""
@@ -162,6 +170,9 @@ class VerifyScreen(QWidget):
         note = QLabel("Ручной ввод отключен, принимаем только сканер")
         note.setObjectName("verifyMutedText")
         note.setWordWrap(True)
+        duplicate_note = QLabel("Включите, если повторный скан должен считаться дублем.")
+        duplicate_note.setObjectName("verifyMutedText")
+        duplicate_note.setWordWrap(True)
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -170,6 +181,8 @@ class VerifyScreen(QWidget):
         layout.addWidget(title)
         layout.addWidget(note)
         layout.addWidget(self._scanner_status)
+        layout.addWidget(self._duplicate_check)
+        layout.addWidget(duplicate_note)
         layout.addStretch(1)
         return card
 
@@ -262,6 +275,15 @@ class VerifyScreen(QWidget):
         if exists is False:
             return "код не найден"
         return "-"
+
+    def _sync_duplicate_check(self, checked: bool) -> None:
+        """Синхронизирует переключатель дублей без повторного сигнала."""
+
+        if self._duplicate_check.isChecked() == checked:
+            return
+        self._duplicate_check.blockSignals(True)
+        self._duplicate_check.setChecked(checked)
+        self._duplicate_check.blockSignals(False)
 
     @staticmethod
     def _preview(code: str) -> str:

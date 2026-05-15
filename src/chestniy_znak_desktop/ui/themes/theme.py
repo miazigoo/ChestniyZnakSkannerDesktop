@@ -473,6 +473,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         }}
 
         #packingCheckBox,
+        #verifyDuplicateCheck,
         #settingsCheckBox {{
             color: {palette.text};
             font-weight: 700;

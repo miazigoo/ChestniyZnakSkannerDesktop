@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
@@ -44,6 +44,7 @@ class VerifyUiState:
     order_name: str = ""
     device_name: str = ""
     exists: bool | None = None
+    check_duplicates: bool = False
     warnings: list[str] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
 
@@ -81,19 +82,33 @@ class VerifyController(QObject):
 
         if self._state.is_busy:
             return
+        check_duplicates = self._state.check_duplicates
+        allow_duplicate = not check_duplicates
         self._set_state(
             VerifyUiState(
                 is_busy=True,
                 status_message="Проверяем код...",
                 last_visible_code=code,
+                check_duplicates=check_duplicates,
                 log=self._state.log,
             )
         )
         self._task_runner.submit(
-            lambda: self._verify_service.verify_exists(code, self._scanner_id),
+            lambda: self._verify_service.verify_exists(
+                code,
+                self._scanner_id,
+                allow_duplicate=allow_duplicate,
+            ),
             self._on_code_verified,
             self._on_error,
         )
+
+    def set_check_duplicates(self, enabled: bool) -> None:
+        """Включает или отключает учет дублей при проверке."""
+
+        if self._state.check_duplicates == enabled:
+            return
+        self._set_state(replace(self._state, check_duplicates=enabled))
 
     def _on_code_verified(self, result: object) -> None:
         """Обрабатывает результат проверки кода."""
@@ -114,6 +129,7 @@ class VerifyController(QObject):
                 order_name=self._order_name(result),
                 device_name=self._device_name(result),
                 exists=result.exists,
+                check_duplicates=self._state.check_duplicates,
                 warnings=result.warnings,
                 log=log,
             )
@@ -129,6 +145,7 @@ class VerifyController(QObject):
                 status_message="Ошибка проверки кода",
                 error_message=str(exc),
                 last_visible_code=self._state.last_visible_code,
+                check_duplicates=self._state.check_duplicates,
                 log=log,
             )
         )

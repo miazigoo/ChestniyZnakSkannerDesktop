@@ -114,6 +114,18 @@ def test_verify_controller_checks_scanned_code() -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
+def test_verify_controller_can_check_duplicates() -> None:
+    """Проверяет режим учета дублей при проверке."""
+
+    controller, service, _sounds = _controller_pair()
+
+    controller.set_check_duplicates(True)
+    controller.on_code_scanned("CODE")
+
+    assert controller.state.check_duplicates is True
+    assert service.last_call == ("CODE", "desktop-com-verify", False)
+
+
 def test_verify_controller_reports_missing_code() -> None:
     """Проверяет отображение отсутствующего кода."""
 

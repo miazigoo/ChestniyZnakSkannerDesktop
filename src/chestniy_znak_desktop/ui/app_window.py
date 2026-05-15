@@ -111,6 +111,9 @@ class AppWindow(QMainWindow):
         )
         self._box_lookup_controller.box_found.connect(self._open_found_box)
         self._verify_controller.state_changed.connect(self._main_screen.verify_screen.apply_state)
+        self._main_screen.verify_screen.duplicate_check_changed.connect(
+            self._verify_controller.set_check_duplicates
+        )
         self._defect_controller.state_changed.connect(self._main_screen.defect_screen.apply_state)
         self._diagnostics_controller.state_changed.connect(
             self._main_screen.diagnostics_screen.apply_state
