@@ -105,6 +105,12 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             border-radius: 18px;
         }}
 
+        #mainSidebarScroll,
+        #mainSidebarContent {{
+            background: transparent;
+            border: 0;
+        }}
+
         #packingHero,
         #boxesHero,
         #lookupHero,
@@ -302,6 +308,11 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #settingsDangerButton:disabled {{
             color: {palette.muted};
             background: {palette.panel_alt};
+        }}
+
+        #sessionLogout {{
+            min-height: 32px;
+            border-radius: 10px;
         }}
 
         #packingBadge,

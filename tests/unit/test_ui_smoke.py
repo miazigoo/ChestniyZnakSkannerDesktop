@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest  # noqa: E402
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox, QScrollArea  # noqa: E402
 
 from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     ConnectionState,
@@ -94,6 +94,19 @@ def test_main_screen_does_not_force_tall_window() -> None:
     screen = MainScreen()
 
     assert screen.minimumSizeHint().height() <= 760
+
+
+def test_main_sidebar_keeps_navigation_compact() -> None:
+    """Проверяет, что сайдбар не сжимает блок сессии поверх меню."""
+
+    qapp()
+    screen = MainScreen()
+
+    scroll_area = screen.findChild(QScrollArea, "mainSidebarScroll")
+
+    assert scroll_area is not None
+    assert screen._session_panel.minimumHeight() == 124  # noqa: SLF001
+    assert all(item.minimumHeight() == 58 for item in screen._nav_items)  # noqa: SLF001
 
 
 def test_boxes_screen_has_backend_status_filters() -> None:

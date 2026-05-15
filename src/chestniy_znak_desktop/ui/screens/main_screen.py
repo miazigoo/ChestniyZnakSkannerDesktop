@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
@@ -152,9 +153,22 @@ class MainScreen(QWidget):
         """Создает боковую навигационную панель."""
 
         sidebar = MainSidebar()
-        layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(16, 18, 16, 18)
-        layout.setSpacing(10)
+        shell_layout = QVBoxLayout(sidebar)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setObjectName("mainSidebarScroll")
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        content = QWidget()
+        content.setObjectName("mainSidebarContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
 
         brand = QLabel("CZ Desktop")
         brand.setObjectName("mainBrand")
@@ -172,6 +186,8 @@ class MainScreen(QWidget):
         layout.addWidget(utility)
         for item in self._utility_nav_items():
             layout.addWidget(item)
+        scroll_area.setWidget(content)
+        shell_layout.addWidget(scroll_area)
         return sidebar
 
     def _workspace_header(self) -> QHBoxLayout:

@@ -98,6 +98,7 @@ class NavItem(QFrame):
         self._active = False
         self.setObjectName("mainNavItem")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(58)
         self.setProperty("active", False)
         self.setProperty("screen_name", screen_name)
         self._icon = VectorIcon(icon_name, "#56c7b8")
@@ -114,7 +115,7 @@ class NavItem(QFrame):
         texts.addWidget(self._subtitle)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(10)
         layout.addWidget(self._icon)
         layout.addLayout(texts, stretch=1)

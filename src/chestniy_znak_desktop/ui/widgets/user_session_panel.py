@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.runtime.state_models import (
     ConnectionStatus,
@@ -23,6 +23,8 @@ class UserSessionPanel(QWidget):
 
         super().__init__()
         self.setObjectName("userSessionPanel")
+        self.setFixedHeight(124)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._user_label = QLabel("Оператор: нет сессии")
         self._user_label.setObjectName("sessionUser")
         self._connection_label = QLabel("Backend: неизвестно")
@@ -33,8 +35,8 @@ class UserSessionPanel(QWidget):
         self._logout_button.setObjectName("sessionLogout")
         self._logout_button.clicked.connect(self.logout_requested.emit)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(6)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(4)
         layout.addWidget(self._user_label)
         layout.addWidget(self._connection_label)
         layout.addWidget(self._scanner_label)
