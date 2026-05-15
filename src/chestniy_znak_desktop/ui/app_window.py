@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QResizeEvent
-from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QMainWindow,
+    QMessageBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
@@ -19,6 +27,10 @@ from chestniy_znak_desktop.controllers.settings_controller import SettingsContro
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
+from chestniy_znak_desktop.services.scanner_command_service import (
+    ScannerCommand,
+    parse_scanner_command,
+)
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay
@@ -96,6 +108,9 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.diagnostics_screen.logs_refresh_requested.connect(
             self._diagnostics_controller.refresh_logs
+        )
+        self._main_screen.diagnostics_screen.logs_clear_requested.connect(
+            self._diagnostics_controller.clear_logs
         )
         self._printer_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_printer_state
@@ -233,6 +248,9 @@ class AppWindow(QMainWindow):
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
+        command = parse_scanner_command(code)
+        if command is not None and self._handle_scanner_command(command):
+            return
         if self._stack.currentWidget() is self._login_screen:
             self._auth_controller.login_with_raw_token(code)
             return
@@ -247,6 +265,42 @@ class AppWindow(QMainWindow):
             return
         if self._scan_target == "packing":
             self._packing_controller.on_code_scanned(code)
+
+    def _handle_scanner_command(self, command: ScannerCommand) -> bool:
+        """Выполняет служебную QR-команду сканера."""
+
+        if command == ScannerCommand.CONFIRM_OK:
+            self._confirm_active_dialog()
+            return True
+        if self._stack.currentWidget() is self._login_screen:
+            return True
+        self._main_screen.show_packing()
+        if command == ScannerCommand.OPEN_NEW_BOX:
+            self._packing_controller.open_box()
+            return True
+        self._packing_controller.close_current_box()
+        return True
+
+    @staticmethod
+    def _confirm_active_dialog() -> bool:
+        """Подтверждает активный модальный диалог, если он открыт."""
+
+        active_modal = QApplication.activeModalWidget()
+        if isinstance(active_modal, QMessageBox):
+            for button in (
+                QMessageBox.StandardButton.Yes,
+                QMessageBox.StandardButton.Ok,
+                QMessageBox.StandardButton.Apply,
+                QMessageBox.StandardButton.Save,
+            ):
+                widget = active_modal.button(button)
+                if widget is not None:
+                    widget.click()
+                    return True
+        if isinstance(active_modal, QDialog):
+            active_modal.accept()
+            return True
+        return False
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Подгоняет blocking overlay под размер центрального виджета."""

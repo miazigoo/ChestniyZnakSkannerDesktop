@@ -124,6 +124,11 @@ class MainScreen(QWidget):
 
         self._show_screen(1, "boxes")
 
+    def show_packing(self) -> None:
+        """Переключает рабочую область на экран упаковки."""
+
+        self._show_screen(0, "packing")
+
     def _register_work_screens(self) -> None:
         """Добавляет рабочие экраны в стек."""
 

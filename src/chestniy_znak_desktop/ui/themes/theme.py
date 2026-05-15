@@ -293,6 +293,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
 
         #packingDangerButton,
         #boxesDangerButton,
+        #diagnosticsDangerButton,
         #settingsDangerButton {{
             min-height: 38px;
             border: 0;
@@ -311,6 +312,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #boxesDangerButton:disabled,
         #lookupSecondaryButton:disabled,
         #diagnosticsPrimaryButton:disabled,
+        #diagnosticsDangerButton:disabled,
         #settingsPrimaryButton:disabled,
         #settingsSecondaryButton:disabled,
         #settingsDangerButton:disabled {{

@@ -18,3 +18,14 @@ def test_log_service_reports_missing_file(tmp_path) -> None:  # type: ignore[no-
     """Проверяет понятный текст для отсутствующего лог-файла."""
 
     assert LogService(tmp_path / "missing.log").tail() == "Лог-файл еще не создан"
+
+
+def test_log_service_clears_log_file(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Проверяет очистку существующего лог-файла."""
+
+    log_file = tmp_path / "desktop.log"
+    log_file.write_text("line\n", encoding="utf-8")
+
+    LogService(log_file).clear()
+
+    assert log_file.read_text(encoding="utf-8") == ""

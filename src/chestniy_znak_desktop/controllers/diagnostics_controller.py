@@ -74,6 +74,27 @@ class DiagnosticsController(QObject):
             )
         )
 
+    def clear_logs(self) -> None:
+        """Очищает лог-файл и обновляет диагностический экран."""
+
+        try:
+            self._log_service.clear()
+        except OSError as exc:
+            self._set_state(
+                self._base_state(
+                    log_text=self._state.log_text,
+                    status_message="Ошибка очистки логов",
+                    error_message=str(exc),
+                )
+            )
+            return
+        self._set_state(
+            self._base_state(
+                log_text="",
+                status_message="Логи очищены",
+            )
+        )
+
     def _base_state(
         self,
         log_text: str = "",

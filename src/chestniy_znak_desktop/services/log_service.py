@@ -28,3 +28,9 @@ class LogService:
         with self._log_file.open("r", encoding="utf-8", errors="replace") as file:
             lines = deque(file, maxlen=max_lines)
         return "".join(lines).rstrip()
+
+    def clear(self) -> None:
+        """Очищает лог-файл приложения."""
+
+        self._log_file.parent.mkdir(parents=True, exist_ok=True)
+        self._log_file.write_text("", encoding="utf-8")

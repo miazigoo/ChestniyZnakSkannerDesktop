@@ -23,6 +23,7 @@ class DiagnosticsScreen(QWidget):
     """Показывает runtime-состояние, конфигурацию и последние логи."""
 
     logs_refresh_requested = Signal()
+    logs_clear_requested = Signal()
 
     def __init__(self) -> None:
         """Создает современный экран диагностики."""
@@ -41,6 +42,7 @@ class DiagnosticsScreen(QWidget):
         self._scanner_value = QLabel("-")
         self._log_path = QLabel("Лог: -")
         self._refresh_button = QPushButton("Обновить логи")
+        self._clear_button = QPushButton("Очистить логи")
         self._log_view = QTextEdit()
         self._log_view.setReadOnly(True)
 
@@ -84,8 +86,10 @@ class DiagnosticsScreen(QWidget):
         self._error.setObjectName("diagnosticsErrorText")
         self._log_path.setObjectName("diagnosticsMutedText")
         self._refresh_button.setObjectName("diagnosticsPrimaryButton")
+        self._clear_button.setObjectName("diagnosticsDangerButton")
         self._log_view.setObjectName("diagnosticsLog")
         self._refresh_button.clicked.connect(self.logs_refresh_requested.emit)
+        self._clear_button.clicked.connect(self.logs_clear_requested.emit)
         for label in (
             self._status,
             self._error,
@@ -213,6 +217,7 @@ class DiagnosticsScreen(QWidget):
         header_text.addWidget(self._log_path)
         header.addLayout(header_text, 1)
         header.addWidget(self._refresh_button)
+        header.addWidget(self._clear_button)
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 18, 20, 20)

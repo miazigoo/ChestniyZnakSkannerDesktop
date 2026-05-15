@@ -92,6 +92,10 @@ def test_main_screen_updates_active_navigation() -> None:
 
     assert screen._nav_items[1].property("active") is True  # noqa: SLF001
 
+    screen.show_packing()
+
+    assert screen._nav_items[0].property("active") is True  # noqa: SLF001
+
 
 def test_main_screen_does_not_force_tall_window() -> None:
     """Проверяет, что рабочий экран не растягивает окно по высоте."""
@@ -333,6 +337,19 @@ def test_diagnostics_screen_shows_runtime_and_logs() -> None:
     assert "backend" in screen._backend_value.text()  # noqa: SLF001
     assert "connected" in screen._connection_value.text()  # noqa: SLF001
     assert "line two" in screen._log_view.toPlainText()  # noqa: SLF001
+
+
+def test_diagnostics_screen_emits_clear_logs() -> None:
+    """Проверяет сигнал очистки логов из диагностики."""
+
+    qapp()
+    screen = DiagnosticsScreen()
+    requests: list[bool] = []
+    screen.logs_clear_requested.connect(lambda: requests.append(True))
+
+    screen._clear_button.click()  # noqa: SLF001
+
+    assert requests == [True]
 
 
 def test_packing_screen_shows_box_progress_and_items() -> None:
