@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (  # noqa: E402
     QLabel,
     QMessageBox,
     QProgressBar,
+    QPushButton,
     QScrollArea,
 )
 
@@ -73,6 +74,10 @@ from chestniy_znak_desktop.ui.widgets.close_box_dialog import (  # noqa: E402
     CloseBoxProgressDialog,
 )
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
+from chestniy_znak_desktop.ui.widgets.settings_saved_dialog import (  # noqa: E402
+    SettingsSavedDialog,
+    SvgBackdrop,
+)
 
 
 def qapp() -> QApplication:
@@ -509,6 +514,21 @@ def test_close_box_progress_dialog_has_indeterminate_progress() -> None:
     assert progress is not None
     assert progress.minimum() == 0
     assert progress.maximum() == 0
+
+
+def test_settings_saved_dialog_has_svg_backdrop_and_ok_button() -> None:
+    """Проверяет красивую модалку успешного сохранения настроек."""
+
+    qapp()
+    dialog = SettingsSavedDialog("Настройки сохранены")
+
+    backdrop = dialog.findChild(SvgBackdrop, "settingsSavedSvgBackdrop")
+    ok_button = dialog.findChild(QPushButton, "settingsSavedButton")
+
+    assert backdrop is not None
+    assert ok_button is not None
+    assert ok_button.text() == "OK"
+    assert dialog.minimumWidth() >= 700
 
 
 def test_settings_screen_has_grouped_pages() -> None:

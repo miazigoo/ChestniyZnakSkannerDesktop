@@ -67,7 +67,9 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
 
     controller, store = _controller(tmp_path)
     states: list[SettingsUiState] = []
+    saved_messages: list[str] = []
     controller.state_changed.connect(states.append)
+    controller.settings_saved.connect(saved_messages.append)
 
     controller.save_form(
         SettingsFormData(
@@ -93,6 +95,9 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
     assert loaded.sound_warning_file == "other_order.mp3"
     assert loaded.sound_error_file == "error_02.mp3"
     assert states[-1].status_message.startswith("Настройки сохранены")
+    assert saved_messages == [
+        "Настройки сохранены. Backend и Device ID применятся после перезапуска."
+    ]
 
 
 def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -160,13 +165,16 @@ def test_settings_controller_previews_sound_file(  # type: ignore[no-untyped-def
     controller, _store = _controller(tmp_path)
     played: list[str] = []
     states: list[SettingsUiState] = []
+    saved_messages: list[str] = []
     controller.state_changed.connect(states.append)
+    controller.settings_saved.connect(saved_messages.append)
     monkeypatch.setattr(controller._sound_service, "preview_file", played.append)  # noqa: SLF001
 
     controller.preview_sound_file("ok_02.mp3")
 
     assert played == ["ok_02.mp3"]
     assert states[-1].status_message == "Прослушивание: ok_02.mp3"
+    assert saved_messages == []
 
 
 def test_settings_controller_rejects_missing_sound_file(  # type: ignore[no-untyped-def]

@@ -40,6 +40,7 @@ from chestniy_znak_desktop.ui.widgets.close_box_dialog import (
     CloseBoxProgressDialog,
 )
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar
+from chestniy_znak_desktop.ui.widgets.settings_saved_dialog import SettingsSavedDialog
 
 
 class AppWindow(QMainWindow):
@@ -85,6 +86,7 @@ class AppWindow(QMainWindow):
         self._login_screen = LoginScreen()
         self._main_screen = MainScreen()
         self._close_box_dialogs: list[CloseBoxDialog] = []
+        self._settings_saved_dialogs: list[SettingsSavedDialog] = []
         self._close_progress_dialog: CloseBoxProgressDialog | None = None
         self._stack.addWidget(self._login_screen)
         self._stack.addWidget(self._main_screen)
@@ -185,6 +187,7 @@ class AppWindow(QMainWindow):
         self._settings_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_settings_state
         )
+        self._settings_controller.settings_saved.connect(self._show_settings_saved_dialog)
         self._main_screen.settings_screen.settings_save_requested.connect(
             self._settings_controller.save_form
         )
@@ -382,6 +385,22 @@ class AppWindow(QMainWindow):
 
         if dialog in self._close_box_dialogs:
             self._close_box_dialogs.remove(dialog)
+
+    def _show_settings_saved_dialog(self, message: str) -> None:
+        """Показывает модалку успешного сохранения настроек."""
+
+        dialog = SettingsSavedDialog(message, self)
+        self._settings_saved_dialogs.append(dialog)
+        dialog.finished.connect(
+            lambda _code, dialog=dialog: self._forget_settings_saved_dialog(dialog)
+        )
+        dialog.open()
+
+    def _forget_settings_saved_dialog(self, dialog: SettingsSavedDialog) -> None:
+        """Удаляет закрытую модалку сохранения настроек из списка."""
+
+        if dialog in self._settings_saved_dialogs:
+            self._settings_saved_dialogs.remove(dialog)
 
     def _show_packing_without_refresh(self) -> None:
         """Показывает упаковку перед быстрым действием без автообновления."""

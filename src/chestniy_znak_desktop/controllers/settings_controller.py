@@ -49,6 +49,7 @@ class SettingsController(QObject):
     """Сохраняет настройки и применяет изменения, доступные без перезапуска."""
 
     state_changed = Signal(SettingsUiState)
+    settings_saved = Signal(str)
 
     def __init__(
         self,
@@ -103,7 +104,9 @@ class SettingsController(QObject):
             sound_victory_file=form_data.sound_victory_file,
         )
         self._apply_live_settings()
-        self._save("Настройки сохранены. Backend и Device ID применятся после перезапуска.")
+        message = "Настройки сохранены. Backend и Device ID применятся после перезапуска."
+        self._save(message)
+        self.settings_saved.emit(message)
 
     def set_scanner_port(self, port: str) -> None:
         """Сохраняет выбранный COM/SPP-порт сканера."""

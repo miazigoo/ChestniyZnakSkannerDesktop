@@ -566,8 +566,47 @@ def _custom_object_styles(palette: ThemePalette) -> str:
 
         #closeBoxDialog,
         #closeBoxConfirmDialog,
-        #closeBoxProgressDialog {{
+        #closeBoxProgressDialog,
+        #settingsSavedDialog {{
             background: {palette.panel};
+        }}
+
+        #settingsSavedContent {{
+            background: transparent;
+        }}
+
+        #settingsSavedTitle {{
+            color: {palette.text};
+            font-size: 30px;
+            font-weight: 950;
+            background: transparent;
+        }}
+
+        #settingsSavedMessage {{
+            color: {palette.text};
+            font-size: 15px;
+            font-weight: 750;
+            background: transparent;
+        }}
+
+        #settingsSavedBadge {{
+            color: {palette.button_text};
+            background: {palette.button_bg};
+            border-radius: 13px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-weight: 900;
+        }}
+
+        #settingsSavedButton {{
+            min-width: 122px;
+            min-height: 42px;
+            border: 0;
+            border-radius: 13px;
+            padding: 0 18px;
+            color: {palette.button_text};
+            background: {palette.button_bg};
+            font-weight: 900;
         }}
 
         #closeBoxDialogImage {{
