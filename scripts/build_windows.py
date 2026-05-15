@@ -27,9 +27,21 @@ def build_command(root: Path) -> list[str]:
     ]
 
 
+def ensure_windows_platform() -> None:
+    """Останавливает сборку, если запущена не на Windows."""
+
+    if sys.platform == "win32":
+        return
+    raise RuntimeError(
+        "Windows .exe нужно собирать на Windows с Windows Python. "
+        "PyInstaller не делает корректную Windows-сборку из Linux."
+    )
+
+
 def main() -> int:
     """Запускает PyInstaller и возвращает код завершения процесса."""
 
+    ensure_windows_platform()
     root = project_root()
     subprocess.run(build_command(root), cwd=root, check=True)
     return 0

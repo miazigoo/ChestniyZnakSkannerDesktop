@@ -4,7 +4,7 @@
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(SPECPATH).parent
+PROJECT_ROOT = Path(SPECPATH).parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 PACKAGE_DIR = SRC_DIR / "chestniy_znak_desktop"
 ENTRYPOINT = PACKAGE_DIR / "app" / "main.py"
