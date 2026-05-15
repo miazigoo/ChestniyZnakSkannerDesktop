@@ -8,7 +8,10 @@ from chestniy_znak_desktop.api.models.verify import (
     RemoteCodeDto,
     VerifyExistsResponseDto,
 )
-from chestniy_znak_desktop.controllers.verify_controller import VerifyController
+from chestniy_znak_desktop.controllers.verify_controller import (
+    VERIFY_LOG_LIMIT,
+    VerifyController,
+)
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
@@ -124,6 +127,18 @@ def test_verify_controller_can_check_duplicates() -> None:
 
     assert controller.state.check_duplicates is True
     assert service.last_call == ("CODE", "desktop-com-verify", False)
+
+
+def test_verify_controller_keeps_only_recent_log_entries() -> None:
+    """Проверяет ограничение журнала последних проверок."""
+
+    controller, _service, _sounds = _controller_pair()
+
+    for index in range(VERIFY_LOG_LIMIT + 5):
+        controller.on_code_scanned(f"CODE-{index}")
+
+    assert len(controller.state.log) == VERIFY_LOG_LIMIT
+    assert controller.state.log[0].startswith("010460123456789021SERIAL")
 
 
 def test_verify_controller_reports_missing_code() -> None:

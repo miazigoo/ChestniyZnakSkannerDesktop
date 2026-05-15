@@ -11,6 +11,8 @@ from chestniy_znak_desktop.api.models.verify import VerifyExistsResponseDto
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
+VERIFY_LOG_LIMIT = 30
+
 
 class VerifyBackend(Protocol):
     """Контракт backend-сервиса проверки кодов."""
@@ -118,7 +120,7 @@ class VerifyController(QObject):
         self._play(SoundEvent.OK if result.ok else SoundEvent.ERROR)
         visible_code = self._visible_code(result) or self._state.last_visible_code
         result_message = self._result_message(result)
-        log = [f"{visible_code}: {result_message}", *self._state.log][:50]
+        log = self._prepend_log(f"{visible_code}: {result_message}")
         self._set_state(
             VerifyUiState(
                 status_message="Код обработан",
@@ -139,7 +141,7 @@ class VerifyController(QObject):
         """Обрабатывает ошибку проверки кода."""
 
         self._play(SoundEvent.ERROR)
-        log = [f"{self._state.last_visible_code}: {exc}", *self._state.log][:50]
+        log = self._prepend_log(f"{self._state.last_visible_code}: {exc}")
         self._set_state(
             VerifyUiState(
                 status_message="Ошибка проверки кода",
@@ -161,6 +163,11 @@ class VerifyController(QObject):
 
         if self._sound_service is not None:
             self._sound_service.play(event)
+
+    def _prepend_log(self, message: str) -> list[str]:
+        """Добавляет запись в журнал, оставляя только последние события."""
+
+        return [message, *self._state.log][:VERIFY_LOG_LIMIT]
 
     @staticmethod
     def _result_message(result: VerifyExistsResponseDto) -> str:
