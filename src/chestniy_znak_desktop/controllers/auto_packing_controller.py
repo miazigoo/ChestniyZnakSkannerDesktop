@@ -126,6 +126,7 @@ class AutoPackingController(QObject):
         self._device_id = device_id
         self._scanner_id = scanner_id
         self._sound_service = sound_service
+        self._scan_queue: list[str] = []
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
@@ -215,7 +216,7 @@ class AutoPackingController(QObject):
         """Проверяет скан и добавляет его в локальный бокс."""
 
         if self._state.is_busy:
-            self._play(SoundEvent.WARNING)
+            self._enqueue_scan(code)
             return
         if self._state.current_box is None:
             self._play(SoundEvent.WARNING)
@@ -265,6 +266,7 @@ class AutoPackingController(QObject):
                     last_scanned_code=raw_code,
                 )
             )
+            self._process_next_queued_scan()
             return
 
         order_key = (verify.code.order_dnp_name or verify.order_name or "").strip()
@@ -279,6 +281,7 @@ class AutoPackingController(QObject):
                     last_scanned_code=raw_code,
                 )
             )
+            self._process_next_queued_scan()
             return
 
         if any(item.code_id == verify.code.id for item in self._state.pending_items):
@@ -292,6 +295,7 @@ class AutoPackingController(QObject):
                     last_scanned_code=raw_code,
                 )
             )
+            self._process_next_queued_scan()
             return
 
         current_order = self._state.pending_items[0].order_key if self._state.pending_items else ""
@@ -306,6 +310,7 @@ class AutoPackingController(QObject):
                     last_scanned_code=raw_code,
                 )
             )
+            self._process_next_queued_scan()
             return
 
         item = AutoPackingBoxItemUi(
@@ -330,6 +335,8 @@ class AutoPackingController(QObject):
         self._play(SoundEvent.OK)
         if next_state.is_pending_full:
             self._submit_pending_batch()
+            return
+        self._process_next_queued_scan()
 
     def _submit_pending_batch(self) -> None:
         """Отправляет заполненный локальный бокс в текущую коробку."""
@@ -377,6 +384,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._process_next_queued_scan()
 
     def _on_current_box_loaded(self, result: object) -> None:
         """Обрабатывает загрузку текущей коробки."""
@@ -401,6 +409,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._process_next_queued_scan()
 
     def _on_box_opened(self, result: object) -> None:
         """Обрабатывает открытие коробки."""
@@ -419,6 +428,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._process_next_queued_scan()
 
     def _on_error(self, exc: Exception) -> None:
         """Обрабатывает ошибку backend-сценария."""
@@ -457,6 +467,29 @@ class AutoPackingController(QObject):
 
         if self._sound_service is not None:
             self._sound_service.play(event)
+
+    def _enqueue_scan(self, code: str) -> None:
+        """Кладет скан в очередь, если контроллер занят предыдущей операцией."""
+
+        normalized = (code or "").strip()
+        if not normalized:
+            return
+        self._scan_queue.append(normalized)
+        self._set_state(
+            replace(
+                self._state,
+                result_message=f"Сканов в очереди: {len(self._scan_queue)}",
+                last_scanned_code=normalized,
+            )
+        )
+
+    def _process_next_queued_scan(self) -> None:
+        """Запускает следующий скан из очереди после завершения операции."""
+
+        if self._state.is_busy or self._state.is_pending_full or not self._scan_queue:
+            return
+        next_code = self._scan_queue.pop(0)
+        self.on_code_scanned(next_code)
 
     @staticmethod
     def _box_to_ui(box: BoxDto | BoxDetailDto) -> PackingBoxUi:

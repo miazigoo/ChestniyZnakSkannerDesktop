@@ -36,6 +36,42 @@ class ImmediateTaskRunner:
         on_success(result)
 
 
+class ManualTaskRunner:
+    """TaskRunner, который выполняет задачи по команде теста."""
+
+    def __init__(self) -> None:
+        """Создает пустую очередь задач."""
+
+        self.tasks: list[
+            tuple[
+                Callable[[], object],
+                Callable[[object], None],
+                Callable[[Exception], None],
+            ]
+        ] = []
+
+    def submit(
+        self,
+        task: Callable[[], object],
+        on_success: Callable[[object], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Кладет задачу в очередь без немедленного выполнения."""
+
+        self.tasks.append((task, on_success, on_error))
+
+    def run_next(self) -> None:
+        """Выполняет следующую задачу и вызывает нужный callback."""
+
+        task, on_success, on_error = self.tasks.pop(0)
+        try:
+            result = task()
+        except Exception as exc:
+            on_error(exc)
+            return
+        on_success(result)
+
+
 class FakeSoundService:
     """Fake sound service для проверки звуковых событий."""
 
@@ -181,6 +217,54 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert controller.state.current_box is not None
     assert controller.state.current_box.filled == 2
     assert sounds.events[-1] == SoundEvent.OK
+
+
+def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
+    """Проверяет очередь быстрых HID-сканов автосканера."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    runner = ManualTaskRunner()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        task_runner=runner,
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+    controller.open_box()
+    runner.run_next()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+    controller.on_code_scanned("CODE2")
+
+    assert len(runner.tasks) == 1
+    assert controller.state.is_busy is True
+    assert controller.state.result_message == "Сканов в очереди: 1"
+
+    runner.run_next()
+
+    assert len(runner.tasks) == 1
+    assert verifier.calls == ["CODE1"]
+
+    runner.run_next()
+
+    assert verifier.calls == ["CODE1", "CODE2"]
+    assert len(runner.tasks) == 1
+    assert controller.state.is_busy is True
+    runner.run_next()
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 2
 
 
 def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None:
