@@ -56,9 +56,9 @@ def _modified_key_event(
 def test_hid_keyboard_scanner_emits_code_on_enter() -> None:
     """Проверяет сбор HID-клавиш в один код до Enter."""
 
-    app = qapp()
+    qapp()
     target = QWidget()
-    scanner = HidKeyboardScanner(app)
+    scanner = HidKeyboardScanner()
     received: list[str] = []
     scanner.code_scanned.connect(received.append)
     scanner.start()
@@ -74,9 +74,9 @@ def test_hid_keyboard_scanner_emits_code_on_enter() -> None:
 def test_hid_keyboard_scanner_keeps_gs_for_datamatrix() -> None:
     """Проверяет сохранение GS-разделителя DataMatrix из HID-ввода."""
 
-    app = qapp()
+    qapp()
     target = QWidget()
-    scanner = HidKeyboardScanner(app)
+    scanner = HidKeyboardScanner()
     received: list[str] = []
     scanner.code_scanned.connect(received.append)
     scanner.start()
@@ -102,9 +102,9 @@ def test_hid_keyboard_scanner_keeps_gs_for_datamatrix() -> None:
 def test_hid_keyboard_scanner_ignores_editable_widgets() -> None:
     """Проверяет, что ввод в настройках не превращается в скан."""
 
-    app = qapp()
+    qapp()
     edit = QLineEdit()
-    scanner = HidKeyboardScanner(app)
+    scanner = HidKeyboardScanner()
     received: list[str] = []
     scanner.code_scanned.connect(received.append)
     scanner.start()
@@ -114,3 +114,21 @@ def test_hid_keyboard_scanner_ignores_editable_widgets() -> None:
 
     scanner.stop()
     assert received == []
+
+
+def test_hid_keyboard_scanner_installs_filter_on_bound_widgets() -> None:
+    """Проверяет установку фильтра только на виджеты привязанного окна."""
+
+    qapp()
+    root = QWidget()
+    child = QWidget(root)
+    scanner = HidKeyboardScanner()
+
+    scanner.bind_root(root)
+    scanner.start()
+
+    assert root in scanner._filtered_widgets  # noqa: SLF001
+    assert child in scanner._filtered_widgets  # noqa: SLF001
+
+    scanner.stop()
+    assert scanner._filtered_widgets == set()  # noqa: SLF001

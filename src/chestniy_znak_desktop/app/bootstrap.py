@@ -140,9 +140,10 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         config=config,
         log_service=LogService(config.data_dir / "logs" / "desktop.log"),
     )
+    hid_keyboard_scanner = HidKeyboardScanner()
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
-        hid_keyboard_worker=HidKeyboardScanner(qt_app),
+        hid_keyboard_worker=hid_keyboard_scanner,
         initial_port=settings.scanner_port,
         initial_baudrate=settings.scanner_baudrate,
     )
@@ -169,6 +170,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )
+    hid_keyboard_scanner.bind_root(window)
     window.destroyed.connect(lambda _obj: runtime_controller.stop())
     window.destroyed.connect(lambda _obj: api_client.close())
     window.destroyed.connect(lambda _obj: scanner_controller.stop())

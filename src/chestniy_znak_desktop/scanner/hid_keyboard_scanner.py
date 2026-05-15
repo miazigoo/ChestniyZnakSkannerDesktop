@@ -8,7 +8,6 @@ from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
-    QApplication,
     QComboBox,
     QLineEdit,
     QPlainTextEdit,
@@ -28,38 +27,49 @@ class HidKeyboardScanner(QObject):
 
     def __init__(
         self,
-        qt_app: QApplication,
         idle_flush_ms: int = 250,
         dedupe_window_ms: int = 750,
         parent: QObject | None = None,
     ) -> None:
-        """Создает HID-источник сканов поверх глобального event filter Qt."""
+        """Создает HID-источник сканов поверх event filter виджетов окна."""
 
         super().__init__(parent)
-        self._qt_app = qt_app
         self._idle_flush_ms = idle_flush_ms
         self._dedupe_window_sec = dedupe_window_ms / 1000
         self._buffer: list[str] = []
         self._last_emitted_code = ""
         self._last_emitted_at = 0.0
         self._is_running = False
+        self._root_widget: QWidget | None = None
+        self._filtered_widgets: set[QWidget] = set()
         self._idle_timer = QTimer(self)
         self._idle_timer.setSingleShot(True)
         self._idle_timer.timeout.connect(self._flush_buffer)
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(1000)
+        self._refresh_timer.timeout.connect(self._refresh_widget_filters)
 
     @property
     def is_running(self) -> bool:
-        """Возвращает `True`, если HID-источник установлен в QApplication."""
+        """Возвращает `True`, если HID-источник установлен на виджеты окна."""
 
         return self._is_running
+
+    def bind_root(self, widget: QWidget) -> None:
+        """Привязывает HID-источник к корневому окну приложения."""
+
+        self._root_widget = widget
+        if self._is_running:
+            self._refresh_widget_filters()
 
     def start(self) -> None:
         """Устанавливает Qt event filter для HID keyboard scanner."""
 
         if self._is_running:
             return
-        self._qt_app.installEventFilter(self)
         self._is_running = True
+        self._refresh_widget_filters()
+        self._refresh_timer.start()
         self.started.emit()
 
     def stop(self) -> None:
@@ -67,7 +77,8 @@ class HidKeyboardScanner(QObject):
 
         if not self._is_running:
             return
-        self._qt_app.removeEventFilter(self)
+        self._refresh_timer.stop()
+        self._remove_widget_filters()
         self._idle_timer.stop()
         self._buffer.clear()
         self._is_running = False
@@ -139,8 +150,27 @@ class HidKeyboardScanner(QObject):
     def _is_editable_widget(watched: QObject) -> bool:
         """Проверяет, что пользователь сейчас редактирует поле формы."""
 
-        widget = watched if isinstance(watched, QWidget) else QApplication.focusWidget()
+        widget = watched if isinstance(watched, QWidget) else None
         return isinstance(
             widget,
             (QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QAbstractSpinBox),
         )
+
+    def _refresh_widget_filters(self) -> None:
+        """Устанавливает фильтр на корневой виджет и его дочерние виджеты."""
+
+        if self._root_widget is None:
+            return
+        widgets = {self._root_widget, *self._root_widget.findChildren(QWidget)}
+        for widget in widgets - self._filtered_widgets:
+            widget.installEventFilter(self)
+        for widget in self._filtered_widgets - widgets:
+            widget.removeEventFilter(self)
+        self._filtered_widgets = widgets
+
+    def _remove_widget_filters(self) -> None:
+        """Удаляет фильтр со всех ранее зарегистрированных виджетов."""
+
+        for widget in list(self._filtered_widgets):
+            widget.removeEventFilter(self)
+        self._filtered_widgets.clear()
