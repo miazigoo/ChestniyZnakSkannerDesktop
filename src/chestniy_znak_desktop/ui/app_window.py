@@ -74,6 +74,7 @@ class AppWindow(QMainWindow):
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
         self._scan_target = "packing"
+        self._suppress_next_screen_refresh = False
         self._central = QWidget()
         self._stack = QStackedWidget()
         self._status_bar = RuntimeStatusBar()
@@ -97,7 +98,7 @@ class AppWindow(QMainWindow):
         self._auth_controller.authenticated.connect(lambda _user: self.show_main_screen())
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
-        self._main_screen.screen_changed.connect(self._set_scan_target)
+        self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._packing_controller.close_completed.connect(self._handle_box_close_completed)
         self._box_lookup_controller.state_changed.connect(
@@ -242,6 +243,37 @@ class AppWindow(QMainWindow):
 
         self._scan_target = screen_name
 
+    def _handle_screen_changed(self, screen_name: str) -> None:
+        """Обновляет активный сценарий и подтягивает актуальные данные экрана."""
+
+        self._set_scan_target(screen_name)
+        if self._suppress_next_screen_refresh:
+            self._suppress_next_screen_refresh = False
+            return
+        if self._stack.currentWidget() is not self._main_screen:
+            return
+        self._refresh_screen_data(screen_name)
+
+    def _refresh_screen_data(self, screen_name: str) -> None:
+        """Запускает обновление данных для выбранного рабочего экрана."""
+
+        if screen_name == "packing":
+            self._packing_controller.refresh_current_box()
+            return
+        if screen_name == "boxes":
+            selected_box_id = self._boxes_controller.state.selected_box_id
+            self._boxes_controller.refresh()
+            if selected_box_id is not None:
+                self._boxes_controller.load_detail(selected_box_id)
+            return
+        if screen_name == "diagnostics":
+            self._diagnostics_controller.refresh_logs()
+            return
+        if screen_name == "settings":
+            self._settings_controller.publish_state()
+            self._printer_controller.refresh()
+            self._scanner_controller.refresh_ports()
+
     def _open_found_box(self, box_id: int) -> None:
         """Открывает найденную коробку в рабочем экране коробок."""
 
@@ -251,7 +283,7 @@ class AppWindow(QMainWindow):
     def _request_close_current_box(self) -> None:
         """Запрашивает закрытие коробки с подтверждением неполного заполнения."""
 
-        self._main_screen.show_packing()
+        self._show_packing_without_refresh()
         state = self._packing_controller.state
         box = state.current_box
         if state.is_busy:
@@ -301,6 +333,12 @@ class AppWindow(QMainWindow):
         if dialog in self._close_box_dialogs:
             self._close_box_dialogs.remove(dialog)
 
+    def _show_packing_without_refresh(self) -> None:
+        """Показывает упаковку перед быстрым действием без автообновления."""
+
+        self._suppress_next_screen_refresh = True
+        self._main_screen.show_packing()
+
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
@@ -330,8 +368,8 @@ class AppWindow(QMainWindow):
             return True
         if self._stack.currentWidget() is self._login_screen:
             return True
-        self._main_screen.show_packing()
         if command == ScannerCommand.OPEN_NEW_BOX:
+            self._show_packing_without_refresh()
             self._packing_controller.open_box()
             return True
         self._request_close_current_box()
