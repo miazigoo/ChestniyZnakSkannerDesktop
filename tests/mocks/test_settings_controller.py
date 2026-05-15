@@ -134,6 +134,23 @@ def test_settings_controller_saves_scanner_values(tmp_path) -> None:  # type: ig
     assert loaded.scanner_baudrate == 115200
 
 
+def test_settings_controller_applies_theme_immediately(  # type: ignore[no-untyped-def]
+    tmp_path,
+) -> None:
+    """Проверяет быстрое сохранение темы без полной формы настроек."""
+
+    controller, store = _controller(tmp_path)
+    states: list[SettingsUiState] = []
+    controller.state_changed.connect(states.append)
+
+    controller.set_theme("graphite")
+
+    loaded = store.load(AppConfig())
+    assert loaded.theme_name == "graphite"
+    assert controller.settings.theme_name == "graphite"
+    assert states[-1].status_message == "Тема применена: Graphite Pro"
+
+
 def test_settings_controller_previews_sound_file(  # type: ignore[no-untyped-def]
     tmp_path,
     monkeypatch,

@@ -52,6 +52,9 @@ from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScree
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.settings_pages.theme_page import (  # noqa: E402
+    ThemeOptionCard,
+)
 from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import (  # noqa: E402
     AdaptiveScrollArea,
 )
@@ -384,9 +387,35 @@ def test_settings_screen_has_grouped_pages() -> None:
     screen = SettingsScreen()
 
     assert screen._stack.count() == 6  # noqa: SLF001
-    assert screen._theme_page._theme_select.count() == 10  # noqa: SLF001
-    popup = screen._theme_page._theme_select.view()  # noqa: SLF001
-    assert popup.objectName() == "settingsComboPopup"
+    assert len(screen._theme_page.findChildren(ThemeOptionCard)) == 10  # noqa: SLF001
+
+
+def test_settings_theme_card_emits_immediate_selection() -> None:
+    """Проверяет выбор темы кликом без кнопки сохранения."""
+
+    qapp()
+    screen = SettingsScreen()
+    selected: list[str] = []
+    screen.theme_selected.connect(selected.append)
+    screen.apply_settings_state(
+        SettingsUiState(
+            api_base_url="http://backend/api/v2/",
+            device_id="pc-1",
+            theme_name="light",
+            sound_enabled=True,
+            sound_volume=0.85,
+            sound_ok_file="ok_02.mp3",
+            sound_warning_file="other.mp3",
+            sound_error_file="error.mp3",
+            sound_victory_file="victory.mp3",
+            available_sound_files=[],
+        )
+    )
+
+    screen._theme_page.theme_selected.emit("graphite")  # noqa: SLF001
+
+    assert selected == ["graphite"]
+    assert screen._settings_state.theme_name == "graphite"  # noqa: SLF001
 
 
 def test_settings_screen_emits_sound_preview() -> None:

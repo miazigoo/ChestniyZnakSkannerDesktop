@@ -35,6 +35,7 @@ class SettingsScreen(QWidget):
     scanner_port_changed = Signal(str)
     scanner_baudrate_changed = Signal(int)
     settings_save_requested = Signal(SettingsFormData)
+    theme_selected = Signal(str)
     printer_refresh_requested = Signal()
     printer_selected = Signal(int)
     sound_preview_requested = Signal(str)
@@ -140,7 +141,7 @@ class SettingsScreen(QWidget):
         self._scanner_page.baudrate_changed.connect(self.scanner_baudrate_changed.emit)
         self._printer_page.refresh_requested.connect(self.printer_refresh_requested.emit)
         self._printer_page.printer_selected.connect(self.printer_selected.emit)
-        self._theme_page.save_requested.connect(self._save_theme_settings)
+        self._theme_page.theme_selected.connect(self._select_theme_settings)
         self._sound_page.save_requested.connect(self._save_sound_settings)
         self._sound_page.preview_requested.connect(self.sound_preview_requested.emit)
 
@@ -164,10 +165,11 @@ class SettingsScreen(QWidget):
         )
         self._emit_settings_save(state)
 
-    def _save_theme_settings(self, theme_name: str) -> None:
-        """Сохраняет выбранную тему через общий DTO настроек."""
+    def _select_theme_settings(self, theme_name: str) -> None:
+        """Сохраняет выбранную тему отдельным быстрым действием."""
 
-        self._emit_settings_save(replace(self._settings_state, theme_name=theme_name))
+        self._settings_state = replace(self._settings_state, theme_name=theme_name)
+        self.theme_selected.emit(theme_name)
 
     def _save_sound_settings(
         self,

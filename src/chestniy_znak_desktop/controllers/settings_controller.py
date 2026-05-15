@@ -117,6 +117,14 @@ class SettingsController(QObject):
         self._settings = replace(self._settings, scanner_baudrate=baudrate)
         self._save("Скорость сканера сохранена")
 
+    def set_theme(self, theme_name: str) -> None:
+        """Сохраняет и сразу применяет выбранную тему интерфейса."""
+
+        theme = self._theme_manager.get_theme(theme_name)
+        self._settings = replace(self._settings, theme_name=theme.name)
+        self._theme_manager.set_theme(theme.name, self._qt_app)
+        self._save(f"Тема применена: {theme.title}")
+
     def preview_sound_file(self, filename: str) -> None:
         """Проигрывает выбранный звук из настроек."""
 

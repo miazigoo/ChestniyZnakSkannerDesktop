@@ -163,6 +163,9 @@ class AppWindow(QMainWindow):
         self._main_screen.settings_screen.settings_save_requested.connect(
             self._settings_controller.save_form
         )
+        self._main_screen.settings_screen.theme_selected.connect(
+            self._settings_controller.set_theme
+        )
         self._main_screen.settings_screen.sound_preview_requested.connect(
             self._settings_controller.preview_sound_file
         )

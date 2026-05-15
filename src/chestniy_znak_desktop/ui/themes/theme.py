@@ -513,6 +513,54 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             text-align: left;
         }}
 
+        #settingsThemeItem {{
+            background: {palette.input_bg};
+            border: 1px solid {palette.border};
+            border-radius: 16px;
+        }}
+
+        #settingsThemeItem:hover {{
+            background: {palette.accent_soft};
+            border-color: {palette.accent};
+        }}
+
+        #settingsThemeItem[selected="true"] {{
+            background: {palette.selection_bg};
+            border-color: {palette.button_bg};
+        }}
+
+        #settingsThemeTitle {{
+            color: {palette.text};
+            font-size: 16px;
+            font-weight: 850;
+            background: transparent;
+        }}
+
+        #settingsThemeMeta {{
+            color: {palette.muted};
+            font-size: 12px;
+            font-weight: 700;
+            background: transparent;
+        }}
+
+        #settingsThemeCheck {{
+            color: {palette.muted};
+            border-radius: 10px;
+            padding: 6px 9px;
+            background: {palette.panel_alt};
+            font-size: 12px;
+            font-weight: 800;
+        }}
+
+        #settingsThemeItem[selected="true"] #settingsThemeCheck {{
+            color: {palette.button_text};
+            background: {palette.button_bg};
+        }}
+
+        #settingsThemeSwatch {{
+            border: 1px solid {palette.border};
+        }}
+
         #settingsSlider {{
             min-height: 34px;
             background: transparent;
