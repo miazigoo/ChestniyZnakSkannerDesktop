@@ -63,6 +63,7 @@ class FakeBoxesController:
         self.state = SimpleNamespace(selected_box_id=29)
         self.refresh_count = 0
         self.loaded_details: list[int] = []
+        self.clear_messages: list[str] = []
 
     def refresh(self) -> None:
         """Запоминает обновление списка."""
@@ -73,6 +74,11 @@ class FakeBoxesController:
         """Запоминает обновление деталей."""
 
         self.loaded_details.append(box_id)
+
+    def clear_detail(self, message: str) -> None:
+        """Запоминает сброс деталей."""
+
+        self.clear_messages.append(message)
 
 
 class FakeWindow:
@@ -138,6 +144,30 @@ def test_boxes_screen_refreshes_list_and_selected_detail() -> None:
 
     assert window._boxes_controller.refresh_count == 1
     assert window._boxes_controller.loaded_details == [29]
+
+
+def test_box_changed_refreshes_list_and_detail() -> None:
+    """Проверяет обновление списка и карточки после редактирования."""
+
+    boxes_controller = FakeBoxesController()
+    window = SimpleNamespace(_boxes_controller=boxes_controller)
+
+    AppWindow._handle_box_changed(window, 42)  # type: ignore[arg-type]
+
+    assert boxes_controller.refresh_count == 1
+    assert boxes_controller.loaded_details == [42]
+
+
+def test_box_deleted_clears_detail_and_refreshes_list() -> None:
+    """Проверяет сброс карточки и обновление списка после удаления."""
+
+    boxes_controller = FakeBoxesController()
+    window = SimpleNamespace(_boxes_controller=boxes_controller)
+
+    AppWindow._handle_box_deleted(window, 42)  # type: ignore[arg-type]
+
+    assert boxes_controller.clear_messages == ["Коробка удалена"]
+    assert boxes_controller.refresh_count == 1
 
 
 def test_settings_screen_refreshes_device_sources() -> None:

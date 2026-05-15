@@ -11,7 +11,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest  # noqa: E402
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QColor, QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QScrollArea  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QScrollArea,
+)
 
 from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     ConnectionState,
@@ -60,7 +66,11 @@ from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import (  # noqa: E40
     AdaptiveScrollArea,
 )
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay  # noqa: E402
-from chestniy_znak_desktop.ui.widgets.close_box_dialog import CloseBoxDialog  # noqa: E402
+from chestniy_znak_desktop.ui.widgets.close_box_dialog import (  # noqa: E402
+    CloseBoxConfirmDialog,
+    CloseBoxDialog,
+    CloseBoxProgressDialog,
+)
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar  # noqa: E402
 
 
@@ -452,6 +462,33 @@ def test_close_box_dialog_uses_android_assets() -> None:
     assert image is not None
     assert image.pixmap() is not None
     assert image.pixmap().isNull() is False
+    assert dialog.minimumWidth() >= 760
+
+
+def test_close_box_confirm_dialog_has_primary_box_image() -> None:
+    """Проверяет модалку подтверждения закрытия неполной коробки."""
+
+    qapp()
+    dialog = CloseBoxConfirmDialog(filled=4, capacity=10)
+
+    image = dialog.findChild(QLabel, "closeBoxDialogImage")
+
+    assert image is not None
+    assert image.pixmap() is not None
+    assert image.pixmap().isNull() is False
+    assert dialog.minimumWidth() >= 720
+
+
+def test_close_box_progress_dialog_has_indeterminate_progress() -> None:
+    """Проверяет модалку ожидания закрытия коробки."""
+
+    qapp()
+    dialog = CloseBoxProgressDialog()
+    progress = dialog.findChild(QProgressBar, "closeBoxProgressBar")
+
+    assert progress is not None
+    assert progress.minimum() == 0
+    assert progress.maximum() == 0
 
 
 def test_settings_screen_has_grouped_pages() -> None:

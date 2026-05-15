@@ -229,6 +229,20 @@ class BoxesController(QObject):
             self._on_detail_error,
         )
 
+    def clear_detail(self, message: str = "Выберите коробку для просмотра состава") -> None:
+        """Сбрасывает выбранную коробку и правую панель состава."""
+
+        self._set_state(
+            replace(
+                self._state,
+                selected_box_id=None,
+                detail=None,
+                is_detail_busy=False,
+                detail_status_message=message,
+                detail_error_message="",
+            )
+        )
+
     def print_selected_label(self, box_id: int) -> None:
         """Запускает повторную печать этикетки выбранной коробки."""
 
@@ -280,6 +294,10 @@ class BoxesController(QObject):
 
         if not isinstance(result, BoxListDto):
             raise TypeError("Ожидался результат BoxListDto")
+        rows = [self._box_to_row(box) for box in result.items]
+        row_ids = {row.box_id for row in rows}
+        selected_box_id = self._state.selected_box_id
+        selected_exists = selected_box_id is not None and selected_box_id in row_ids
         self._set_state(
             replace(
                 self._state,
@@ -290,9 +308,17 @@ class BoxesController(QObject):
                 offset=result.offset,
                 total=result.total,
                 has_more=result.has_more,
-                rows=[self._box_to_row(box) for box in result.items],
+                rows=rows,
+                selected_box_id=selected_box_id if selected_exists else None,
+                detail=self._state.detail if selected_exists else None,
                 status_message="Коробки загружены",
                 error_message="",
+                detail_status_message=(
+                    self._state.detail_status_message
+                    if selected_exists
+                    else "Выберите коробку для просмотра состава"
+                ),
+                detail_error_message=self._state.detail_error_message if selected_exists else "",
             )
         )
 
@@ -333,6 +359,7 @@ class BoxesController(QObject):
             replace(
                 self._state,
                 is_detail_busy=False,
+                detail=None,
                 detail_status_message="Ошибка загрузки коробки",
                 detail_error_message=str(exc),
             )

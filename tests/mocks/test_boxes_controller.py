@@ -41,6 +41,7 @@ class FakeBoxesService:
 
         self.last_call: tuple[str, str, int, int] | None = None
         self.error: Exception | None = None
+        self.items = [_box()]
 
     def list_boxes(
         self,
@@ -55,7 +56,7 @@ class FakeBoxesService:
         if self.error is not None:
             raise self.error
         return BoxListDto(
-            items=[_box()],
+            items=self.items,
             total=2,
             limit=limit,
             offset=offset,
@@ -238,12 +239,41 @@ def test_boxes_controller_reports_detail_error() -> None:
     """Проверяет ошибку загрузки детальной карточки."""
 
     controller, service, _printer, _sounds = _controller_pair()
+    controller.load_detail(10)
     service.error = RuntimeError("Коробка не найдена")
 
     controller.load_detail(10)
 
+    assert controller.state.detail is None
     assert controller.state.detail_status_message == "Ошибка загрузки коробки"
     assert controller.state.detail_error_message == "Коробка не найдена"
+
+
+def test_boxes_controller_clear_detail_resets_selected_box() -> None:
+    """Проверяет явный сброс выбранной коробки."""
+
+    controller, _service, _printer, _sounds = _controller_pair()
+    controller.load_detail(10)
+
+    controller.clear_detail("Коробка удалена")
+
+    assert controller.state.selected_box_id is None
+    assert controller.state.detail is None
+    assert controller.state.detail_status_message == "Коробка удалена"
+
+
+def test_boxes_controller_refresh_clears_missing_selected_box() -> None:
+    """Проверяет сброс карточки, если выбранной коробки нет в списке."""
+
+    controller, service, _printer, _sounds = _controller_pair()
+    controller.load_detail(10)
+    service.items = []
+
+    controller.refresh()
+
+    assert controller.state.selected_box_id is None
+    assert controller.state.detail is None
+    assert controller.state.detail_status_message == "Выберите коробку для просмотра состава"
 
 
 def test_boxes_controller_prints_selected_label() -> None:

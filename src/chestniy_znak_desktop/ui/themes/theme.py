@@ -563,7 +563,9 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             border: 1px solid {palette.border};
         }}
 
-        #closeBoxDialog {{
+        #closeBoxDialog,
+        #closeBoxConfirmDialog,
+        #closeBoxProgressDialog {{
             background: {palette.panel};
         }}
 
@@ -605,6 +607,30 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             color: {palette.button_text};
             background: {palette.button_bg};
             font-weight: 850;
+        }}
+
+        #closeBoxDialogSecondaryButton {{
+            min-width: 112px;
+            min-height: 38px;
+            border: 1px solid {palette.border};
+            border-radius: 12px;
+            padding: 0 16px;
+            color: {palette.text};
+            background: {palette.panel_alt};
+            font-weight: 850;
+        }}
+
+        #closeBoxProgressBar {{
+            min-height: 14px;
+            max-height: 14px;
+            border-radius: 7px;
+            background: {palette.panel_alt};
+            border: 1px solid {palette.border};
+        }}
+
+        #closeBoxProgressBar::chunk {{
+            border-radius: 7px;
+            background: {palette.button_bg};
         }}
 
         #settingsSlider {{

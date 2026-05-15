@@ -34,7 +34,11 @@ from chestniy_znak_desktop.services.scanner_command_service import (
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay
-from chestniy_znak_desktop.ui.widgets.close_box_dialog import CloseBoxDialog
+from chestniy_znak_desktop.ui.widgets.close_box_dialog import (
+    CloseBoxConfirmDialog,
+    CloseBoxDialog,
+    CloseBoxProgressDialog,
+)
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar
 
 
@@ -81,6 +85,7 @@ class AppWindow(QMainWindow):
         self._login_screen = LoginScreen()
         self._main_screen = MainScreen()
         self._close_box_dialogs: list[CloseBoxDialog] = []
+        self._close_progress_dialog: CloseBoxProgressDialog | None = None
         self._stack.addWidget(self._login_screen)
         self._stack.addWidget(self._main_screen)
         layout = QVBoxLayout(self._central)
@@ -123,10 +128,8 @@ class AppWindow(QMainWindow):
         self._box_edit_controller.state_changed.connect(
             self._main_screen.boxes_screen.apply_edit_state
         )
-        self._box_edit_controller.box_changed.connect(self._boxes_controller.load_detail)
-        self._box_edit_controller.box_deleted.connect(
-            lambda _box_id: self._boxes_controller.refresh()
-        )
+        self._box_edit_controller.box_changed.connect(self._handle_box_changed)
+        self._box_edit_controller.box_deleted.connect(self._handle_box_deleted)
         self._main_screen.boxes_screen.refresh_requested.connect(self._boxes_controller.refresh)
         self._main_screen.boxes_screen.search_requested.connect(self._boxes_controller.set_query)
         self._main_screen.boxes_screen.status_filter_changed.connect(
@@ -294,23 +297,14 @@ class AppWindow(QMainWindow):
             return
         if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
             return
+        self._show_close_progress_dialog()
         self._packing_controller.close_current_box()
 
     def _confirm_incomplete_box(self, filled: int, capacity: int) -> bool:
         """Просит подтверждение закрытия неполной коробки."""
 
-        answer = QMessageBox.question(
-            self,
-            "Закрыть неполную коробку?",
-            (
-                "Коробка заполнена не полностью.\n\n"
-                f"Заполнение: {filled} / {capacity}\n\n"
-                "Закрыть коробку и отправить этикетку на печать?"
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        return answer == QMessageBox.StandardButton.Yes
+        dialog = CloseBoxConfirmDialog(filled, capacity, self)
+        return dialog.exec() == QDialog.DialogCode.Accepted
 
     def _show_message(self, title: str, text: str) -> None:
         """Показывает короткое информационное сообщение."""
@@ -320,12 +314,50 @@ class AppWindow(QMainWindow):
     def _handle_box_close_completed(self, event: CloseBoxUiEvent) -> None:
         """Показывает результат закрытия и открывает следующую коробку."""
 
+        self._hide_close_progress_dialog()
         dialog = CloseBoxDialog(event, self)
         self._close_box_dialogs.append(dialog)
         dialog.finished.connect(lambda _code, dialog=dialog: self._forget_close_dialog(dialog))
         dialog.open()
         if event.ok:
             self._packing_controller.open_box()
+
+    def _handle_box_changed(self, box_id: int) -> None:
+        """Обновляет список и карточку после редактирования коробки."""
+
+        self._boxes_controller.refresh()
+        self._boxes_controller.load_detail(box_id)
+
+    def _handle_box_deleted(self, _box_id: int) -> None:
+        """Сбрасывает карточку и обновляет список после удаления коробки."""
+
+        self._boxes_controller.clear_detail("Коробка удалена")
+        self._boxes_controller.refresh()
+
+    def _show_close_progress_dialog(self) -> None:
+        """Показывает модалку ожидания закрытия коробки."""
+
+        if self._close_progress_dialog is not None:
+            return
+        dialog = CloseBoxProgressDialog(self)
+        self._close_progress_dialog = dialog
+        dialog.finished.connect(lambda _code: self._clear_close_progress_dialog(dialog))
+        dialog.open()
+
+    def _hide_close_progress_dialog(self) -> None:
+        """Закрывает модалку ожидания закрытия коробки."""
+
+        dialog = self._close_progress_dialog
+        if dialog is None:
+            return
+        self._close_progress_dialog = None
+        dialog.accept()
+
+    def _clear_close_progress_dialog(self, dialog: CloseBoxProgressDialog) -> None:
+        """Очищает ссылку на закрытую модалку прогресса."""
+
+        if self._close_progress_dialog is dialog:
+            self._close_progress_dialog = None
 
     def _forget_close_dialog(self, dialog: CloseBoxDialog) -> None:
         """Удаляет закрытую модалку из списка активных окон."""
@@ -391,6 +423,8 @@ class AppWindow(QMainWindow):
                 if widget is not None:
                     widget.click()
                     return True
+        if isinstance(active_modal, CloseBoxProgressDialog):
+            return False
         if isinstance(active_modal, QDialog):
             active_modal.accept()
             return True

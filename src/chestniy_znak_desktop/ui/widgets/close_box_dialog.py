@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -28,13 +29,14 @@ class CloseBoxDialog(QDialog):
         self.setObjectName("closeBoxDialog")
         self.setWindowTitle(event.title)
         self.setModal(True)
-        self.setMinimumWidth(520)
+        self.setMinimumSize(760, 420)
+        self.resize(820, 460)
 
         image = QLabel()
         image.setObjectName("closeBoxDialogImage")
         image.setPixmap(
             self._pixmap(event).scaledToWidth(
-                210,
+                300,
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
@@ -55,7 +57,7 @@ class CloseBoxDialog(QDialog):
         ok_button.clicked.connect(self.accept)
 
         text_layout = QVBoxLayout()
-        text_layout.setSpacing(10)
+        text_layout.setSpacing(14)
         text_layout.addWidget(title)
         text_layout.addWidget(message)
         text_layout.addWidget(details)
@@ -63,8 +65,8 @@ class CloseBoxDialog(QDialog):
         text_layout.addWidget(ok_button, alignment=Qt.AlignmentFlag.AlignRight)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(22, 22, 22, 22)
-        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(28)
         layout.addWidget(image)
         layout.addLayout(text_layout, 1)
 
@@ -93,3 +95,111 @@ class CloseBoxDialog(QDialog):
         if event.error_message:
             lines.append(f"Ошибка: {event.error_message}")
         return "\n".join(lines)
+
+
+class CloseBoxConfirmDialog(QDialog):
+    """Показывает красивое подтверждение закрытия неполной коробки."""
+
+    def __init__(self, filled: int, capacity: int, parent: QWidget | None = None) -> None:
+        """Создает диалог подтверждения закрытия коробки."""
+
+        super().__init__(parent)
+        self.setObjectName("closeBoxConfirmDialog")
+        self.setWindowTitle("Закрыть неполную коробку?")
+        self.setModal(True)
+        self.setMinimumSize(720, 390)
+
+        image = QLabel()
+        image.setObjectName("closeBoxDialogImage")
+        image.setPixmap(
+            self._box_pixmap("open_box.png").scaledToWidth(
+                260,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        title = QLabel("Закрыть неполную коробку?")
+        title.setObjectName("closeBoxDialogTitle")
+        title.setWordWrap(True)
+
+        message = QLabel(
+            "Коробка заполнена не полностью. После закрытия будет проверен принтер, "
+            "этикетка уйдет на печать, а приложение откроет следующую коробку."
+        )
+        message.setObjectName("closeBoxDialogMessage")
+        message.setWordWrap(True)
+
+        details = QLabel(f"Заполнение: {filled} / {capacity}")
+        details.setObjectName("closeBoxDialogDetails")
+        details.setWordWrap(True)
+
+        cancel_button = QPushButton("Отмена")
+        cancel_button.setObjectName("closeBoxDialogSecondaryButton")
+        cancel_button.clicked.connect(self.reject)
+
+        close_button = QPushButton("Закрыть коробку")
+        close_button.setObjectName("closeBoxDialogButton")
+        close_button.clicked.connect(self.accept)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(10)
+        buttons_layout.addStretch(1)
+        buttons_layout.addWidget(cancel_button)
+        buttons_layout.addWidget(close_button)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(14)
+        text_layout.addWidget(title)
+        text_layout.addWidget(message)
+        text_layout.addWidget(details)
+        text_layout.addStretch(1)
+        text_layout.addLayout(buttons_layout)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(28)
+        layout.addWidget(image)
+        layout.addLayout(text_layout, 1)
+
+    @staticmethod
+    def _box_pixmap(image_name: str) -> QPixmap:
+        """Возвращает картинку коробки из ресурсов приложения."""
+
+        image_path = resources.files("chestniy_znak_desktop.resources.icons").joinpath(image_name)
+        return QPixmap(str(image_path))
+
+
+class CloseBoxProgressDialog(QDialog):
+    """Показывает ожидание закрытия коробки и печати этикетки."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """Создает модалку прогресса закрытия коробки."""
+
+        super().__init__(parent)
+        self.setObjectName("closeBoxProgressDialog")
+        self.setWindowTitle("Закрываем коробку")
+        self.setModal(True)
+        self.setMinimumSize(520, 230)
+
+        title = QLabel("Закрываем коробку")
+        title.setObjectName("closeBoxDialogTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setWordWrap(True)
+
+        message = QLabel("Проверяем принтер и отправляем этикетку на печать...")
+        message.setObjectName("closeBoxDialogMessage")
+        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message.setWordWrap(True)
+
+        progress = QProgressBar()
+        progress.setObjectName("closeBoxProgressBar")
+        progress.setRange(0, 0)
+        progress.setTextVisible(False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(34, 34, 34, 34)
+        layout.setSpacing(18)
+        layout.addWidget(title)
+        layout.addWidget(message)
+        layout.addWidget(progress)
