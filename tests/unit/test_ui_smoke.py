@@ -87,6 +87,15 @@ def test_main_screen_updates_active_navigation() -> None:
     assert screen._nav_items[1].property("active") is True  # noqa: SLF001
 
 
+def test_main_screen_does_not_force_tall_window() -> None:
+    """Проверяет, что рабочий экран не растягивает окно по высоте."""
+
+    qapp()
+    screen = MainScreen()
+
+    assert screen.minimumSizeHint().height() <= 760
+
+
 def test_boxes_screen_has_backend_status_filters() -> None:
     """Проверяет наличие backend-фильтров списка коробок."""
 

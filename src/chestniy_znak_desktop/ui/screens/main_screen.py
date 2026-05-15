@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -39,6 +40,7 @@ class MainScreen(QWidget):
         self.setObjectName("mainScreen")
         self._stack = QStackedWidget()
         self._stack.setObjectName("mainContentStack")
+        self._stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         self._stack_effect = QGraphicsOpacityEffect(self._stack)
         self._stack.setGraphicsEffect(self._stack_effect)
         self._stack_animation = QPropertyAnimation(self._stack_effect, b"opacity", self)

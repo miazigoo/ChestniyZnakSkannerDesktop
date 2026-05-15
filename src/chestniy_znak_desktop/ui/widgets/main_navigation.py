@@ -11,7 +11,7 @@ from PySide6.QtGui import (
     QPaintEvent,
     QPen,
 )
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -25,6 +25,7 @@ class MainSidebar(QFrame):
         super().__init__(parent)
         self.setObjectName("mainSidebar")
         self.setFixedWidth(238)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Ignored)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         """Рисует премиальный фон боковой панели."""

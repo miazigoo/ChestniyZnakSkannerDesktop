@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import QSize
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 
@@ -193,7 +194,7 @@ class AppWindow(QMainWindow):
             self._settings_controller.set_scanner_baudrate
         )
         self.setWindowTitle(app_state.config.app_name)
-        self.resize(1180, 760)
+        self._resize_to_available_screen(QSize(1180, 760))
 
     def show_login_screen(self) -> None:
         """Переключает окно на экран авторизации."""
@@ -248,3 +249,16 @@ class AppWindow(QMainWindow):
 
         super().resizeEvent(event)
         self._blocking_overlay.setGeometry(self._central.rect())
+
+    def _resize_to_available_screen(self, preferred_size: QSize) -> None:
+        """Задает стартовый размер окна с учетом доступной области экрана."""
+
+        screen = self.screen()
+        available = screen.availableGeometry()
+        width = min(preferred_size.width(), max(900, available.width() - 80))
+        height = min(preferred_size.height(), max(620, available.height() - 80))
+        self.resize(width, height)
+        self.move(
+            available.x() + max(0, (available.width() - width) // 2),
+            available.y() + max(0, (available.height() - height) // 2),
+        )
