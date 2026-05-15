@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.domain.scanner_normalizer import GS
+
 
 class HidKeyboardScanner(QObject):
     """Собирает быстрые HID-клавиатурные события в строку сканера."""
@@ -81,6 +83,10 @@ class HidKeyboardScanner(QObject):
         key_event = event
         if not isinstance(key_event, QKeyEvent) or key_event.isAutoRepeat():
             return False
+        if self._is_gs_key(key_event):
+            self._buffer.append(GS)
+            self._idle_timer.start(self._idle_flush_ms)
+            return True
         text = key_event.text()
         if key_event.key() in {
             Qt.Key.Key_Return,
@@ -92,6 +98,10 @@ class HidKeyboardScanner(QObject):
             return had_buffer
         if not text or text in {"\r", "\n", "\t"}:
             return False
+        if text == GS:
+            self._buffer.append(GS)
+            self._idle_timer.start(self._idle_flush_ms)
+            return True
         if len(text) != 1 or not text.isprintable():
             return False
         self._buffer.append(text)
@@ -116,6 +126,14 @@ class HidKeyboardScanner(QObject):
         self._last_emitted_code = code
         self._last_emitted_at = now
         self.code_scanned.emit(code)
+
+    @staticmethod
+    def _is_gs_key(key_event: QKeyEvent) -> bool:
+        """Проверяет HID-ввод ASCII GS через типичную комбинацию Ctrl+]."""
+
+        return key_event.key() == Qt.Key.Key_BracketRight and bool(
+            key_event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        )
 
     @staticmethod
     def _is_editable_widget(watched: QObject) -> bool:

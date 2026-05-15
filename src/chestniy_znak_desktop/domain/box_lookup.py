@@ -7,8 +7,16 @@ def build_box_lookup_candidates(raw_code: str) -> list[str]:
     """Возвращает варианты поиска коробки по SSCC или ID."""
 
     compact = (
-        raw_code.strip().replace("(", "").replace(")", "").replace("\u001d", "").replace(" ", "")
+        raw_code.strip()
+        .replace("<GS>", "")
+        .replace("[GS]", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace("\u001d", "")
+        .replace(" ", "")
     )
+    if compact.startswith("]C1"):
+        compact = compact[3:]
     values: dict[str, None] = {}
     if compact:
         values[compact] = None
