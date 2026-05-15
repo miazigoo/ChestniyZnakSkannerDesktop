@@ -28,6 +28,20 @@ class ScannerWorkerProtocol(Protocol):
         """Останавливает чтение serial-порта."""
 
 
+class HidKeyboardWorkerProtocol(Protocol):
+    """Контракт HID keyboard wedge источника сканов."""
+
+    code_scanned: Any
+    started: Any
+    stopped: Any
+
+    def start(self) -> None:
+        """Запускает чтение HID-клавиатурных событий."""
+
+    def stop(self) -> None:
+        """Останавливает чтение HID-клавиатурных событий."""
+
+
 @dataclass(frozen=True, slots=True)
 class ScannerUiState:
     """Состояние UI-настроек сканера."""
@@ -50,6 +64,7 @@ class ScannerController(QObject):
         self,
         runtime_controller: RuntimeController,
         scanner_worker: ScannerWorkerProtocol | None = None,
+        hid_keyboard_worker: HidKeyboardWorkerProtocol | None = None,
         initial_port: str = "",
         initial_baudrate: int = 9600,
         parent: QObject | None = None,
@@ -59,6 +74,9 @@ class ScannerController(QObject):
         super().__init__(parent)
         self._runtime_controller = runtime_controller
         self._scanner_worker = scanner_worker or ScannerWorker()
+        self._hid_keyboard_worker = hid_keyboard_worker
+        self._serial_running = False
+        self._hid_running = False
         self._state = ScannerUiState(
             selected_port=initial_port,
             baudrate=initial_baudrate,
@@ -67,6 +85,10 @@ class ScannerController(QObject):
         self._scanner_worker.error_occurred.connect(self._on_scanner_error)
         self._scanner_worker.started.connect(self._on_scanner_started)
         self._scanner_worker.stopped.connect(self._on_scanner_stopped)
+        if self._hid_keyboard_worker is not None:
+            self._hid_keyboard_worker.code_scanned.connect(self.code_scanned.emit)
+            self._hid_keyboard_worker.started.connect(self._on_hid_keyboard_started)
+            self._hid_keyboard_worker.stopped.connect(self._on_hid_keyboard_stopped)
 
     @property
     def state(self) -> ScannerUiState:
@@ -123,9 +145,12 @@ class ScannerController(QObject):
     def start(self) -> None:
         """Запускает чтение выбранного COM/SPP-порта."""
 
-        if self._state.is_running:
+        if self._serial_running:
             return
         if not self._state.selected_port:
+            if self._hid_keyboard_worker is not None:
+                self.start_hid_keyboard()
+                return
             self._on_scanner_error("Выберите COM/SPP-порт сканера")
             return
         self._set_state(
@@ -150,6 +175,11 @@ class ScannerController(QObject):
         if self._state.selected_port:
             self.start()
             return
+        if self._hid_running:
+            self._publish_running_state(
+                status_message="HID-сканер активен. COM/SPP-порт не выбран.",
+            )
+            return
         self._set_state(
             ScannerUiState(
                 ports=self._state.ports,
@@ -163,46 +193,91 @@ class ScannerController(QObject):
         """Останавливает чтение сканера."""
 
         self._scanner_worker.stop()
+        self.stop_hid_keyboard()
+
+    def start_hid_keyboard(self) -> None:
+        """Запускает HID keyboard wedge источник сканов."""
+
+        if self._hid_keyboard_worker is None or self._hid_running:
+            return
+        self._hid_keyboard_worker.start()
+
+    def stop_hid_keyboard(self) -> None:
+        """Останавливает HID keyboard wedge источник сканов."""
+
+        if self._hid_keyboard_worker is None:
+            return
+        self._hid_keyboard_worker.stop()
 
     def _on_scanner_started(self) -> None:
         """Обрабатывает успешный старт worker."""
 
-        self._runtime_controller.set_scanner_running(self._state.selected_port)
+        self._serial_running = True
+        self._publish_running_state(status_message=f"Сканер запущен: {self._state.selected_port}")
+
+    def _on_hid_keyboard_started(self) -> None:
+        """Обрабатывает старт HID keyboard wedge источника."""
+
+        self._hid_running = True
+        self._publish_running_state(status_message="HID-сканер активен")
+
+    def _on_hid_keyboard_stopped(self) -> None:
+        """Обрабатывает остановку HID keyboard wedge источника."""
+
+        self._hid_running = False
+        self._publish_running_state(status_message="HID-сканер остановлен")
+
+    def _publish_running_state(self, status_message: str) -> None:
+        """Публикует агрегированное состояние COM/SPP и HID источников."""
+
+        is_running = self._serial_running or self._hid_running
+        if self._serial_running:
+            runtime_port = self._state.selected_port
+        elif self._hid_running:
+            runtime_port = "HID keyboard"
+        else:
+            runtime_port = ""
+        if is_running:
+            self._runtime_controller.set_scanner_running(runtime_port)
+        else:
+            self._runtime_controller.set_scanner_stopped()
         self._set_state(
             ScannerUiState(
                 ports=self._state.ports,
                 selected_port=self._state.selected_port,
                 baudrate=self._state.baudrate,
-                is_running=True,
-                status_message=f"Сканер запущен: {self._state.selected_port}",
+                is_running=is_running,
+                status_message=status_message,
+                error_message=self._state.error_message,
             )
         )
 
     def _on_scanner_stopped(self) -> None:
         """Обрабатывает остановку worker."""
 
-        self._runtime_controller.set_scanner_stopped()
-        self._set_state(
-            ScannerUiState(
-                ports=self._state.ports,
-                selected_port=self._state.selected_port,
-                baudrate=self._state.baudrate,
-                is_running=False,
-                status_message="Сканер остановлен",
-            )
-        )
+        self._serial_running = False
+        message = "HID-сканер активен" if self._hid_running else "Сканер остановлен"
+        self._publish_running_state(status_message=message)
 
     def _on_scanner_error(self, message: str) -> None:
         """Обрабатывает ошибку чтения serial-порта."""
 
-        self._runtime_controller.set_scanner_error(message)
+        self._serial_running = False
+        if self._hid_running:
+            self._runtime_controller.set_scanner_running("HID keyboard")
+        else:
+            self._runtime_controller.set_scanner_error(message)
         self._set_state(
             ScannerUiState(
                 ports=self._state.ports,
                 selected_port=self._state.selected_port,
                 baudrate=self._state.baudrate,
-                is_running=False,
-                status_message="Ошибка сканера",
+                is_running=self._hid_running,
+                status_message=(
+                    "HID-сканер активен. COM/SPP не запущен."
+                    if self._hid_running
+                    else "Ошибка сканера"
+                ),
                 error_message=message,
             )
         )

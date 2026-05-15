@@ -31,6 +31,7 @@ from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
+from chestniy_znak_desktop.scanner.hid_keyboard_scanner import HidKeyboardScanner
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.services.log_service import LogService
 from chestniy_znak_desktop.ui.app_window import AppWindow
@@ -141,6 +142,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     )
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
+        hid_keyboard_worker=HidKeyboardScanner(qt_app),
         initial_port=settings.scanner_port,
         initial_baudrate=settings.scanner_baudrate,
     )
@@ -177,6 +179,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     auth_controller.authenticated.connect(lambda _user: printer_controller.refresh())
     runtime_controller.start()
     scanner_controller.refresh_ports()
+    scanner_controller.start_hid_keyboard()
     scanner_controller.start_if_configured()
     settings_controller.publish_state()
     diagnostics_controller.publish_state()

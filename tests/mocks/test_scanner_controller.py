@@ -40,6 +40,32 @@ class FakeScannerWorker(QObject):
         self.stopped.emit()
 
 
+class FakeHidKeyboardWorker(QObject):
+    """Fake HID keyboard scanner worker."""
+
+    code_scanned = Signal(str)
+    started = Signal()
+    stopped = Signal()
+
+    def __init__(self) -> None:
+        """Создает fake HID worker."""
+
+        super().__init__()
+        self.is_running = False
+
+    def start(self) -> None:
+        """Публикует старт HID worker."""
+
+        self.is_running = True
+        self.started.emit()
+
+    def stop(self) -> None:
+        """Публикует остановку HID worker."""
+
+        self.is_running = False
+        self.stopped.emit()
+
+
 def _runtime() -> RuntimeController:
     """Создает runtime controller для тестов."""
 
@@ -130,6 +156,43 @@ def test_scanner_controller_autostarts_configured_port() -> None:
     assert worker.last_config is not None
     assert worker.last_config.port == "COM8"
     assert runtime.snapshot.scanner.status == ScannerStatus.RUNNING
+
+
+def test_scanner_controller_runs_hid_without_com_port() -> None:
+    """Проверяет HID-режим без выбранного COM/SPP-порта."""
+
+    runtime = _runtime()
+    hid = FakeHidKeyboardWorker()
+    controller = ScannerController(
+        runtime_controller=runtime,
+        scanner_worker=FakeScannerWorker(),
+        hid_keyboard_worker=hid,
+    )
+
+    controller.start_hid_keyboard()
+    controller.start_if_configured()
+
+    assert controller.state.is_running is True
+    assert controller.state.status_message == "HID-сканер активен. COM/SPP-порт не выбран."
+    assert runtime.snapshot.scanner.status == ScannerStatus.RUNNING
+    assert runtime.snapshot.scanner.port == "HID keyboard"
+
+
+def test_scanner_controller_forwards_hid_scanned_code() -> None:
+    """Проверяет проброс HID-кода наружу через общий signal."""
+
+    hid = FakeHidKeyboardWorker()
+    controller = ScannerController(
+        runtime_controller=_runtime(),
+        scanner_worker=FakeScannerWorker(),
+        hid_keyboard_worker=hid,
+    )
+    received: list[str] = []
+    controller.code_scanned.connect(received.append)
+
+    hid.code_scanned.emit("HID-CODE")
+
+    assert received == ["HID-CODE"]
 
 
 def test_scanner_controller_autostart_without_port_reports_setup() -> None:
