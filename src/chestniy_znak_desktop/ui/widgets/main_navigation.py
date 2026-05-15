@@ -5,7 +5,6 @@ from __future__ import annotations
 from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import (
     QColor,
-    QLinearGradient,
     QMouseEvent,
     QPainter,
     QPainterPath,
@@ -34,13 +33,7 @@ class MainSidebar(QFrame):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        gradient = QLinearGradient(0, 0, self.width(), self.height())
-        gradient.setColorAt(0.0, QColor(15, 21, 28, 235))
-        gradient.setColorAt(0.55, QColor(12, 31, 36, 235))
-        gradient.setColorAt(1.0, QColor(24, 20, 34, 235))
-        painter.fillRect(self.rect(), gradient)
-
-        painter.setPen(QPen(QColor(255, 255, 255, 32), 1.2))
+        painter.setPen(QPen(QColor(86, 199, 184, 36), 1.2))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(QRectF(-86, 92, 210, 210))
         painter.drawEllipse(QRectF(132, -58, 176, 176))

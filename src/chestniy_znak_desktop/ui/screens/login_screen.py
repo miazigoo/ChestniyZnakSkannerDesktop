@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPaintEvent, QPen
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState
@@ -127,12 +127,12 @@ class LoginScreen(QWidget):
             return
         self._scanner_row.set_value("Сканер не запущен. Вход невозможен без сканера.")
 
-    def paintEvent(self, _event: object) -> None:
+    def paintEvent(self, _event: QPaintEvent) -> None:
         """Рисует векторный фон экрана входа."""
 
+        super().paintEvent(_event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self._draw_gradient_background(painter)
         self._draw_scan_beams(painter)
         self._draw_matrix_pattern(painter)
         self._draw_orbit_lines(painter)
@@ -178,15 +178,6 @@ class LoginScreen(QWidget):
         root.setSpacing(26)
         root.addLayout(hero, stretch=6)
         root.addWidget(panel, stretch=5)
-
-    def _draw_gradient_background(self, painter: QPainter) -> None:
-        """Рисует глубокий градиентный фон."""
-
-        gradient = QLinearGradient(0, 0, self.width(), self.height())
-        gradient.setColorAt(0.0, QColor("#071217"))
-        gradient.setColorAt(0.48, QColor("#102a32"))
-        gradient.setColorAt(1.0, QColor("#1d1726"))
-        painter.fillRect(self.rect(), gradient)
 
     def _draw_scan_beams(self, painter: QPainter) -> None:
         """Рисует декоративные лучи сканирования."""

@@ -68,7 +68,6 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             background: transparent;
         }}
 
-        #mainSidebar,
         #mainWorkspace,
         #userSessionPanel,
         #loginPanel,
@@ -96,6 +95,12 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #diagnosticsLogsPanel,
         #settingsCard {{
             background: {palette.panel};
+            border: 1px solid {palette.border};
+            border-radius: 18px;
+        }}
+
+        #mainSidebar {{
+            background: {hero_background};
             border: 1px solid {palette.border};
             border-radius: 18px;
         }}
@@ -179,6 +184,11 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             background: transparent;
         }}
 
+        #mainSection {{
+            color: {palette.accent};
+            font-weight: 800;
+        }}
+
         #packingCardTitle,
         #boxesPanelTitle,
         #lookupCardTitle,
@@ -202,7 +212,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #mainNavItem,
         #loginStatusRow,
         #settingsFormRow {{
-            background: {palette.panel_alt};
+            background: {palette.input_bg};
             border: 1px solid {palette.border};
             border-radius: 14px;
         }}
@@ -214,8 +224,8 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         }}
 
         #mainNavItem[active="true"] {{
-            background: {palette.accent_soft};
-            border-color: {palette.accent};
+            background: {palette.selection_bg};
+            border-color: {palette.button_bg};
         }}
 
         #mainNavTitle,
@@ -223,6 +233,14 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             color: {palette.text};
             font-weight: 800;
             background: transparent;
+        }}
+
+        #mainNavItem[active="true"] #mainNavTitle {{
+            color: {palette.selection_text};
+        }}
+
+        #mainNavItem[active="true"] #mainNavSubtitle {{
+            color: {palette.selection_text};
         }}
 
         #mainNavSubtitle {{
