@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpinBox,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -62,6 +63,10 @@ class AutoPackingScreen(QWidget):
         self._scanner_status = QLabel("Сканер не запущен")
         self._scanner_status.setObjectName("packingScannerStatus")
         self._pending_table = self._create_pending_table()
+        self._box_items_table = self._create_box_items_table()
+        self._pending_tab_index = 0
+        self._box_tab_index = 1
+        self._tables_tabs = QTabWidget()
         self._configure_actions()
         self._build_layout()
         self._set_busy(False)
@@ -87,6 +92,8 @@ class AutoPackingScreen(QWidget):
                 is_closed=box.is_closed,
             )
         self._fill_pending_table(state)
+        self._fill_box_items_table(state)
+        self._update_table_tabs(state)
         self._apply_pending_tone(state)
         self._status_detail.setText(
             state.error_message or state.result_message or state.status_message
@@ -118,6 +125,7 @@ class AutoPackingScreen(QWidget):
         self._capacity_spin.valueChanged.connect(self.codes_per_item_changed.emit)
         self._refresh_button.setObjectName("packingSecondaryButton")
         self._open_box_button.setObjectName("packingPrimaryButton")
+        self._clear_button.setText("Очистить локальный бокс")
         self._clear_button.setObjectName("packingDangerButton")
         self._remove_button.setObjectName("packingSecondaryButton")
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
@@ -235,11 +243,17 @@ class AutoPackingScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("packingTablePanel")
-        title = QLabel("Коды в автоскана-боксе")
+        title = QLabel("Коды автоскана и текущей коробки")
         title.setObjectName("packingCardTitle")
-        hint = QLabel("Если автосканер прочитал не все коды, очистите бокс и досканируйте изделие")
+        hint = QLabel(
+            "В локальном боксе видны прочитанные коды изделия. "
+            "После заполнения они появляются во вкладке текущей коробки."
+        )
         hint.setObjectName("packingMutedText")
         hint.setWordWrap(True)
+        self._tables_tabs.setObjectName("packingTablesTabs")
+        self._tables_tabs.addTab(self._pending_table, "Локальный бокс")
+        self._tables_tabs.addTab(self._box_items_table, "Текущая коробка")
         header = QVBoxLayout()
         header.addWidget(title)
         header.addWidget(hint)
@@ -247,7 +261,7 @@ class AutoPackingScreen(QWidget):
         layout.setContentsMargins(20, 18, 20, 20)
         layout.setSpacing(14)
         layout.addLayout(header)
-        layout.addWidget(self._pending_table, 1)
+        layout.addWidget(self._tables_tabs, 1)
         return panel
 
     def _create_pending_table(self) -> QTableWidget:
@@ -270,6 +284,25 @@ class AutoPackingScreen(QWidget):
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         return table
 
+    def _create_box_items_table(self) -> QTableWidget:
+        """Создает таблицу кодов, уже добавленных в текущую коробку."""
+
+        table = QTableWidget(0, 4)
+        table.setObjectName("packingItemsTable")
+        table.setHorizontalHeaderLabels(["#", "GTIN", "Serial", "Код"])
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        table.setColumnWidth(0, 54)
+        table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        return table
+
     def _fill_pending_table(self, state: AutoPackingUiState) -> None:
         """Заполняет таблицу кодами локального бокса."""
 
@@ -287,6 +320,38 @@ class AutoPackingScreen(QWidget):
                 if column == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._pending_table.setItem(row, column, cell)
+
+    def _fill_box_items_table(self, state: AutoPackingUiState) -> None:
+        """Заполняет таблицу кодов, уже добавленных в текущую коробку."""
+
+        items = state.current_box.items if state.current_box is not None else []
+        self._box_items_table.setRowCount(len(items))
+        for row, item in enumerate(items):
+            values = [
+                str(row + 1),
+                item.gtin,
+                item.serial,
+                item.visible_code,
+            ]
+            for column, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if column == 0:
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._box_items_table.setItem(row, column, cell)
+
+    def _update_table_tabs(self, state: AutoPackingUiState) -> None:
+        """Обновляет подписи вкладок таблиц и выбирает актуальную вкладку."""
+
+        box_count = len(state.current_box.items) if state.current_box is not None else 0
+        self._tables_tabs.setTabText(
+            self._pending_tab_index,
+            f"Локальный бокс ({state.pending_count}/{state.codes_per_item})",
+        )
+        self._tables_tabs.setTabText(self._box_tab_index, f"Текущая коробка ({box_count})")
+        if state.pending_items:
+            self._tables_tabs.setCurrentIndex(self._pending_tab_index)
+        elif box_count:
+            self._tables_tabs.setCurrentIndex(self._box_tab_index)
 
     def _apply_pending_tone(self, state: AutoPackingUiState) -> None:
         """Подкрашивает локальный бокс по заполненности."""

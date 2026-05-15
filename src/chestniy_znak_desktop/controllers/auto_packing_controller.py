@@ -16,7 +16,7 @@ from chestniy_znak_desktop.api.models.packing import (
 from chestniy_znak_desktop.api.models.verify import VerifyExistsResponseDto
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
-from chestniy_znak_desktop.controllers.packing_controller import PackingBoxUi
+from chestniy_znak_desktop.controllers.packing_controller import PackingBoxUi, PackingItemUi
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -424,7 +424,7 @@ class AutoPackingController(QObject):
             )
         )
         self._play(SoundEvent.OK)
-        self._process_next_queued_scan()
+        self.refresh_current_box()
 
     def _on_current_box_loaded(self, result: object) -> None:
         """Обрабатывает загрузку текущей коробки."""
@@ -533,6 +533,17 @@ class AutoPackingController(QObject):
     def _box_to_ui(box: BoxDto | BoxDetailDto) -> PackingBoxUi:
         """Преобразует DTO коробки в UI-модель."""
 
+        items = []
+        if isinstance(box, BoxDetailDto):
+            items = [
+                PackingItemUi(
+                    id=item.id,
+                    gtin=item.gtin,
+                    serial=item.serial,
+                    visible_code=item.visible_code,
+                )
+                for item in box.items
+            ]
         return PackingBoxUi(
             box_id=box.box_id,
             order_name=box.order_name or "Заказ не определен",
@@ -543,7 +554,7 @@ class AutoPackingController(QObject):
             is_closed=box.is_closed,
             print_ok=box.print_ok,
             print_error=box.print_error,
-            items=[],
+            items=items,
         )
 
     @staticmethod

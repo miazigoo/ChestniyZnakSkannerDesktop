@@ -459,7 +459,10 @@ class BoxesScreen(QWidget):
         box_id = self._selected_box_id()
         if box_id is not None and self._confirm(
             title="Очистить коробку",
-            text=f"Удалить все коды из коробки #{box_id}?",
+            text=(
+                f"Удалить все коды из коробки #{box_id} на сервере?\n\n"
+                "Это не очистка локального автоскана-бокса."
+            ),
         ):
             self.clear_box_requested.emit(box_id)
 

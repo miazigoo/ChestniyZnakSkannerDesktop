@@ -208,6 +208,7 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
 
     assert screen._pending_table.rowCount() == 1  # noqa: SLF001
     assert screen._status_title.text() == "Бокс не заполнен: 1 / 2"  # noqa: SLF001
+    assert screen._tables_tabs.tabText(0) == "Локальный бокс (1/2)"  # noqa: SLF001
 
 
 def test_boxes_screen_shows_rows_and_detail_panel() -> None:

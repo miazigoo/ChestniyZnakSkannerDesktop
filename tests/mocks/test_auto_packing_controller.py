@@ -7,6 +7,7 @@ from collections.abc import Callable
 from chestniy_znak_desktop.api.models.packing import (
     BoxDetailDto,
     BoxDto,
+    BoxItemDto,
     OpenBoxResultDto,
     ScanBatchToBoxResultDto,
 )
@@ -161,6 +162,20 @@ class FakePackingService:
         """Запоминает пачку и возвращает обновленную коробку."""
 
         self.batch_calls.append((box_id, codes, scanner_id))
+        self.current_box_result = BoxDetailDto(
+            **_box(filled=len(codes)).model_dump(),
+            items=[
+                BoxItemDto(
+                    id=index,
+                    code_id=index,
+                    scan_id=index,
+                    gtin="04646151697261",
+                    serial=f"SERIAL{index}",
+                    visible_code=code,
+                )
+                for index, code in enumerate(codes, start=1)
+            ],
+        )
         return ScanBatchToBoxResultDto(
             ok=True,
             reason_code="batch_added",
@@ -258,7 +273,8 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
     assert controller.state.current_box is not None
     assert controller.state.current_box.filled == 2
-    assert sounds.events[-1] == SoundEvent.OK
+    assert len(controller.state.current_box.items) == 2
+    assert sounds.events == [SoundEvent.OK]
 
 
 def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
@@ -307,6 +323,11 @@ def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
     assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
     assert controller.state.current_box is not None
     assert controller.state.current_box.filled == 2
+    assert controller.state.is_busy is True
+    runner.run_next()
+
+    assert controller.state.current_box is not None
+    assert len(controller.state.current_box.items) == 2
 
 
 def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
