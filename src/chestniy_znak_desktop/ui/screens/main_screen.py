@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.screens.auto_packing_screen import AutoPackingScreen
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen
 from chestniy_znak_desktop.ui.screens.defect_screen import DefectScreen
@@ -56,6 +57,7 @@ class MainScreen(QWidget):
         self._workspace_layout: QVBoxLayout | None = None
         self._session_panel = UserSessionPanel()
         self._packing_screen = PackingScreen()
+        self._auto_packing_screen = AutoPackingScreen()
         self._boxes_screen = BoxesScreen()
         self._box_lookup_screen = BoxLookupScreen()
         self._verify_screen = VerifyScreen()
@@ -72,6 +74,12 @@ class MainScreen(QWidget):
         """Возвращает экран упаковки для подключения контроллера."""
 
         return self._packing_screen
+
+    @property
+    def auto_packing_screen(self) -> AutoPackingScreen:
+        """Возвращает экран автоупаковки для подключения контроллера."""
+
+        return self._auto_packing_screen
 
     @property
     def boxes_screen(self) -> BoxesScreen:
@@ -114,6 +122,7 @@ class MainScreen(QWidget):
 
         self._session_panel.apply_snapshot(snapshot)
         self._packing_screen.apply_runtime_snapshot(snapshot)
+        self._auto_packing_screen.apply_runtime_snapshot(snapshot)
         self._box_lookup_screen.apply_runtime_snapshot(snapshot)
         self._verify_screen.apply_runtime_snapshot(snapshot)
         self._defect_screen.apply_runtime_snapshot(snapshot)
@@ -122,7 +131,7 @@ class MainScreen(QWidget):
     def show_boxes(self) -> None:
         """Переключает рабочую область на список коробок."""
 
-        self._show_screen(1, "boxes")
+        self._show_screen(2, "boxes")
 
     def show_packing(self) -> None:
         """Переключает рабочую область на экран упаковки."""
@@ -134,6 +143,7 @@ class MainScreen(QWidget):
 
         for screen in (
             self._packing_screen,
+            self._auto_packing_screen,
             self._boxes_screen,
             self._box_lookup_screen,
             self._verify_screen,
@@ -262,22 +272,29 @@ class MainScreen(QWidget):
 
         return [
             self._nav_item("Упаковка", "Текущая коробка", VectorIconName.BOX, 0, "packing"),
-            self._nav_item("Коробки", "Список и детали", VectorIconName.BOX, 1, "boxes"),
-            self._nav_item("Поиск коробки", "SSCC или ID", VectorIconName.SCANNER, 2, "box_lookup"),
-            self._nav_item("Проверка", "DataMatrix", VectorIconName.TOKEN, 3, "verify"),
-            self._nav_item("Брак", "Отметка кодов", VectorIconName.WARNING, 4, "defect"),
+            self._nav_item(
+                "Автоупаковка",
+                "Мультиплаты",
+                VectorIconName.SCANNER,
+                1,
+                "auto_packing",
+            ),
+            self._nav_item("Коробки", "Список и детали", VectorIconName.BOX, 2, "boxes"),
+            self._nav_item("Поиск коробки", "SSCC или ID", VectorIconName.SCANNER, 3, "box_lookup"),
+            self._nav_item("Проверка", "DataMatrix", VectorIconName.TOKEN, 4, "verify"),
+            self._nav_item("Брак", "Отметка кодов", VectorIconName.WARNING, 5, "defect"),
         ]
 
     def _utility_nav_items(self) -> list[NavItem]:
         """Создает сервисные пункты навигации."""
 
         return [
-            self._nav_item("Настройки", "Устройство", VectorIconName.SETTINGS, 5, "settings"),
+            self._nav_item("Настройки", "Устройство", VectorIconName.SETTINGS, 6, "settings"),
             self._nav_item(
                 "Диагностика",
                 "Логи и статус",
                 VectorIconName.DIAGNOSTICS,
-                6,
+                7,
                 "diagnostics",
             ),
         ]

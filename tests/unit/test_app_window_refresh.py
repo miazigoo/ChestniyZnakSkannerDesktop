@@ -173,6 +173,7 @@ def test_boxes_screen_refreshes_list_and_selected_detail() -> None:
 
     window = SimpleNamespace(
         _packing_controller=Counter(),
+        _auto_packing_controller=Counter(),
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=Counter(),
@@ -184,6 +185,25 @@ def test_boxes_screen_refreshes_list_and_selected_detail() -> None:
 
     assert window._boxes_controller.refresh_count == 1
     assert window._boxes_controller.loaded_details == [29]
+
+
+def test_auto_packing_screen_refreshes_current_box() -> None:
+    """Проверяет обновление текущей коробки на экране автоупаковки."""
+
+    auto_packing = Counter()
+    window = SimpleNamespace(
+        _packing_controller=Counter(),
+        _auto_packing_controller=auto_packing,
+        _boxes_controller=FakeBoxesController(),
+        _diagnostics_controller=Counter(),
+        _settings_controller=Counter(),
+        _printer_controller=Counter(),
+        _scanner_controller=Counter(),
+    )
+
+    AppWindow._refresh_screen_data(window, "auto_packing")  # type: ignore[arg-type]
+
+    assert auto_packing.count == 1
 
 
 def test_box_changed_refreshes_list_and_detail() -> None:
@@ -239,6 +259,7 @@ def test_settings_screen_refreshes_device_sources() -> None:
     scanner = Counter()
     window = SimpleNamespace(
         _packing_controller=Counter(),
+        _auto_packing_controller=Counter(),
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=settings,

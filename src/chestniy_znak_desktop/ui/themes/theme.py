@@ -57,6 +57,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
     return f"""
         #mainScreen,
         #packingScreen,
+        #autoPackingScreen,
         #boxesScreen,
         #boxLookupScreen,
         #verifyScreen,
@@ -66,6 +67,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #settingsPage,
         #settingsStack,
         #packingScreenScroll,
+        #autoPackingScreenScroll,
         #boxesScreenScroll,
         #boxLookupScreenScroll,
         #verifyScreenScroll,
@@ -83,6 +85,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #packingScanCard,
         #packingActionsPanel,
         #packingTablePanel,
+        #autoPackingBoxPanel,
         #boxesToolbar,
         #boxesListPanel,
         #boxesDetailPanel,
@@ -111,6 +114,34 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             background: {hero_background};
             border: 1px solid {palette.border};
             border-radius: 18px;
+        }}
+
+        #autoPackingBoxPanel[tone="partial"] {{
+            background: {palette.accent_soft};
+            border-color: {palette.danger};
+        }}
+
+        #autoPackingBoxPanel[tone="full"] {{
+            background: {palette.selection_bg};
+            border-color: {palette.button_bg};
+        }}
+
+        #autoPackingStatusTitle {{
+            color: {palette.text};
+            font-size: 22px;
+            font-weight: 900;
+            background: transparent;
+        }}
+
+        #autoPackingStatusDetail {{
+            color: {palette.text};
+            font-weight: 750;
+            background: transparent;
+        }}
+
+        #autoPackingBoxPanel[tone="full"] #autoPackingStatusTitle,
+        #autoPackingBoxPanel[tone="full"] #autoPackingStatusDetail {{
+            color: {palette.selection_text};
         }}
 
         #mainSidebarScroll,

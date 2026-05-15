@@ -31,6 +31,10 @@ from chestniy_znak_desktop.runtime.state_models import (  # noqa: E402
     SessionStatus,
 )
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState  # noqa: E402
+from chestniy_znak_desktop.controllers.auto_packing_controller import (  # noqa: E402
+    AutoPackingBoxItemUi,
+    AutoPackingUiState,
+)
 from chestniy_znak_desktop.controllers.boxes_controller import (  # noqa: E402
     BoxDetailItemUi,
     BoxDetailUi,
@@ -53,6 +57,9 @@ from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
 from chestniy_znak_desktop.controllers.verify_controller import VerifyUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
+from chestniy_znak_desktop.ui.screens.auto_packing_screen import (  # noqa: E402
+    AutoPackingScreen,
+)
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.boxes_screen import BoxesScreen  # noqa: E402
@@ -103,12 +110,12 @@ def test_main_screen_updates_active_navigation() -> None:
     qapp()
     screen = MainScreen()
 
-    assert len(screen._nav_items) == 7  # noqa: SLF001
+    assert len(screen._nav_items) == 8  # noqa: SLF001
     assert screen._nav_items[0].property("active") is True  # noqa: SLF001
 
     screen.show_boxes()
 
-    assert screen._nav_items[1].property("active") is True  # noqa: SLF001
+    assert screen._nav_items[2].property("active") is True  # noqa: SLF001
 
     screen.show_packing()
 
@@ -132,7 +139,7 @@ def test_main_work_screens_are_scrollable() -> None:
 
     wrappers = screen.findChildren(AdaptiveScrollArea)
 
-    assert len(wrappers) == 7
+    assert len(wrappers) == 8
     assert all(wrapper.minimumSizeHint().height() <= 240 for wrapper in wrappers)
 
 
@@ -175,6 +182,32 @@ def test_boxes_screen_has_backend_status_filters() -> None:
     ]
 
     assert values == ["all", "active", "open", "edit", "closed", "empty"]
+
+
+def test_auto_packing_screen_shows_local_box_state() -> None:
+    """Проверяет экран локального бокса автосканера."""
+
+    qapp()
+    screen = AutoPackingScreen()
+    screen.apply_state(
+        AutoPackingUiState(
+            codes_per_item=2,
+            pending_items=[
+                AutoPackingBoxItemUi(
+                    code_id=1,
+                    raw_code="CODE1",
+                    gtin="04646151697261",
+                    serial="SERIAL1",
+                    visible_code="CODE1",
+                    order_key="26-0001/0001",
+                )
+            ],
+            status_message="Код добавлен",
+        )
+    )
+
+    assert screen._pending_table.rowCount() == 1  # noqa: SLF001
+    assert screen._status_title.text() == "Бокс не заполнен: 1 / 2"  # noqa: SLF001
 
 
 def test_boxes_screen_shows_rows_and_detail_panel() -> None:

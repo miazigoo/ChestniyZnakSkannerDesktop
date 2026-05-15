@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
@@ -52,6 +53,7 @@ class AppWindow(QMainWindow):
         runtime_controller: RuntimeController,
         auth_controller: AuthController,
         packing_controller: PackingController,
+        auto_packing_controller: AutoPackingController,
         boxes_controller: BoxesController,
         box_lookup_controller: BoxLookupController,
         box_edit_controller: BoxEditController,
@@ -69,6 +71,7 @@ class AppWindow(QMainWindow):
         self._runtime_controller = runtime_controller
         self._auth_controller = auth_controller
         self._packing_controller = packing_controller
+        self._auto_packing_controller = auto_packing_controller
         self._boxes_controller = boxes_controller
         self._box_lookup_controller = box_lookup_controller
         self._box_edit_controller = box_edit_controller
@@ -108,6 +111,9 @@ class AppWindow(QMainWindow):
         self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._packing_controller.close_completed.connect(self._handle_box_close_completed)
+        self._auto_packing_controller.state_changed.connect(
+            self._main_screen.auto_packing_screen.apply_state
+        )
         self._box_lookup_controller.state_changed.connect(
             self._main_screen.box_lookup_screen.apply_state
         )
@@ -179,6 +185,21 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.packing_screen.count_in_packing_changed.connect(
             self._packing_controller.set_count_in_packing
+        )
+        self._main_screen.auto_packing_screen.refresh_requested.connect(
+            self._auto_packing_controller.refresh_current_box
+        )
+        self._main_screen.auto_packing_screen.open_box_requested.connect(
+            self._auto_packing_controller.open_box
+        )
+        self._main_screen.auto_packing_screen.clear_pending_requested.connect(
+            self._auto_packing_controller.clear_pending
+        )
+        self._main_screen.auto_packing_screen.remove_pending_requested.connect(
+            self._auto_packing_controller.remove_pending_at
+        )
+        self._main_screen.auto_packing_screen.codes_per_item_changed.connect(
+            self._auto_packing_controller.set_codes_per_item
         )
         self._scanner_controller.code_scanned.connect(self._handle_scanned_code)
         self._scanner_controller.state_changed.connect(
@@ -271,6 +292,9 @@ class AppWindow(QMainWindow):
 
         if screen_name == "packing":
             self._packing_controller.refresh_current_box()
+            return
+        if screen_name == "auto_packing":
+            self._auto_packing_controller.refresh_current_box()
             return
         if screen_name == "boxes":
             selected_box_id = self._boxes_controller.state.selected_box_id
@@ -430,6 +454,9 @@ class AppWindow(QMainWindow):
             return
         if self._scan_target == "packing":
             self._packing_controller.on_code_scanned(code)
+            return
+        if self._scan_target == "auto_packing":
+            self._auto_packing_controller.on_code_scanned(code)
 
     def _handle_scanner_command(self, command: ScannerCommand) -> bool:
         """Выполняет служебную QR-команду сканера."""

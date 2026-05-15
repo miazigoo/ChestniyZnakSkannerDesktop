@@ -14,6 +14,7 @@ def test_settings_store_loads_defaults(tmp_path) -> None:  # type: ignore[no-unt
     assert settings.api_base_url == "http://test/api/v2/"
     assert settings.device_id == "pc-1"
     assert settings.theme_name == "light"
+    assert settings.auto_pack_codes_per_item == 1
 
 
 def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -34,6 +35,7 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
             sound_warning_file="other_order.mp3",
             sound_error_file="error_02.mp3",
             sound_victory_file="victory.mp3",
+            auto_pack_codes_per_item=12,
         )
     )
     loaded = SettingsStore.from_file(str(settings_path)).load(AppConfig())
@@ -45,3 +47,4 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
     assert loaded.sound_ok_file == "ok_03.mp3"
     assert loaded.sound_warning_file == "other_order.mp3"
     assert loaded.sound_error_file == "error_02.mp3"
+    assert loaded.auto_pack_codes_per_item == 12

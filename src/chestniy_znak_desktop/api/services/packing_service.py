@@ -10,6 +10,7 @@ from chestniy_znak_desktop.api.models.packing import (
     BoxListDto,
     CloseBoxResultDto,
     OpenBoxResultDto,
+    ScanBatchToBoxResultDto,
     ScanToBoxResultDto,
 )
 
@@ -72,6 +73,20 @@ class PackingService:
             json={"code": code, "scanner_id": scanner_id},
         )
         return ScanToBoxResultDto.model_validate(payload)
+
+    def scan_batch_to_box(
+        self,
+        box_id: int,
+        codes: list[str],
+        scanner_id: str,
+    ) -> ScanBatchToBoxResultDto:
+        """Атомарно добавляет пачку отсканированных кодов в коробку."""
+
+        payload = self._api_client.post(
+            f"chestniy-znak/packing/boxes/{box_id}/scan-batch",
+            json={"codes": codes, "scanner_id": scanner_id},
+        )
+        return ScanBatchToBoxResultDto.model_validate(payload)
 
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
         """Закрывает коробку и запускает печать этикетки."""

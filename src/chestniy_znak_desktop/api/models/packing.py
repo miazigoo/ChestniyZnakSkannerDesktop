@@ -72,6 +72,17 @@ class ScanToBoxResultDto(BaseModel):
     box_full_signal: bool | None = None
 
 
+class ScanBatchToBoxResultDto(BaseModel):
+    """Результат атомарного добавления пачки кодов в коробку."""
+
+    ok: bool
+    reason_code: str
+    error: str | None = None
+    added: int = 0
+    box: BoxDto
+    box_full_signal: bool | None = None
+
+
 class CloseBoxResultDto(BaseModel):
     """Результат закрытия коробки и печати этикетки."""
 

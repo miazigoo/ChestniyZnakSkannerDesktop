@@ -1,0 +1,222 @@
+"""Mock-тесты контроллера автоупаковки."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from chestniy_znak_desktop.api.models.packing import (
+    BoxDetailDto,
+    BoxDto,
+    OpenBoxResultDto,
+    ScanBatchToBoxResultDto,
+)
+from chestniy_znak_desktop.api.models.verify import RemoteCodeDto, VerifyExistsResponseDto
+from chestniy_znak_desktop.app.config import AppConfig
+from chestniy_znak_desktop.app.settings_store import SettingsStore
+from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
+from chestniy_znak_desktop.services.sound_service import SoundEvent
+
+
+class ImmediateTaskRunner:
+    """TaskRunner, который выполняет задачу сразу."""
+
+    def submit(
+        self,
+        task: Callable[[], object],
+        on_success: Callable[[object], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Синхронно выполняет задачу."""
+
+        try:
+            result = task()
+        except Exception as exc:
+            on_error(exc)
+            return
+        on_success(result)
+
+
+class FakeSoundService:
+    """Fake sound service для проверки звуковых событий."""
+
+    def __init__(self) -> None:
+        """Создает список проигранных событий."""
+
+        self.events: list[SoundEvent] = []
+
+    def play(self, event: SoundEvent) -> None:
+        """Запоминает событие звука."""
+
+        self.events.append(event)
+
+
+class FakePackingService:
+    """Fake backend коробок для автоупаковки."""
+
+    def __init__(self) -> None:
+        """Создает fake-сервис с состоянием вызовов."""
+
+        self.current_box_result: BoxDetailDto | None = None
+        self.batch_calls: list[tuple[int, list[str], str]] = []
+
+    def current_box(self) -> BoxDetailDto | None:
+        """Возвращает текущую коробку."""
+
+        return self.current_box_result
+
+    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+        """Возвращает открытую коробку."""
+
+        return OpenBoxResultDto(
+            ok=True,
+            created=True,
+            has_active_boxes=False,
+            box=_box(filled=0),
+        )
+
+    def scan_batch_to_box(
+        self,
+        box_id: int,
+        codes: list[str],
+        scanner_id: str,
+    ) -> ScanBatchToBoxResultDto:
+        """Запоминает пачку и возвращает обновленную коробку."""
+
+        self.batch_calls.append((box_id, codes, scanner_id))
+        return ScanBatchToBoxResultDto(
+            ok=True,
+            reason_code="batch_added",
+            added=len(codes),
+            box=_box(filled=len(codes)),
+        )
+
+
+class FakeVerifyService:
+    """Fake проверка кодов для локального бокса."""
+
+    def __init__(self) -> None:
+        """Создает счетчик проверок."""
+
+        self.calls: list[str] = []
+
+    def verify_exists(
+        self,
+        code: str,
+        scanner_id: str,
+        allow_duplicate: bool = True,
+    ) -> VerifyExistsResponseDto:
+        """Возвращает успешную проверку с одним заказом."""
+
+        self.calls.append(code)
+        return VerifyExistsResponseDto(
+            ok=True,
+            exists=True,
+            status="ok",
+            message="Код найден",
+            order_name="26-0001/0001",
+            code=RemoteCodeDto(
+                id=len(self.calls),
+                gtin="04646151697261",
+                serial=f"SERIAL{len(self.calls)}",
+                visible_code=code,
+                order_dnp_name="26-0001/0001",
+            ),
+        )
+
+
+def _box(*, filled: int = 0, capacity: int = 20) -> BoxDto:
+    """Создает DTO коробки для тестов."""
+
+    return BoxDto(
+        box_id=1,
+        order_name="26-0001/0001",
+        sscc="",
+        capacity=capacity,
+        filled=filled,
+        count_in_packing=True,
+        allow_duplicate_scans=False,
+        is_closed=False,
+        is_edit_mode=False,
+    )
+
+
+def _controller_pair(
+    tmp_path,
+) -> tuple[AutoPackingController, FakePackingService, FakeVerifyService, FakeSoundService]:
+    """Создает контроллер с fake-зависимостями."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+    return controller, service, verifier, sounds
+
+
+def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
+    """Проверяет отправку пачки только после заполнения локального бокса."""
+
+    controller, service, _verifier, sounds = _controller_pair(tmp_path)
+    controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned("CODE1")
+
+    assert controller.state.pending_count == 1
+    assert service.batch_calls == []
+
+    controller.on_code_scanned("CODE2")
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 2
+    assert sounds.events[-1] == SoundEvent.OK
+
+
+def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None:
+    """Проверяет локальный запрет разных заказов в одном боксе."""
+
+    controller, service, verifier, sounds = _controller_pair(tmp_path)
+    controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned("CODE1")
+
+    def other_order(
+        code: str,
+        scanner_id: str,
+        allow_duplicate: bool = True,
+    ) -> VerifyExistsResponseDto:
+        """Возвращает проверку кода другого заказа."""
+
+        return VerifyExistsResponseDto(
+            ok=True,
+            exists=True,
+            status="ok",
+            message="Код найден",
+            order_name="26-0002/0001",
+            code=RemoteCodeDto(
+                id=99,
+                gtin="04646151697261",
+                serial="SERIAL99",
+                visible_code=code,
+                order_dnp_name="26-0002/0001",
+            ),
+        )
+
+    verifier.verify_exists = other_order  # type: ignore[method-assign]
+    controller.on_code_scanned("CODE2")
+
+    assert controller.state.pending_count == 1
+    assert service.batch_calls == []
+    assert "одного заказа" in controller.state.error_message
+    assert sounds.events[-1] == SoundEvent.ERROR

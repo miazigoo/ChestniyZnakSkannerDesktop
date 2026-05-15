@@ -16,6 +16,7 @@ from chestniy_znak_desktop.api.session_store import FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
+from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditController
 from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupController
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
@@ -93,6 +94,15 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
         sound_service=sound_service,
     )
+    auto_packing_controller = AutoPackingController(
+        packing_service=packing_service,
+        verify_service=chz_service,
+        task_runner=api_task_runner,
+        settings_store=settings_store,
+        settings_defaults=config,
+        device_id=settings.device_id,
+        sound_service=sound_service,
+    )
     boxes_controller = BoxesController(
         boxes_service=packing_service,
         printer_service=printer_service,
@@ -146,6 +156,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         runtime_controller=runtime_controller,
         auth_controller=auth_controller,
         packing_controller=packing_controller,
+        auto_packing_controller=auto_packing_controller,
         boxes_controller=boxes_controller,
         box_lookup_controller=box_lookup_controller,
         box_edit_controller=box_edit_controller,
@@ -160,6 +171,9 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: api_client.close())
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
+    auth_controller.authenticated.connect(
+        lambda _user: auto_packing_controller.refresh_current_box()
+    )
     auth_controller.authenticated.connect(lambda _user: printer_controller.refresh())
     runtime_controller.start()
     scanner_controller.refresh_ports()

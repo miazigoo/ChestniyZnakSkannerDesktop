@@ -24,6 +24,7 @@ class UserSettings:
     sound_warning_file: str = "other.mp3"
     sound_error_file: str = "error.mp3"
     sound_victory_file: str = "victory.mp3"
+    auto_pack_codes_per_item: int = 1
 
 
 class SettingsStore:
@@ -61,6 +62,7 @@ class SettingsStore:
             sound_warning_file=self._value("sound/warning_file", "other.mp3"),
             sound_error_file=self._value("sound/error_file", "error.mp3"),
             sound_victory_file=self._value("sound/victory_file", "victory.mp3"),
+            auto_pack_codes_per_item=self._int_value("auto_packing/codes_per_item", 1),
         )
 
     def save(self, settings: UserSettings) -> None:
@@ -77,6 +79,10 @@ class SettingsStore:
         self._settings.setValue("sound/warning_file", settings.sound_warning_file)
         self._settings.setValue("sound/error_file", settings.sound_error_file)
         self._settings.setValue("sound/victory_file", settings.sound_victory_file)
+        self._settings.setValue(
+            "auto_packing/codes_per_item",
+            max(1, settings.auto_pack_codes_per_item),
+        )
         self._settings.sync()
 
     def _value(self, key: str, default: str) -> str:
