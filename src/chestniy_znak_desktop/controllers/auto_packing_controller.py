@@ -8,6 +8,7 @@ from typing import Any, Protocol, TypeVar
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.packing import (
+    BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
     OpenBoxResultDto,
@@ -51,6 +52,19 @@ class AutoPackingVerifier(Protocol):
         allow_duplicate: bool = True,
     ) -> VerifyExistsResponseDto:
         """Проверяет код по backend перед добавлением в локальный бокс."""
+
+
+class AutoPackingBoxEditor(Protocol):
+    """Контракт backend-сервиса быстрых правок текущей коробки."""
+
+    def remove_item(self, box_id: int, item_id: int) -> BoxActionResultDto:
+        """Удаляет один код из открытой коробки."""
+
+    def clear_box(self, box_id: int) -> BoxActionResultDto:
+        """Очищает открытую коробку от всех кодов."""
+
+    def delete_empty_box(self, box_id: int) -> BoxActionResultDto:
+        """Удаляет пустую открытую коробку."""
 
 
 class AutoPackingWsVerifier(Protocol):
@@ -122,6 +136,7 @@ class AutoPackingController(QObject):
         self,
         packing_service: AutoPackingBackend,
         verify_service: AutoPackingVerifier,
+        box_edit_service: AutoPackingBoxEditor | None,
         task_runner: TaskRunner,
         settings_store: SettingsStore,
         settings_defaults: AppConfig,
@@ -136,6 +151,7 @@ class AutoPackingController(QObject):
         super().__init__(parent)
         self._packing_service = packing_service
         self._verify_service = verify_service
+        self._box_edit_service = box_edit_service
         self._task_runner = task_runner
         self._settings_store = settings_store
         self._settings_defaults = settings_defaults
@@ -228,6 +244,55 @@ class AutoPackingController(QObject):
                 result_message=removed.serial,
                 error_message="",
             )
+        )
+
+    def remove_box_item_at(self, row: int) -> None:
+        """Удаляет выбранный код из текущей открытой коробки."""
+
+        if (
+            self._state.is_busy
+            or self._state.current_box is None
+            or self._box_edit_service is None
+            or row < 0
+            or row >= len(self._state.current_box.items)
+        ):
+            return
+        editor = self._box_edit_service
+        box_id = self._state.current_box.box_id
+        item_id = self._state.current_box.items[row].id
+        self._set_busy(f"Удаляем код #{item_id} из коробки #{box_id}...")
+        self._task_runner.submit(
+            lambda: editor.remove_item(box_id, item_id),
+            self._on_box_edit_result,
+            self._on_error,
+        )
+
+    def clear_current_box(self) -> None:
+        """Очищает текущую открытую коробку от уже добавленных кодов."""
+
+        if self._state.is_busy or self._state.current_box is None or self._box_edit_service is None:
+            return
+        editor = self._box_edit_service
+        box_id = self._state.current_box.box_id
+        self._set_busy(f"Очищаем коробку #{box_id}...")
+        self._task_runner.submit(
+            lambda: editor.clear_box(box_id),
+            self._on_box_edit_result,
+            self._on_error,
+        )
+
+    def delete_current_box(self) -> None:
+        """Удаляет текущую открытую коробку, если она пустая."""
+
+        if self._state.is_busy or self._state.current_box is None or self._box_edit_service is None:
+            return
+        editor = self._box_edit_service
+        box_id = self._state.current_box.box_id
+        self._set_busy(f"Удаляем пустую коробку #{box_id}...")
+        self._task_runner.submit(
+            lambda: editor.delete_empty_box(box_id),
+            self._on_box_delete_result,
+            self._on_error,
         )
 
     def on_code_scanned(self, code: str) -> None:
@@ -426,6 +491,59 @@ class AutoPackingController(QObject):
         self._play(SoundEvent.OK)
         self.refresh_current_box()
 
+    def _on_box_edit_result(self, result: object) -> None:
+        """Обрабатывает быструю правку текущей коробки автоскана."""
+
+        edit_result = self._expect(result, BoxActionResultDto)
+        message = edit_result.error or edit_result.reason_code
+        if not edit_result.ok:
+            self._set_state(
+                replace(
+                    self._state,
+                    is_busy=False,
+                    status_message="Коробка не изменена",
+                    error_message=message,
+                )
+            )
+            return
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                current_box=self._box_to_ui(edit_result.box),
+                status_message=self._status_for_edit_reason(edit_result.reason_code),
+                result_message=message,
+                error_message="",
+            )
+        )
+        self.refresh_current_box()
+
+    def _on_box_delete_result(self, result: object) -> None:
+        """Обрабатывает удаление пустой текущей коробки."""
+
+        edit_result = self._expect(result, BoxActionResultDto)
+        message = edit_result.error or edit_result.reason_code
+        if not edit_result.ok:
+            self._set_state(
+                replace(
+                    self._state,
+                    is_busy=False,
+                    status_message="Коробка не удалена",
+                    error_message=message,
+                )
+            )
+            return
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                current_box=None,
+                status_message="Пустая коробка удалена",
+                result_message=message,
+                error_message="",
+            )
+        )
+
     def _on_current_box_loaded(self, result: object) -> None:
         """Обрабатывает загрузку текущей коробки."""
 
@@ -567,3 +685,13 @@ class AutoPackingController(QObject):
         if not isinstance(result, expected_type):
             raise TypeError(f"Неожиданный результат операции: {type(result)!r}")
         return result
+
+    @staticmethod
+    def _status_for_edit_reason(reason_code: str) -> str:
+        """Возвращает статус быстрой правки коробки по reason_code."""
+
+        messages = {
+            "item_removed": "Код удален из коробки",
+            "box_cleared": "Коробка очищена",
+        }
+        return messages.get(reason_code, reason_code)

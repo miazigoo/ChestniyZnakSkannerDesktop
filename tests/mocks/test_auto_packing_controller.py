@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from chestniy_znak_desktop.api.models.packing import (
+    BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
     BoxItemDto,
@@ -217,6 +218,53 @@ class FakeVerifyService:
         )
 
 
+class FakeBoxEditService:
+    """Fake backend быстрых правок коробки в автоупаковке."""
+
+    def __init__(self, packing_service: FakePackingService) -> None:
+        """Создает fake-сервис поверх состояния fake упаковки."""
+
+        self._packing_service = packing_service
+        self.remove_calls: list[tuple[int, int]] = []
+        self.clear_calls: list[int] = []
+        self.delete_calls: list[int] = []
+
+    def remove_item(self, box_id: int, item_id: int) -> BoxActionResultDto:
+        """Удаляет один fake-код из текущей коробки."""
+
+        self.remove_calls.append((box_id, item_id))
+        box = self._packing_service.current_box_result or _detail_box(items_count=2)
+        items = [item for item in box.items if item.id != item_id]
+        self._packing_service.current_box_result = _detail_box(items_count=len(items))
+        return BoxActionResultDto(
+            ok=True,
+            reason_code="item_removed",
+            box=_box(filled=len(items)),
+        )
+
+    def clear_box(self, box_id: int) -> BoxActionResultDto:
+        """Очищает fake-коробку."""
+
+        self.clear_calls.append(box_id)
+        self._packing_service.current_box_result = _detail_box(items_count=0)
+        return BoxActionResultDto(
+            ok=True,
+            reason_code="box_cleared",
+            box=_box(filled=0),
+        )
+
+    def delete_empty_box(self, box_id: int) -> BoxActionResultDto:
+        """Удаляет fake-пустую коробку."""
+
+        self.delete_calls.append(box_id)
+        self._packing_service.current_box_result = None
+        return BoxActionResultDto(
+            ok=True,
+            reason_code="box_deleted",
+            box=_box(filled=0),
+        )
+
+
 def _box(*, filled: int = 0, capacity: int = 20) -> BoxDto:
     """Создает DTO коробки для тестов."""
 
@@ -233,6 +281,25 @@ def _box(*, filled: int = 0, capacity: int = 20) -> BoxDto:
     )
 
 
+def _detail_box(*, items_count: int = 2) -> BoxDetailDto:
+    """Создает детальную DTO коробки с кодами для тестов."""
+
+    return BoxDetailDto(
+        **_box(filled=items_count).model_dump(),
+        items=[
+            BoxItemDto(
+                id=index,
+                code_id=index,
+                scan_id=index,
+                gtin="04646151697261",
+                serial=f"SERIAL{index}",
+                visible_code=f"CODE{index}",
+            )
+            for index in range(1, items_count + 1)
+        ],
+    )
+
+
 def _controller_pair(
     tmp_path,
 ) -> tuple[AutoPackingController, FakePackingService, FakeVerifyService, FakeSoundService]:
@@ -246,6 +313,7 @@ def _controller_pair(
     controller = AutoPackingController(
         packing_service=service,
         verify_service=verifier,
+        box_edit_service=None,
         task_runner=ImmediateTaskRunner(),
         settings_store=store,
         settings_defaults=config,
@@ -289,6 +357,7 @@ def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
     controller = AutoPackingController(
         packing_service=service,
         verify_service=verifier,
+        box_edit_service=None,
         task_runner=runner,
         settings_store=store,
         settings_defaults=config,
@@ -342,6 +411,7 @@ def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
     controller = AutoPackingController(
         packing_service=service,
         verify_service=verifier,
+        box_edit_service=None,
         task_runner=ImmediateTaskRunner(),
         settings_store=store,
         settings_defaults=config,
@@ -390,6 +460,7 @@ def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
     controller = AutoPackingController(
         packing_service=service,
         verify_service=verifier,
+        box_edit_service=None,
         task_runner=ImmediateTaskRunner(),
         settings_store=store,
         settings_defaults=config,
@@ -405,6 +476,67 @@ def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
 
     assert verifier.calls == ["CODE1"]
     assert controller.state.pending_count == 1
+
+
+def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
+    """Проверяет удаление кода из открытой коробки на экране автоскана."""
+
+    service = FakePackingService()
+    service.current_box_result = _detail_box(items_count=2)
+    editor = FakeBoxEditService(service)
+    verifier = FakeVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=editor,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+    controller.refresh_current_box()
+
+    controller.remove_box_item_at(0)
+
+    assert editor.remove_calls == [(1, 1)]
+    assert controller.state.current_box is not None
+    assert len(controller.state.current_box.items) == 1
+
+
+def test_auto_packing_can_clear_and_delete_open_box(tmp_path) -> None:
+    """Проверяет очистку и удаление открытой коробки из автоупаковки."""
+
+    service = FakePackingService()
+    service.current_box_result = _detail_box(items_count=2)
+    editor = FakeBoxEditService(service)
+    verifier = FakeVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=editor,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+    controller.refresh_current_box()
+
+    controller.clear_current_box()
+
+    assert editor.clear_calls == [1]
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 0
+
+    controller.delete_current_box()
+
+    assert editor.delete_calls == [1]
+    assert controller.state.current_box is None
 
 
 def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None:

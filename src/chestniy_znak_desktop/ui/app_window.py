@@ -198,6 +198,15 @@ class AppWindow(QMainWindow):
         self._main_screen.auto_packing_screen.remove_pending_requested.connect(
             self._auto_packing_controller.remove_pending_at
         )
+        self._main_screen.auto_packing_screen.remove_box_item_requested.connect(
+            self._request_auto_remove_box_item
+        )
+        self._main_screen.auto_packing_screen.clear_box_requested.connect(
+            self._request_auto_clear_box
+        )
+        self._main_screen.auto_packing_screen.delete_box_requested.connect(
+            self._request_auto_delete_box
+        )
         self._main_screen.auto_packing_screen.codes_per_item_changed.connect(
             self._auto_packing_controller.set_codes_per_item
         )
@@ -355,6 +364,65 @@ class AppWindow(QMainWindow):
         """Показывает короткое информационное сообщение."""
 
         QMessageBox.information(self, title, text)
+
+    def _request_auto_remove_box_item(self, row: int) -> None:
+        """Запрашивает удаление выбранного кода из открытой коробки автоскана."""
+
+        state = self._auto_packing_controller.state
+        box = state.current_box
+        if box is None or row < 0 or row >= len(box.items):
+            self._show_message("Код не выбран", "Выберите код во вкладке текущей коробки.")
+            return
+        item = box.items[row]
+        if self._confirm_action(
+            "Удалить код из коробки",
+            f"Удалить код #{item.id} из открытой коробки #{box.box_id}?",
+        ):
+            self._auto_packing_controller.remove_box_item_at(row)
+
+    def _request_auto_clear_box(self) -> None:
+        """Запрашивает очистку текущей открытой коробки автоскана."""
+
+        box = self._auto_packing_controller.state.current_box
+        if box is None:
+            self._show_message("Коробка не открыта", "Открытая коробка не найдена.")
+            return
+        if self._confirm_action(
+            "Очистить коробку",
+            f"Удалить все коды из открытой коробки #{box.box_id}?",
+        ):
+            self._auto_packing_controller.clear_current_box()
+
+    def _request_auto_delete_box(self) -> None:
+        """Запрашивает удаление текущей пустой открытой коробки автоскана."""
+
+        box = self._auto_packing_controller.state.current_box
+        if box is None:
+            self._show_message("Коробка не открыта", "Открытая коробка не найдена.")
+            return
+        if box.filled > 0:
+            self._show_message(
+                "Коробка не пустая",
+                "Перед удалением коробки удалите коды или очистите коробку.",
+            )
+            return
+        if self._confirm_action(
+            "Удалить пустую коробку",
+            f"Удалить открытую пустую коробку #{box.box_id}?",
+        ):
+            self._auto_packing_controller.delete_current_box()
+
+    def _confirm_action(self, title: str, text: str) -> bool:
+        """Показывает подтверждение опасного действия."""
+
+        answer = QMessageBox.question(
+            self,
+            title,
+            text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _handle_box_close_completed(self, event: CloseBoxUiEvent) -> None:
         """Показывает результат закрытия и открывает следующую коробку."""

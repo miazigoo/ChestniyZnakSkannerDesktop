@@ -35,6 +35,9 @@ class AutoPackingScreen(QWidget):
     open_box_requested = Signal()
     clear_pending_requested = Signal()
     remove_pending_requested = Signal(int)
+    remove_box_item_requested = Signal(int)
+    clear_box_requested = Signal()
+    delete_box_requested = Signal()
     codes_per_item_changed = Signal(int)
 
     def __init__(self) -> None:
@@ -51,6 +54,9 @@ class AutoPackingScreen(QWidget):
         self._open_box_button = QPushButton("Открыть коробку")
         self._clear_button = QPushButton("Очистить бокс")
         self._remove_button = QPushButton("Удалить код")
+        self._remove_box_item_button = QPushButton("Удалить код из коробки")
+        self._clear_box_button = QPushButton("Очистить коробку")
+        self._delete_box_button = QPushButton("Удалить пустую коробку")
         self._quick_buttons: list[QPushButton] = []
         self._status_title = QLabel("Автоскана-бокс пуст")
         self._status_title.setObjectName("autoPackingStatusTitle")
@@ -67,6 +73,8 @@ class AutoPackingScreen(QWidget):
         self._pending_tab_index = 0
         self._box_tab_index = 1
         self._tables_tabs = QTabWidget()
+        self._box_filled = 0
+        self._box_items_count = 0
         self._configure_actions()
         self._build_layout()
         self._set_busy(False)
@@ -78,6 +86,8 @@ class AutoPackingScreen(QWidget):
         self._capacity_spin.setValue(state.codes_per_item)
         self._capacity_spin.blockSignals(False)
         self._has_box = state.current_box is not None
+        self._box_filled = state.current_box.filled if state.current_box is not None else 0
+        self._box_items_count = len(state.current_box.items) if state.current_box is not None else 0
         if state.current_box is None:
             self._summary_card.set_empty()
         else:
@@ -128,10 +138,16 @@ class AutoPackingScreen(QWidget):
         self._clear_button.setText("Очистить локальный бокс")
         self._clear_button.setObjectName("packingDangerButton")
         self._remove_button.setObjectName("packingSecondaryButton")
+        self._remove_box_item_button.setObjectName("packingDangerButton")
+        self._clear_box_button.setObjectName("packingDangerButton")
+        self._delete_box_button.setObjectName("packingDangerButton")
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._open_box_button.clicked.connect(self.open_box_requested.emit)
         self._clear_button.clicked.connect(self.clear_pending_requested.emit)
         self._remove_button.clicked.connect(self._emit_remove_selected)
+        self._remove_box_item_button.clicked.connect(self._emit_remove_box_item_selected)
+        self._clear_box_button.clicked.connect(self.clear_box_requested.emit)
+        self._delete_box_button.clicked.connect(self.delete_box_requested.emit)
         for value in (1, 6, 12):
             button = QPushButton(str(value))
             button.setObjectName("packingSecondaryButton")
@@ -254,6 +270,11 @@ class AutoPackingScreen(QWidget):
         self._tables_tabs.setObjectName("packingTablesTabs")
         self._tables_tabs.addTab(self._pending_table, "Локальный бокс")
         self._tables_tabs.addTab(self._box_items_table, "Текущая коробка")
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        actions.addWidget(self._remove_box_item_button)
+        actions.addWidget(self._clear_box_button)
+        actions.addWidget(self._delete_box_button)
         header = QVBoxLayout()
         header.addWidget(title)
         header.addWidget(hint)
@@ -262,6 +283,7 @@ class AutoPackingScreen(QWidget):
         layout.setSpacing(14)
         layout.addLayout(header)
         layout.addWidget(self._tables_tabs, 1)
+        layout.addLayout(actions)
         return panel
 
     def _create_pending_table(self) -> QTableWidget:
@@ -376,6 +398,12 @@ class AutoPackingScreen(QWidget):
         row = self._pending_table.currentRow()
         self.remove_pending_requested.emit(row)
 
+    def _emit_remove_box_item_selected(self) -> None:
+        """Публикует запрос удаления выбранной строки из текущей коробки."""
+
+        row = self._box_items_table.currentRow()
+        self.remove_box_item_requested.emit(row)
+
     def _set_busy(self, is_busy: bool) -> None:
         """Включает или отключает рабочие действия."""
 
@@ -388,3 +416,6 @@ class AutoPackingScreen(QWidget):
             button.setEnabled(not is_busy)
         self._clear_button.setEnabled(not is_busy)
         self._remove_button.setEnabled(not is_busy and self._pending_table.rowCount() > 0)
+        self._remove_box_item_button.setEnabled(not is_busy and self._box_items_count > 0)
+        self._clear_box_button.setEnabled(not is_busy and self._box_items_count > 0)
+        self._delete_box_button.setEnabled(not is_busy and self._has_box and self._box_filled == 0)

@@ -90,6 +90,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     packing_service = PackingService(api_client)
     printer_service = PrinterService(api_client)
     chz_service = ChestniyZnakService(api_client)
+    box_edit_service = BoxEditService(api_client)
     auto_pack_ws_verifier = AutoPackWsVerifier(connection_monitor=connection_monitor)
     packing_controller = PackingController(
         packing_service=packing_service,
@@ -100,6 +101,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     auto_packing_controller = AutoPackingController(
         packing_service=packing_service,
         verify_service=chz_service,
+        box_edit_service=box_edit_service,
         task_runner=api_task_runner,
         settings_store=settings_store,
         settings_defaults=config,
@@ -125,7 +127,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
     )
     box_edit_controller = BoxEditController(
-        edit_service=BoxEditService(api_client),
+        edit_service=box_edit_service,
         task_runner=api_task_runner,
         sound_service=sound_service,
     )

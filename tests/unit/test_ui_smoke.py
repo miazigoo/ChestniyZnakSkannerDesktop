@@ -202,13 +202,34 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
                     order_key="26-0001/0001",
                 )
             ],
+            current_box=PackingBoxUi(
+                box_id=7,
+                order_name="26-0001/0001",
+                sscc="",
+                filled=1,
+                capacity=12,
+                count_in_packing=True,
+                is_closed=False,
+                print_ok=False,
+                print_error="",
+                items=[
+                    PackingItemUi(
+                        id=11,
+                        gtin="04646151697261",
+                        serial="SERIAL1",
+                        visible_code="CODE1",
+                    )
+                ],
+            ),
             status_message="Код добавлен",
         )
     )
 
     assert screen._pending_table.rowCount() == 1  # noqa: SLF001
+    assert screen._box_items_table.rowCount() == 1  # noqa: SLF001
     assert screen._status_title.text() == "Бокс не заполнен: 1 / 2"  # noqa: SLF001
     assert screen._tables_tabs.tabText(0) == "Локальный бокс (1/2)"  # noqa: SLF001
+    assert screen._tables_tabs.tabText(1) == "Текущая коробка (1)"  # noqa: SLF001
 
 
 def test_boxes_screen_shows_rows_and_detail_panel() -> None:
