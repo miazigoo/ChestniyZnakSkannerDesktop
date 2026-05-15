@@ -55,7 +55,9 @@ class SettingsScreen(QWidget):
             sound_victory_file="victory.mp3",
             available_sound_files=[],
         )
+        self.setObjectName("settingsScreen")
         self._stack = QStackedWidget()
+        self._stack.setObjectName("settingsStack")
         self._hub_page = SettingsHubPage()
         self._app_page = AppSettingsPage()
         self._scanner_page = ScannerSettingsPage()
@@ -63,14 +65,20 @@ class SettingsScreen(QWidget):
         self._theme_page = ThemeSettingsPage()
         self._sound_page = SoundSettingsPage()
         self._status_label = QLabel("")
+        self._status_label.setObjectName("settingsStatusText")
         self._error_label = QLabel("")
+        self._error_label.setObjectName("settingsErrorText")
+        self._error_label.setVisible(False)
         self._register_pages()
         self._connect_pages()
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
         layout.addWidget(self._stack, stretch=1)
         layout.addWidget(self._status_label)
         layout.addWidget(self._error_label)
+        self._apply_styles()
 
     def apply_settings_state(self, state: SettingsUiState) -> None:
         """Обновляет все страницы из состояния пользовательских настроек."""
@@ -81,6 +89,7 @@ class SettingsScreen(QWidget):
         self._sound_page.apply_state(state)
         self._status_label.setText(state.status_message)
         self._error_label.setText(state.error_message)
+        self._error_label.setVisible(bool(state.error_message))
 
     def apply_scanner_state(self, state: ScannerUiState) -> None:
         """Обновляет страницу сканера."""
@@ -200,3 +209,135 @@ class SettingsScreen(QWidget):
                 sound_victory_file=state.sound_victory_file,
             )
         )
+
+    def _apply_styles(self) -> None:
+        """Применяет общий стиль раздела настроек."""
+
+        self.setStyleSheet("""
+            #settingsScreen,
+            #settingsPage,
+            #settingsStack {
+                background: transparent;
+            }
+            #settingsPageHeader,
+            #settingsCard {
+                background: rgba(16, 24, 40, 222);
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 18px;
+            }
+            #settingsPageHeader {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 rgba(33, 52, 76, 238),
+                    stop: 0.56 rgba(18, 32, 48, 235),
+                    stop: 1 rgba(28, 70, 67, 222)
+                );
+            }
+            #settingsPageTitle {
+                color: #f8fbff;
+                font-size: 25px;
+                font-weight: 850;
+                background: transparent;
+            }
+            #settingsPageSubtitle,
+            #settingsMutedText,
+            #settingsStatusText {
+                color: rgba(225, 233, 244, 176);
+                font-size: 13px;
+                background: transparent;
+            }
+            #settingsCardTitle {
+                color: #f8fbff;
+                font-size: 17px;
+                font-weight: 800;
+                background: transparent;
+            }
+            #settingsHubButton {
+                min-height: 86px;
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 18px;
+                padding: 18px 20px;
+                color: #f8fbff;
+                background: rgba(16, 24, 40, 222);
+                font-size: 17px;
+                font-weight: 850;
+                text-align: left;
+            }
+            #settingsHubButton:hover {
+                border: 1px solid rgba(102, 210, 199, 150);
+                background: rgba(23, 39, 57, 235);
+            }
+            #settingsFormRow {
+                background: rgba(255, 255, 255, 22);
+                border: 1px solid rgba(129, 140, 168, 45);
+                border-radius: 14px;
+            }
+            #settingsFormLabel {
+                color: rgba(225, 233, 244, 190);
+                font-size: 13px;
+                font-weight: 750;
+                background: transparent;
+            }
+            #settingsInput,
+            #settingsCombo {
+                min-height: 38px;
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 28);
+                border: 1px solid rgba(129, 140, 168, 70);
+                border-radius: 12px;
+                padding: 0 12px;
+                font-weight: 650;
+            }
+            #settingsInput:focus,
+            #settingsCombo:focus {
+                border: 1px solid rgba(102, 210, 199, 190);
+            }
+            #settingsCheckBox {
+                color: rgba(225, 233, 244, 210);
+                font-size: 13px;
+                font-weight: 700;
+                background: transparent;
+            }
+            #settingsSlider {
+                min-height: 34px;
+                background: transparent;
+            }
+            #settingsPrimaryButton,
+            #settingsSecondaryButton,
+            #settingsDangerButton {
+                min-height: 38px;
+                border: 0;
+                border-radius: 12px;
+                padding: 0 14px;
+                font-weight: 800;
+            }
+            #settingsPrimaryButton {
+                color: #071212;
+                background: #66d2c7;
+            }
+            #settingsSecondaryButton {
+                color: #f8fbff;
+                background: rgba(255, 255, 255, 42);
+            }
+            #settingsDangerButton {
+                color: #fff4f2;
+                background: rgba(227, 85, 78, 190);
+            }
+            #settingsPrimaryButton:disabled,
+            #settingsSecondaryButton:disabled,
+            #settingsDangerButton:disabled {
+                color: rgba(225, 233, 244, 92);
+                background: rgba(255, 255, 255, 22);
+            }
+            #settingsErrorText {
+                color: #ffb4ad;
+                border-radius: 12px;
+                padding: 9px 11px;
+                background: rgba(227, 85, 78, 38);
+                font-weight: 750;
+            }
+            #settingsInlinePicker {
+                background: transparent;
+                border: 0;
+            }
+            """)

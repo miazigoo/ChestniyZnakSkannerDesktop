@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
+from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    create_back_button,
+    create_card,
+    create_form_row,
+    create_page_header,
+)
 from chestniy_znak_desktop.ui.themes.theme import available_themes, theme_by_name
+from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIconName
 
 
 class ThemeSettingsPage(QWidget):
@@ -19,19 +26,41 @@ class ThemeSettingsPage(QWidget):
         """Создает форму выбора темы."""
 
         super().__init__()
+        self.setObjectName("settingsPage")
         self._theme_select = QComboBox()
+        self._theme_select.setObjectName("settingsCombo")
         for theme in available_themes():
             self._theme_select.addItem(theme.title, theme.name)
-        self._save_button = QPushButton("Сохранить тему")
-        self._back_button = QPushButton("Назад к настройкам")
+        self._save_button = QPushButton("Сохранить")
+        self._save_button.setObjectName("settingsPrimaryButton")
+        self._back_button = create_back_button()
         self._save_button.clicked.connect(self._emit_save)
         self._back_button.clicked.connect(self.back_requested.emit)
 
+        header = create_page_header(
+            title="Тема",
+            subtitle="Визуальный стиль рабочего интерфейса.",
+            icon_name=VectorIconName.SETTINGS,
+            icon_color="#8fb8ff",
+        )
+        card, card_layout = create_card(
+            title="Оформление",
+            subtitle="Тема применяется сразу после сохранения.",
+            icon_name=VectorIconName.SHIELD,
+            icon_color="#66d2c7",
+        )
+        card_layout.addWidget(create_form_row("Тема интерфейса", self._theme_select))
+        actions = QHBoxLayout()
+        actions.addWidget(self._save_button)
+        actions.addWidget(self._back_button)
+        actions.addStretch(1)
+        card_layout.addLayout(actions)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Тема"))
-        layout.addWidget(self._theme_select)
-        layout.addWidget(self._save_button)
-        layout.addWidget(self._back_button)
+        layout.setContentsMargins(8, 4, 8, 8)
+        layout.setSpacing(18)
+        layout.addWidget(header)
+        layout.addWidget(card)
         layout.addStretch(1)
 
     def apply_state(self, state: SettingsUiState) -> None:

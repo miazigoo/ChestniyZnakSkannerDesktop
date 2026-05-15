@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
+from chestniy_znak_desktop.ui.screens.settings_pages.common import (
+    create_back_button,
+    create_card,
+    create_form_row,
+    create_page_header,
+)
+from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIconName
 
 
 class AppSettingsPage(QWidget):
@@ -18,21 +25,44 @@ class AppSettingsPage(QWidget):
         """Создает форму основных настроек."""
 
         super().__init__()
+        self.setObjectName("settingsPage")
         self._backend_input = QLineEdit()
+        self._backend_input.setObjectName("settingsInput")
         self._backend_input.setPlaceholderText("Backend URL")
         self._device_input = QLineEdit()
+        self._device_input.setObjectName("settingsInput")
         self._device_input.setPlaceholderText("Device ID")
-        self._save_button = QPushButton("Сохранить основные настройки")
-        self._back_button = QPushButton("Назад к настройкам")
+        self._save_button = QPushButton("Сохранить")
+        self._save_button.setObjectName("settingsPrimaryButton")
+        self._back_button = create_back_button()
         self._save_button.clicked.connect(self._emit_save)
         self._back_button.clicked.connect(self.back_requested.emit)
 
+        header = create_page_header(
+            title="Основные",
+            subtitle="Backend URL и идентификатор рабочего места.",
+            icon_name=VectorIconName.SETTINGS,
+            icon_color="#8fb8ff",
+        )
+        card, card_layout = create_card(
+            title="Подключение",
+            subtitle="Изменения backend URL и Device ID применятся после перезапуска.",
+            icon_name=VectorIconName.LINK,
+            icon_color="#66d2c7",
+        )
+        card_layout.addWidget(create_form_row("Backend URL", self._backend_input))
+        card_layout.addWidget(create_form_row("Device ID", self._device_input))
+        actions = QHBoxLayout()
+        actions.addWidget(self._save_button)
+        actions.addWidget(self._back_button)
+        actions.addStretch(1)
+        card_layout.addLayout(actions)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Основные"))
-        layout.addWidget(self._backend_input)
-        layout.addWidget(self._device_input)
-        layout.addWidget(self._save_button)
-        layout.addWidget(self._back_button)
+        layout.setContentsMargins(8, 4, 8, 8)
+        layout.setSpacing(18)
+        layout.addWidget(header)
+        layout.addWidget(card)
         layout.addStretch(1)
 
     def apply_state(self, state: SettingsUiState) -> None:
