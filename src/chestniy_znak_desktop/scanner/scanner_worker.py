@@ -35,9 +35,9 @@ class ScannerWorker(QObject):
             config=config,
             on_code=self.code_scanned.emit,
             on_error=lambda exc: self.error_occurred.emit(str(exc)),
+            on_started=self.started.emit,
         )
         self._scanner.start()
-        self.started.emit()
 
     def stop(self) -> None:
         """Останавливает активный источник сканов."""

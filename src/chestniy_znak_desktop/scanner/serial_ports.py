@@ -14,6 +14,12 @@ def list_serial_ports() -> list[ScannerPort]:
 
     ports_by_device: dict[str, ScannerPort] = {}
     for port in list_ports.comports():
+        if _is_phantom_linux_ttys(
+            device=str(port.device),
+            description=str(port.description or ""),
+            hwid=str(port.hwid or ""),
+        ):
+            continue
         scanner_port = ScannerPort(
             device=str(port.device),
             description=str(port.description or port.device),
@@ -39,6 +45,16 @@ def _rfcomm_device_paths() -> list[Path]:
     """Возвращает Linux rfcomm-устройства для Bluetooth SPP-сканеров."""
 
     return sorted(Path("/dev").glob("rfcomm*"))
+
+
+def _is_phantom_linux_ttys(*, device: str, description: str, hwid: str) -> bool:
+    """Проверяет фантомные Linux ttyS-порты, которые не являются сканерами."""
+
+    return (
+        device.startswith("/dev/ttyS")
+        and description.strip().lower() in {"", "n/a"}
+        and hwid.strip().lower() in {"", "n/a"}
+    )
 
 
 def _port_priority(port: ScannerPort) -> int:

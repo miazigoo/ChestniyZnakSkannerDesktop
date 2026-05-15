@@ -39,6 +39,7 @@ def test_serial_scanner_reads_code_from_fake_port() -> None:
     """Проверяет чтение готового кода из fake serial-порта."""
 
     ready = threading.Event()
+    started = threading.Event()
     received: list[str] = []
     fake = FakeSerial([b"C", b"O", b"D", b"E", b"\r"])
 
@@ -56,12 +57,36 @@ def test_serial_scanner_reads_code_from_fake_port() -> None:
     scanner = SerialScanner(
         ScannerConfig(port="COM7", timeout_sec=0.01),
         on_code=on_code,
+        on_started=started.set,
         serial_factory=serial_factory,
     )
     scanner.start()
+    assert started.wait(timeout=1.0)
     assert ready.wait(timeout=1.0)
     scanner.stop()
     assert received == ["CODE"]
+
+
+def test_serial_scanner_emits_started_after_port_is_open() -> None:
+    """Проверяет сигнал старта только после успешного открытия порта."""
+
+    started = threading.Event()
+    fake = FakeSerial([])
+
+    def serial_factory(**kwargs) -> FakeSerial:  # type: ignore[no-untyped-def]
+        """Возвращает fake serial вместо настоящего порта."""
+
+        return fake
+
+    scanner = SerialScanner(
+        ScannerConfig(port="COM7", timeout_sec=0.01),
+        on_code=lambda code: None,
+        on_started=started.set,
+        serial_factory=serial_factory,
+    )
+    scanner.start()
+    assert started.wait(timeout=1.0)
+    scanner.stop()
 
 
 def test_serial_scanner_reports_open_error() -> None:
@@ -85,6 +110,7 @@ def test_serial_scanner_reports_open_error() -> None:
         ScannerConfig(port="COM404", timeout_sec=0.01),
         on_code=lambda code: None,
         on_error=on_error,
+        on_started=lambda: errors.append("started"),
         serial_factory=serial_factory,
     )
     scanner.start()

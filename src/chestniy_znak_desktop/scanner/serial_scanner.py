@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -25,6 +26,7 @@ class SerialLike(Protocol):
 
 
 SerialFactory = Callable[..., SerialLike]
+logger = logging.getLogger(__name__)
 
 
 class SerialScanner:
@@ -35,6 +37,7 @@ class SerialScanner:
         config: ScannerConfig,
         on_code: Callable[[str], None],
         on_error: Callable[[Exception], None] | None = None,
+        on_started: Callable[[], None] | None = None,
         serial_factory: SerialFactory | None = None,
     ) -> None:
         """Создает сканер с callback для готовых кодов."""
@@ -42,6 +45,7 @@ class SerialScanner:
         self._config = config
         self._on_code = on_code
         self._on_error = on_error
+        self._on_started = on_started
         self._serial_factory = serial_factory or serial.Serial
         self._assembler = ScanAssembler(
             ScanAssemblerConfig(
@@ -77,11 +81,20 @@ class SerialScanner:
         """Открывает порт и читает байты до терминатора строки."""
 
         try:
+            logger.info(
+                "Serial scanner opening port=%s baudrate=%s timeout=%s",
+                self._config.port,
+                self._config.baudrate,
+                self._config.timeout_sec,
+            )
             self._serial = self._serial_factory(
                 port=self._config.port,
                 baudrate=self._config.baudrate,
                 timeout=self._config.timeout_sec,
             )
+            logger.info("Serial scanner opened port=%s", self._config.port)
+            if self._on_started is not None:
+                self._on_started()
             while not self._stop_event.is_set():
                 chunk = self._serial.read(1)
                 if chunk:
@@ -92,6 +105,7 @@ class SerialScanner:
                     self._on_code(code)
         except Exception as exc:  # pragma: no cover - защитный слой вокруг внешнего порта.
             if not self._stop_event.is_set() and self._on_error is not None:
+                logger.exception("Serial scanner failed port=%s", self._config.port)
                 self._on_error(exc)
 
     def _emit_codes(self, codes: list[str]) -> None:

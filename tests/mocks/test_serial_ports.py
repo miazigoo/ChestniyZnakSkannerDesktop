@@ -86,4 +86,28 @@ def test_list_serial_ports_prefers_rfcomm_for_autostart(  # type: ignore[no-unty
 
     ports = serial_ports.list_serial_ports()
 
-    assert [port.device for port in ports] == ["/dev/rfcomm0", "/dev/ttyS0"]
+    assert [port.device for port in ports] == ["/dev/rfcomm0"]
+
+
+def test_list_serial_ports_skips_phantom_linux_ttys(  # type: ignore[no-untyped-def]
+    monkeypatch,
+) -> None:
+    """Проверяет фильтрацию фантомных ttyS, которые дают I/O error."""
+
+    monkeypatch.setattr(
+        serial_ports.list_ports,
+        "comports",
+        lambda: [
+            SimpleNamespace(device="/dev/ttyS3", description="n/a", hwid="n/a"),
+            SimpleNamespace(
+                device="/dev/ttyUSB0",
+                description="USB Serial",
+                hwid="USB",
+            ),
+        ],
+    )
+    monkeypatch.setattr(serial_ports, "_rfcomm_device_paths", lambda: [])
+
+    ports = serial_ports.list_serial_ports()
+
+    assert [port.device for port in ports] == ["/dev/ttyUSB0"]
