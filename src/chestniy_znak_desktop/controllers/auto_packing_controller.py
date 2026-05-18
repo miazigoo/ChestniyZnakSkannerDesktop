@@ -395,7 +395,7 @@ class AutoPackingController(QObject):
         self._active_scan_code = ""
         verify = self._expect(result, VerifyExistsResponseDto)
         if not verify.ok or not verify.exists or verify.code is None:
-            if verify.code is not None and self._box_contains_code(verify.code.id):
+            if self._is_current_box_duplicate_response(verify):
                 self._set_state(
                     replace(
                         self._state,
@@ -723,6 +723,14 @@ class AutoPackingController(QObject):
         if self._state.current_box is None:
             return False
         return any(item.code_id == code_id for item in self._state.current_box.items)
+
+    def _is_current_box_duplicate_response(self, verify: VerifyExistsResponseDto) -> bool:
+        """Проверяет, что backend сообщил об уже добавленном коде текущей коробки."""
+
+        if verify.code is not None and self._box_contains_code(verify.code.id):
+            return True
+        message = (verify.message or "").lower()
+        return verify.status == "DUPLICATE_SCAN" and "текущей коробке" in message
 
     def _box_contains_visible_code(self, code: str) -> bool:
         """Проверяет raw-совпадение с кодами, уже показанными в текущей коробке."""

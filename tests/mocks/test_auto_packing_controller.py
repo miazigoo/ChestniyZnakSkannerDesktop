@@ -481,6 +481,51 @@ def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
     assert controller.state.pending_count == 1
 
 
+def test_auto_packing_treats_current_box_ws_duplicate_as_noop(tmp_path) -> None:
+    """Проверяет идемпотентный пропуск server-дубля текущей коробки."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    ws_verifier = FakeWsVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        ws_verify_service=ws_verifier,
+    )
+    controller.open_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+    result = VerifyExistsResponseDto(
+        ok=False,
+        exists=True,
+        status="DUPLICATE_SCAN",
+        message="Код уже лежит в текущей коробке",
+        order_name="26-0001/0001",
+        code=RemoteCodeDto(
+            id=777,
+            gtin="04646151697261",
+            serial="SERIAL777",
+            visible_code="CODE1",
+            order_dnp_name="26-0001/0001",
+        ),
+    )
+    ws_verifier.verified.emit("ws-1", "CODE1", result)
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == []
+    assert controller.state.error_message == ""
+    assert controller.state.result_message == "Повторный скан пропущен"
+
+
 def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
     """Проверяет, что быстрый дубль raw-кода не попадает в очередь."""
 
