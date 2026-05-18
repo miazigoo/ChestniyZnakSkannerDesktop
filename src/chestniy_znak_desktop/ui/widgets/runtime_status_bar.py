@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+from chestniy_znak_desktop import __version__
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 
 
@@ -17,7 +18,13 @@ class RuntimeStatusBar(QWidget):
         self._connection_label = QLabel("Связь: остановлена")
         self._session_label = QLabel("Сессия: неизвестно")
         self._scanner_label = QLabel("Сканер: остановлен")
-        for label in (self._connection_label, self._session_label, self._scanner_label):
+        self._version_label = QLabel(f"Версия: v{__version__}")
+        for label in (
+            self._connection_label,
+            self._session_label,
+            self._scanner_label,
+            self._version_label,
+        ):
             label.setWordWrap(True)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 6, 12, 6)
@@ -26,6 +33,8 @@ class RuntimeStatusBar(QWidget):
         layout.addWidget(self._session_label)
         layout.addStretch(1)
         layout.addWidget(self._scanner_label)
+        layout.addStretch(1)
+        layout.addWidget(self._version_label)
 
     def update_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет тексты панели из runtime snapshot."""

@@ -730,6 +730,7 @@ def test_runtime_status_bar_accepts_snapshot() -> None:
         )
     )
     assert widget is not None
+    assert widget._version_label.text() == "Версия: v1.0.0"  # noqa: SLF001
 
 
 def test_blocking_overlay_changes_visibility() -> None:
