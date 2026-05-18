@@ -54,6 +54,7 @@ PySide6 нужны Windows wheels и Windows Qt DLL.
 - Python 3.11 x64. При установке включить `Add python.exe to PATH`.
 - Доступ к интернету для установки зависимостей через `pip`.
 - PowerShell от обычного пользователя. Администратор не нужен.
+- Inno Setup 6, если нужен установщик `setup.exe`.
 - Опционально: Microsoft Visual C++ Redistributable 2015-2022 x64, если на
   целевом ПК еще не стоит runtime для приложений на C++.
 
@@ -101,7 +102,7 @@ py -3.11 -m venv .venv
 
 ### Сборка
 
-Запустить сборку:
+Запустить сборку portable-папки:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_windows.py
@@ -116,6 +117,53 @@ dist\ChestniyZnakDesktop\ChestniyZnakDesktop.exe
 Сборка использует `packaging/chestniy_znak_desktop.spec`, кладет результат в
 `dist/ChestniyZnakDesktop/` и включает runtime-ресурсы приложения: звуки,
 иконки и Qt-модули для WebSocket/Multimedia.
+
+### Сборка установщика setup.exe
+
+Установить Inno Setup 6:
+
+```text
+https://jrsoftware.org/isinfo.php
+```
+
+При установке можно оставить параметры по умолчанию. Скрипт сборки сам ищет
+`ISCC.exe` в `PATH` и в стандартной папке `Program Files`.
+
+Собрать приложение и установщик одной командой:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_windows_installer.py
+```
+
+Команда делает три шага:
+
+- собирает приложение через PyInstaller в `dist\ChestniyZnakDesktop\`;
+- рендерит векторные SVG-картинки установщика в BMP для Inno Setup;
+- компилирует `setup.exe` через `packaging\windows_installer.iss`.
+
+Готовый установщик появится здесь:
+
+```text
+installer\ChestniyZnakDesktopSetup-0.1.0.exe
+```
+
+Установщик делает:
+
+- установку в `C:\Program Files\ChestniyZnakDesktop`;
+- ярлык в меню Пуск;
+- опциональный ярлык на рабочем столе;
+- запись uninstall в Windows;
+- запуск приложения после установки, если пользователь оставит галочку.
+
+Картинки мастера установки лежат в векторном виде:
+
+```text
+packaging\installer_assets\installer_wizard.svg
+packaging\installer_assets\installer_small.svg
+```
+
+BMP-файлы рядом с ними генерируются автоматически при сборке установщика и не
+нужны в git.
 
 ### Проверка собранного приложения
 
@@ -204,3 +252,6 @@ COM-порт не виден:
 
 Папки `build/` и `dist/` не коммитятся. Это артефакты сборки, они уже
 исключены в `.gitignore`.
+
+Папка `installer/` тоже не коммитится. Готовый `setup.exe` является артефактом
+сборки.

@@ -8,6 +8,11 @@ from pathlib import Path
 import pytest
 
 from scripts.build_windows import build_command, ensure_windows_platform, project_root
+from scripts.build_windows_installer import (
+    build_installer_command,
+    installer_output_dir,
+    installer_script_path,
+)
 
 
 def test_build_script_points_to_project_root() -> None:
@@ -47,3 +52,33 @@ def test_build_script_rejects_non_windows_runtime(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(RuntimeError, match="Windows .exe"):
         ensure_windows_platform()
+
+
+def test_inno_setup_script_is_present() -> None:
+    """Проверяет наличие Inno Setup script и установочных картинок."""
+
+    root = project_root()
+    script_text = installer_script_path(root).read_text(encoding="utf-8")
+
+    assert "ChestniyZnakDesktopSetup" in script_text
+    assert "WizardImageFile=installer_assets\\installer_wizard.bmp" in script_text
+    assert "WizardSmallImageFile=installer_assets\\installer_small.bmp" in script_text
+    assert 'Source: "{#MyBuildDir}\\*"' in script_text
+    assert (root / "packaging" / "installer_assets" / "installer_wizard.svg").is_file()
+    assert (root / "packaging" / "installer_assets" / "installer_small.svg").is_file()
+
+
+def test_inno_setup_command_uses_iss_script() -> None:
+    """Проверяет команду запуска Inno Setup Compiler."""
+
+    root = project_root()
+    command = build_installer_command(root, "ISCC.exe")
+
+    assert command[0] == "ISCC.exe"
+    assert Path(command[1]) == root / "packaging" / "windows_installer.iss"
+
+
+def test_installer_output_dir_points_to_project_artifact() -> None:
+    """Проверяет папку выходного установщика."""
+
+    assert installer_output_dir(project_root()).name == "installer"

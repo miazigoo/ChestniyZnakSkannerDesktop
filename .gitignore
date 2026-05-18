@@ -27,8 +27,10 @@ htmlcov/
 # Сборка и артефакты PyInstaller
 build/
 dist/
+installer/
 *.spec
 !packaging/*.spec
+packaging/installer_assets/*.bmp
 
 # Логи, временные файлы и локальные данные приложения
 *.log
