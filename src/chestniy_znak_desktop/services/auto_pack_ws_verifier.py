@@ -38,6 +38,7 @@ class AutoPackWsVerifier(QObject):
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        box_id: int | None = None,
     ) -> str | None:
         """Отправляет WS-запрос проверки и возвращает request_id."""
 
@@ -50,6 +51,8 @@ class AutoPackWsVerifier(QObject):
             "allow_duplicate": allow_duplicate,
             "save_scan": True,
         }
+        if box_id is not None:
+            payload["box_id"] = box_id
         if not self._connection_monitor.send_json(payload):
             return None
         self._pending_codes[request_id] = code

@@ -52,6 +52,7 @@ class PackingItemUi:
     gtin: str
     serial: str
     visible_code: str
+    code_id: int = 0
 
 
 @dataclass(frozen=True, slots=True)

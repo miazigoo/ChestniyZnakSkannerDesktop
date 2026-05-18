@@ -116,17 +116,18 @@ class FakeWsVerifyService:
 
         self.verified = FakeSignal()
         self.failed = FakeSignal()
-        self.calls: list[str] = []
+        self.calls: list[tuple[str, int | None]] = []
 
     def verify_exists(
         self,
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        box_id: int | None = None,
     ) -> str | None:
         """Запоминает WS-запрос и возвращает request_id."""
 
-        self.calls.append(code)
+        self.calls.append((code, box_id))
         return f"ws-{len(self.calls)}"
 
 
@@ -192,6 +193,7 @@ class FakeVerifyService:
         """Создает счетчик проверок."""
 
         self.calls: list[str] = []
+        self._ids_by_code: dict[str, int] = {}
 
     def verify_exists(
         self,
@@ -202,6 +204,7 @@ class FakeVerifyService:
         """Возвращает успешную проверку с одним заказом."""
 
         self.calls.append(code)
+        code_id = self._ids_by_code.setdefault(code, len(self._ids_by_code) + 1)
         return VerifyExistsResponseDto(
             ok=True,
             exists=True,
@@ -209,9 +212,9 @@ class FakeVerifyService:
             message="Код найден",
             order_name="26-0001/0001",
             code=RemoteCodeDto(
-                id=len(self.calls),
+                id=code_id,
                 gtin="04646151697261",
-                serial=f"SERIAL{len(self.calls)}",
+                serial=f"SERIAL{code_id}",
                 visible_code=code,
                 order_dnp_name="26-0001/0001",
             ),
@@ -425,7 +428,7 @@ def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
 
     controller.on_code_scanned("CODE1")
 
-    assert ws_verifier.calls == ["CODE1"]
+    assert ws_verifier.calls == [("CODE1", 1)]
     assert verifier.calls == []
     assert controller.state.is_busy is True
 
@@ -476,6 +479,67 @@ def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
 
     assert verifier.calls == ["CODE1"]
     assert controller.state.pending_count == 1
+
+
+def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
+    """Проверяет, что быстрый дубль raw-кода не попадает в очередь."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    runner = ManualTaskRunner()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=runner,
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+    controller.open_box()
+    runner.run_next()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+    controller.on_code_scanned("CODE1")
+
+    assert "Дубль" in controller.state.error_message
+    runner.run_next()
+
+    assert verifier.calls == ["CODE1"]
+    assert controller.state.pending_count == 1
+    assert len(runner.tasks) == 0
+
+
+def test_auto_packing_rejects_code_already_in_current_box(tmp_path) -> None:
+    """Проверяет локальный отказ, если код уже виден в текущей коробке."""
+
+    service = FakePackingService()
+    service.current_box_result = _detail_box(items_count=1)
+    verifier = FakeVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+    controller.refresh_current_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE1")
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == []
+    assert "текущей коробке" in controller.state.status_message
 
 
 def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
