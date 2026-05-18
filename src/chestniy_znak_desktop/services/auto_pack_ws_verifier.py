@@ -49,7 +49,7 @@ class AutoPackWsVerifier(QObject):
             "code": code,
             "scanner_id": scanner_id,
             "allow_duplicate": allow_duplicate,
-            "save_scan": True,
+            "save_scan": False,
         }
         if box_id is not None:
             payload["box_id"] = box_id

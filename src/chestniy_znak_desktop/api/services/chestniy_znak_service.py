@@ -40,6 +40,7 @@ class ChestniyZnakService:
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        save_scan: bool = True,
     ) -> VerifyExistsResponseDto:
         """Проверяет существование DataMatrix-кода в базе."""
 
@@ -49,7 +50,7 @@ class ChestniyZnakService:
                 "code": code,
                 "scanner_id": scanner_id,
                 "allow_duplicate": allow_duplicate,
-                "save_scan": True,
+                "save_scan": save_scan,
             },
         )
         return VerifyExistsResponseDto.model_validate(payload)

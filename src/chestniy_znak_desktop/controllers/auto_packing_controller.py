@@ -50,6 +50,7 @@ class AutoPackingVerifier(Protocol):
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        save_scan: bool = True,
     ) -> VerifyExistsResponseDto:
         """Проверяет код по backend перед добавлением в локальный бокс."""
 
@@ -369,6 +370,7 @@ class AutoPackingController(QObject):
                 code=code,
                 scanner_id=self._scanner_id,
                 allow_duplicate=True,
+                save_scan=False,
             ),
             lambda result: self._on_verify_result(result, code),
             self._on_error,

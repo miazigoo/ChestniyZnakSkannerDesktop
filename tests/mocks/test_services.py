@@ -224,6 +224,31 @@ def test_chestniy_znak_service_verify_exists() -> None:
     )
 
 
+def test_chestniy_znak_service_verify_exists_can_skip_scan_save() -> None:
+    """Проверяет проверку существования без сохранения scan."""
+
+    client = FakeApiClient()
+    ChestniyZnakService(client).verify_exists(
+        "code",
+        "desktop-com",
+        save_scan=False,
+    )
+
+    assert client.last_call == (
+        "POST",
+        "chestniy-znak/verify/exists",
+        {
+            "json": {
+                "code": "code",
+                "scanner_id": "desktop-com",
+                "allow_duplicate": True,
+                "save_scan": False,
+            },
+            "params": None,
+        },
+    )
+
+
 def test_chestniy_znak_service_verify() -> None:
     """Проверяет маппинг полной проверки кода."""
 

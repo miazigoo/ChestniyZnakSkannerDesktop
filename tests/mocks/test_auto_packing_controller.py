@@ -200,6 +200,7 @@ class FakeVerifyService:
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        save_scan: bool = True,
     ) -> VerifyExistsResponseDto:
         """Возвращает успешную проверку с одним заказом."""
 
@@ -721,6 +722,7 @@ def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None
         code: str,
         scanner_id: str,
         allow_duplicate: bool = True,
+        save_scan: bool = True,
     ) -> VerifyExistsResponseDto:
         """Возвращает проверку кода другого заказа."""
 
