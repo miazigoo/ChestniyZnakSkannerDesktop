@@ -303,7 +303,7 @@ class PackingController(QObject):
             PackingUiState(
                 current_box=self._box_with_count_in_packing(count_in_packing),
                 status_message="Учет коробки обновлен",
-                result_message=message,
+                result_message=self._count_in_packing_message(count_in_packing),
                 last_scanned_code=self._state.last_scanned_code,
                 count_in_packing=count_in_packing,
             )
@@ -470,6 +470,14 @@ class PackingController(QObject):
             print_error=self._state.current_box.print_error,
             items=self._state.current_box.items,
         )
+
+    @staticmethod
+    def _count_in_packing_message(enabled: bool) -> str:
+        """Возвращает понятный оператору текст режима учета коробки."""
+
+        if enabled:
+            return "Коробка учитывается в упаковке"
+        return "Коробка не учитывается в упаковке"
 
     @staticmethod
     def _item_to_ui(item: BoxItemDto) -> PackingItemUi:

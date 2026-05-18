@@ -183,6 +183,7 @@ def test_packing_controller_updates_count_flag_for_open_box() -> None:
     assert controller.state.current_box.count_in_packing is False
     assert controller.state.count_in_packing is False
     assert controller.state.status_message == "Учет коробки обновлен"
+    assert controller.state.result_message == "Коробка не учитывается в упаковке"
 
 
 def test_packing_controller_warns_when_scan_without_box() -> None:

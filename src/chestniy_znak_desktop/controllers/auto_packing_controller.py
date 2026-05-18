@@ -732,7 +732,7 @@ class AutoPackingController(QObject):
                 current_box=self._box_with_count_in_packing(count_in_packing),
                 count_in_packing=count_in_packing,
                 status_message="Учет коробки обновлен",
-                result_message=message,
+                result_message=self._count_in_packing_message(count_in_packing),
                 error_message="",
             )
         )
@@ -859,6 +859,14 @@ class AutoPackingController(QObject):
         if self._state.current_box is None:
             return None
         return replace(self._state.current_box, count_in_packing=count_in_packing)
+
+    @staticmethod
+    def _count_in_packing_message(enabled: bool) -> str:
+        """Возвращает понятный оператору текст режима учета коробки."""
+
+        if enabled:
+            return "Коробка учитывается в упаковке"
+        return "Коробка не учитывается в упаковке"
 
     def _set_state(self, state: AutoPackingUiState) -> None:
         """Сохраняет и публикует состояние автосканера."""

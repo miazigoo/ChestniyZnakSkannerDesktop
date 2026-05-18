@@ -455,6 +455,7 @@ def test_auto_packing_updates_count_flag_for_open_box(tmp_path) -> None:
     assert controller.state.current_box.count_in_packing is False
     assert controller.state.count_in_packing is False
     assert controller.state.status_message == "Учет коробки обновлен"
+    assert controller.state.result_message == "Коробка не учитывается в упаковке"
 
 
 def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
