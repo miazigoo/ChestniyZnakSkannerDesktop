@@ -9,6 +9,7 @@ from chestniy_znak_desktop.api.models.packing import (
     BoxDetailDto,
     BoxDto,
     BoxItemDto,
+    CloseBoxResultDto,
     OpenBoxResultDto,
     ScanBatchToBoxResultDto,
 )
@@ -139,6 +140,7 @@ class FakePackingService:
 
         self.current_box_result: BoxDetailDto | None = None
         self.batch_calls: list[tuple[int, list[str], str]] = []
+        self.close_calls: list[tuple[int, str]] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую коробку."""
@@ -183,6 +185,17 @@ class FakePackingService:
             reason_code="batch_added",
             added=len(codes),
             box=_box(filled=len(codes)),
+        )
+
+    def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
+        """Запоминает закрытие коробки и возвращает успешный результат."""
+
+        self.close_calls.append((box_id, device_id))
+        return CloseBoxResultDto(
+            ok=True,
+            reason_code="box_closed",
+            box=_box(filled=12, capacity=12),
+            print_ok=True,
         )
 
 
@@ -381,6 +394,23 @@ def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path) -> None:
         )
     ]
     assert sounds.events == [SoundEvent.OK]
+
+
+def test_auto_packing_closes_current_box(tmp_path) -> None:
+    """Проверяет закрытие текущей коробки из сценария автоскана."""
+
+    controller, service, _verifier, sounds = _controller_pair(tmp_path)
+    events = []
+    controller.close_completed.connect(events.append)
+    controller.open_box()
+
+    controller.close_current_box()
+
+    assert service.close_calls == [(1, "pc-1")]
+    assert controller.state.current_box is None
+    assert len(events) == 1
+    assert events[0].ok is True
+    assert sounds.events == [SoundEvent.VICTORY]
 
 
 def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:

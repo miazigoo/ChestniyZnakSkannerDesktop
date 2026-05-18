@@ -115,6 +115,7 @@ class AppWindow(QMainWindow):
         self._auto_packing_controller.state_changed.connect(
             self._main_screen.auto_packing_screen.apply_state
         )
+        self._auto_packing_controller.close_completed.connect(self._handle_auto_box_close_completed)
         self._box_lookup_controller.state_changed.connect(
             self._main_screen.box_lookup_screen.apply_state
         )
@@ -192,6 +193,9 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.auto_packing_screen.open_box_requested.connect(
             self._auto_packing_controller.open_box
+        )
+        self._main_screen.auto_packing_screen.close_box_requested.connect(
+            self._request_auto_close_current_box
         )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending
@@ -413,6 +417,28 @@ class AppWindow(QMainWindow):
         ):
             self._auto_packing_controller.delete_current_box()
 
+    def _request_auto_close_current_box(self) -> None:
+        """Запрашивает закрытие текущей коробки автоскана."""
+
+        state = self._auto_packing_controller.state
+        box = state.current_box
+        if state.is_busy:
+            self._show_message("Операция выполняется", state.status_message)
+            return
+        if box is None:
+            self._show_message("Коробка не открыта", "Сначала откройте коробку.")
+            return
+        if state.pending_items:
+            self._show_message(
+                "Локальный бокс не пуст",
+                "Сначала отправьте заполненный автоскана-бокс или очистите его.",
+            )
+            return
+        if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
+            return
+        self._show_close_progress_dialog()
+        self._auto_packing_controller.close_current_box()
+
     def _confirm_action(self, title: str, text: str) -> bool:
         """Показывает подтверждение опасного действия."""
 
@@ -435,6 +461,17 @@ class AppWindow(QMainWindow):
         dialog.open()
         if event.ok:
             self._packing_controller.open_box()
+
+    def _handle_auto_box_close_completed(self, event: CloseBoxUiEvent) -> None:
+        """Показывает результат закрытия автоскана и открывает новую коробку."""
+
+        self._hide_close_progress_dialog()
+        dialog = CloseBoxDialog(event, self)
+        self._close_box_dialogs.append(dialog)
+        dialog.finished.connect(lambda _code, dialog=dialog: self._forget_close_dialog(dialog))
+        dialog.open()
+        if event.ok:
+            self._auto_packing_controller.open_box()
 
     def _handle_box_changed(self, box_id: int) -> None:
         """Обновляет список и карточку после редактирования коробки."""

@@ -11,13 +11,18 @@ from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
+    CloseBoxResultDto,
     OpenBoxResultDto,
     ScanBatchToBoxResultDto,
 )
 from chestniy_znak_desktop.api.models.verify import VerifyExistsResponseDto
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
-from chestniy_znak_desktop.controllers.packing_controller import PackingBoxUi, PackingItemUi
+from chestniy_znak_desktop.controllers.packing_controller import (
+    CloseBoxUiEvent,
+    PackingBoxUi,
+    PackingItemUi,
+)
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -40,6 +45,9 @@ class AutoPackingBackend(Protocol):
         scanner_id: str,
     ) -> ScanBatchToBoxResultDto:
         """Атомарно добавляет пачку кодов в коробку."""
+
+    def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
+        """Закрывает коробку."""
 
 
 class AutoPackingVerifier(Protocol):
@@ -133,6 +141,7 @@ class AutoPackingController(QObject):
     """Копит коды мультиплаты и отправляет заполненную пачку в коробку."""
 
     state_changed = Signal(AutoPackingUiState)
+    close_completed = Signal(CloseBoxUiEvent)
 
     def __init__(
         self,
@@ -199,6 +208,22 @@ class AutoPackingController(QObject):
             lambda: self._packing_service.open_box(device_id=self._device_id),
             self._on_box_opened,
             self._on_error,
+        )
+
+    def close_current_box(self) -> None:
+        """Закрывает текущую открытую коробку автоскана."""
+
+        if self._state.is_busy or self._state.current_box is None:
+            return
+        box_id = self._state.current_box.box_id
+        self._set_busy("Закрываем коробку и ждем печать этикетки...")
+        self._task_runner.submit(
+            lambda: self._packing_service.close_box(
+                box_id=box_id,
+                device_id=self._device_id,
+            ),
+            self._on_box_closed,
+            self._on_close_error,
         )
 
     def set_codes_per_item(self, value: int) -> None:
@@ -648,6 +673,48 @@ class AutoPackingController(QObject):
         )
         self._forget_accepted_codes()
 
+    def _on_box_closed(self, result: object) -> None:
+        """Обрабатывает результат закрытия коробки автоскана."""
+
+        closed = self._expect(result, CloseBoxResultDto)
+        self._play(SoundEvent.VICTORY if closed.ok else SoundEvent.ERROR)
+        message = closed.error or closed.print_error or closed.reason_code
+        event = self._close_event(closed)
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                current_box=None if closed.ok else self._box_to_ui(closed.box),
+                status_message="Коробка закрыта" if closed.ok else "Коробка не закрыта",
+                result_message=message,
+                error_message="" if closed.ok else message,
+            )
+        )
+        if closed.ok:
+            self._forget_accepted_codes()
+        self.close_completed.emit(event)
+
+    def _on_close_error(self, exc: Exception) -> None:
+        """Обрабатывает ошибку закрытия коробки и публикует модалку."""
+
+        current_box = self._state.current_box
+        self._on_error(exc)
+        if current_box is None:
+            return
+        self.close_completed.emit(
+            CloseBoxUiEvent(
+                ok=False,
+                box_id=current_box.box_id,
+                sscc=current_box.sscc,
+                filled=current_box.filled,
+                capacity=current_box.capacity,
+                is_full=current_box.filled >= current_box.capacity,
+                title="Коробка не закрыта",
+                message="Не удалось закрыть коробку",
+                error_message=str(exc),
+            )
+        )
+
     def _on_current_box_loaded(self, result: object) -> None:
         """Обрабатывает загрузку текущей коробки."""
 
@@ -921,6 +988,36 @@ class AutoPackingController(QObject):
         if single_code:
             rejected_codes.add(single_code)
         return rejected_codes
+
+    @staticmethod
+    def _close_event(result: CloseBoxResultDto) -> CloseBoxUiEvent:
+        """Преобразует backend-результат закрытия в UI-событие."""
+
+        box = result.box
+        is_full = box.filled >= box.capacity
+        print_error = result.print_error or ""
+        if result.ok and result.print_ok is False and print_error:
+            title = "Коробка закрыта, печать с ошибкой"
+            message = print_error
+        elif result.ok:
+            title = "Коробка закрыта"
+            message = f"Коробка #{box.box_id} закрыта"
+        else:
+            title = "Коробка не закрыта"
+            message = result.error or print_error or "Не удалось закрыть коробку"
+        return CloseBoxUiEvent(
+            ok=result.ok,
+            box_id=box.box_id,
+            sscc=box.sscc or "",
+            filled=box.filled,
+            capacity=box.capacity,
+            is_full=is_full,
+            title=title,
+            message=message,
+            error_message="" if result.ok else message,
+            print_ok=result.print_ok,
+            print_error=print_error,
+        )
 
     @staticmethod
     def _box_to_ui(box: BoxDto | BoxDetailDto) -> PackingBoxUi:
