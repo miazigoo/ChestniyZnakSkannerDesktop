@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules
+
 
 PROJECT_ROOT = Path(SPECPATH).parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
@@ -26,6 +28,10 @@ hiddenimports = [
     "PySide6.QtWidgets",
     "serial.tools.list_ports",
 ]
+hiddenimports += collect_submodules("anyio")
+hiddenimports += collect_submodules("httpcore")
+hiddenimports += collect_submodules("httpx")
+hiddenimports += collect_submodules("pydantic")
 
 a = Analysis(
     [str(ENTRYPOINT)],

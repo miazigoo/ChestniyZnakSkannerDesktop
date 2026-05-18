@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from scripts.build_windows import build_command, ensure_windows_platform, project_root
+from scripts import build_windows
+from scripts.build_windows import (
+    build_command,
+    ensure_required_modules,
+    ensure_windows_platform,
+    project_root,
+)
 from scripts.build_windows_installer import (
     build_installer_command,
     installer_output_dir,
@@ -42,6 +49,8 @@ def test_pyinstaller_spec_keeps_runtime_resources() -> None:
     assert "PySide6.QtWebSockets" in spec_text
     assert "PySide6.QtMultimedia" in spec_text
     assert "serial.tools.list_ports" in spec_text
+    assert 'collect_submodules("httpx")' in spec_text
+    assert 'collect_submodules("pydantic")' in spec_text
     assert "console=False" in spec_text
 
 
@@ -52,6 +61,24 @@ def test_build_script_rejects_non_windows_runtime(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(RuntimeError, match="Windows .exe"):
         ensure_windows_platform()
+
+
+def test_build_script_reports_missing_runtime_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Проверяет понятную ошибку, если сборка запущена без зависимостей."""
+
+    def fake_find_spec(module_name: str) -> object | None:
+        """Имитирует отсутствие httpx в окружении сборки."""
+
+        if module_name == "httpx":
+            return None
+        return SimpleNamespace()
+
+    monkeypatch.setattr(build_windows.importlib.util, "find_spec", fake_find_spec)
+
+    with pytest.raises(RuntimeError, match="httpx"):
+        ensure_required_modules()
 
 
 def test_inno_setup_script_is_present() -> None:

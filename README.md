@@ -51,7 +51,8 @@ PySide6 нужны Windows wheels и Windows Qt DLL.
 ### Требования
 
 - Windows 10/11 x64 или Windows Server x64.
-- Python 3.11 x64. При установке включить `Add python.exe to PATH`.
+- Python 3.11+ x64. На Python 3.14 можно пробовать сборку, если `pip`
+  смог поставить Windows wheels для PySide6 и PyInstaller.
 - Доступ к интернету для установки зависимостей через `pip`.
 - PowerShell от обычного пользователя. Администратор не нужен.
 - Inno Setup 6, если нужен установщик `setup.exe`.
@@ -61,8 +62,8 @@ PySide6 нужны Windows wheels и Windows Qt DLL.
 Проверка Python:
 
 ```powershell
-py -3.11 --version
-py -3.11 -c "import struct; print(struct.calcsize('P') * 8)"
+py -3.14 --version
+py -3.14 -c "import struct; print(struct.calcsize('P') * 8)"
 ```
 
 Вторая команда должна вывести `64`.
@@ -78,7 +79,7 @@ cd C:\path\to\ChestniyZnakDescktop
 Создать виртуальное окружение:
 
 ```powershell
-py -3.11 -m venv .venv
+py -3.14 -m venv .venv
 ```
 
 Обновить `pip`:
@@ -90,15 +91,24 @@ py -3.11 -m venv .venv
 Поставить зависимости для сборки:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[build]"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Для полной локальной проверки перед сборкой можно поставить dev-зависимости:
+Проверить, что зависимости поставились именно в это окружение:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,build]"
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -c "import httpx, pydantic, serial, PySide6, PyInstaller; print('deps ok')"
+```
+
+Для полной локальной проверки перед сборкой:
+
+```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
+
+Если на Python 3.14 `pip` не найдет wheels для PySide6/PyInstaller, нужно
+поставить Python 3.11/3.12 x64, удалить `.venv` и повторить шаги подготовки.
 
 ### Сборка
 
