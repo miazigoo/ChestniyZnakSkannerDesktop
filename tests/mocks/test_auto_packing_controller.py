@@ -633,6 +633,72 @@ def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path) -> 
     assert "SSCC-1" in controller.state.error_message
 
 
+def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path) -> None:
+    """Проверяет, что повторы принятой пачки не добивают следующий ВБ."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    runner = ManualTaskRunner()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=runner,
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+    controller.open_box()
+    runner.run_next()
+    controller.set_codes_per_item(12)
+
+    for index in range(1, 13):
+        controller.on_code_scanned(f"CODE{index}")
+
+    assert len(runner.tasks) == 1
+    runner.run_next()
+    assert controller.state.pending_count == 0
+    assert controller.state.is_busy is True
+
+    for index in range(1, 19):
+        controller.on_code_scanned(f"CODE{index}")
+
+    assert len(runner.tasks) == 1
+    runner.run_next()
+
+    assert [item.raw_code for item in controller.state.pending_items] == [
+        "CODE13",
+        "CODE14",
+        "CODE15",
+        "CODE16",
+        "CODE17",
+        "CODE18",
+    ]
+    assert service.batch_calls == [
+        (
+            1,
+            [
+                "CODE1",
+                "CODE2",
+                "CODE3",
+                "CODE4",
+                "CODE5",
+                "CODE6",
+                "CODE7",
+                "CODE8",
+                "CODE9",
+                "CODE10",
+                "CODE11",
+                "CODE12",
+            ],
+            "desktop-com",
+        )
+    ]
+
+
 def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
     """Проверяет удаление кода из открытой коробки на экране автоскана."""
 

@@ -163,6 +163,8 @@ class AutoPackingController(QObject):
         self._sound_service = sound_service
         self._scan_queue: list[str] = []
         self._active_scan_code = ""
+        self._accepted_raw_codes: set[str] = set()
+        self._accepted_box_id: int | None = None
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
@@ -305,6 +307,17 @@ class AutoPackingController(QObject):
         if not normalized:
             return
         if self._box_contains_visible_code(normalized):
+            self._set_state(
+                replace(
+                    self._state,
+                    status_message="Код уже есть в текущей коробке",
+                    result_message="Повторный скан пропущен",
+                    error_message="",
+                    last_scanned_code=normalized,
+                )
+            )
+            return
+        if self._box_contains_accepted_raw_code(normalized):
             self._set_state(
                 replace(
                     self._state,
@@ -542,6 +555,7 @@ class AutoPackingController(QObject):
         if not batch.ok:
             message = batch.error or batch.reason_code
             pending_items = self._pending_without_rejected_batch_item(batch)
+            self._remember_rejected_current_box_duplicate(batch)
             self._set_state(
                 replace(
                     self._state,
@@ -558,6 +572,7 @@ class AutoPackingController(QObject):
                 )
             )
             return
+        self._remember_accepted_batch(self._state.current_box, self._state.pending_items)
         self._set_state(
             replace(
                 self._state,
@@ -597,6 +612,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._forget_accepted_codes_after_box_edit()
         self.refresh_current_box()
 
     def _on_box_delete_result(self, result: object) -> None:
@@ -624,11 +640,13 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._forget_accepted_codes()
 
     def _on_current_box_loaded(self, result: object) -> None:
         """Обрабатывает загрузку текущей коробки."""
 
         if result is None:
+            self._forget_accepted_codes()
             self._set_state(
                 replace(
                     self._state,
@@ -639,6 +657,7 @@ class AutoPackingController(QObject):
             )
             return
         detail = self._expect(result, BoxDetailDto)
+        self._sync_accepted_box(detail.box_id)
         self._set_state(
             replace(
                 self._state,
@@ -654,6 +673,7 @@ class AutoPackingController(QObject):
         """Обрабатывает открытие коробки."""
 
         opened = self._expect(result, OpenBoxResultDto)
+        self._sync_accepted_box(opened.box.box_id)
         self._set_state(
             replace(
                 self._state,
@@ -710,7 +730,11 @@ class AutoPackingController(QObject):
         """Кладет скан в очередь, если контроллер занят предыдущей операцией."""
 
         normalized = (code or "").strip()
-        if not normalized or self._is_local_raw_duplicate(normalized):
+        if (
+            not normalized
+            or self._box_contains_accepted_raw_code(normalized)
+            or self._is_local_raw_duplicate(normalized)
+        ):
             return
         self._scan_queue.append(normalized)
         self._set_state(
@@ -765,6 +789,60 @@ class AutoPackingController(QObject):
         return any(
             item.visible_code.strip() == normalized for item in self._state.current_box.items
         )
+
+    def _box_contains_accepted_raw_code(self, code: str) -> bool:
+        """Проверяет raw-код среди уже принятых в текущую коробку пачек."""
+
+        normalized = code.strip()
+        if self._state.current_box is None or not normalized:
+            return False
+        if self._accepted_box_id != self._state.current_box.box_id:
+            return False
+        return normalized in self._accepted_raw_codes
+
+    def _remember_accepted_batch(
+        self,
+        current_box: PackingBoxUi | None,
+        pending_items: list[AutoPackingBoxItemUi],
+    ) -> None:
+        """Запоминает raw-коды пачки, которую backend принял в текущую коробку."""
+
+        if current_box is None:
+            return
+        self._sync_accepted_box(current_box.box_id)
+        self._accepted_raw_codes.update(
+            item.raw_code.strip() for item in pending_items if item.raw_code.strip()
+        )
+
+    def _remember_rejected_current_box_duplicate(self, batch: ScanBatchToBoxResultDto) -> None:
+        """Запоминает код, который backend признал дублем текущей коробки."""
+
+        if batch.reason_code not in {"duplicate_in_box", "batch_already_in_box"}:
+            return
+        rejected = (batch.rejected_raw_code or "").strip()
+        if self._state.current_box is None or not rejected:
+            return
+        self._sync_accepted_box(self._state.current_box.box_id)
+        self._accepted_raw_codes.add(rejected)
+
+    def _sync_accepted_box(self, box_id: int) -> None:
+        """Сбрасывает raw-кеш при переходе на другую коробку."""
+
+        if self._accepted_box_id == box_id:
+            return
+        self._accepted_box_id = box_id
+        self._accepted_raw_codes.clear()
+
+    def _forget_accepted_codes_after_box_edit(self) -> None:
+        """Сбрасывает raw-кеш после ручного изменения коробки."""
+
+        self._accepted_raw_codes.clear()
+
+    def _forget_accepted_codes(self) -> None:
+        """Полностью сбрасывает raw-кеш принятой коробки."""
+
+        self._accepted_box_id = None
+        self._accepted_raw_codes.clear()
 
     def _pending_without_known_box_duplicates(self) -> list[AutoPackingBoxItemUi]:
         """Удаляет из локального бокса коды, которые уже видны в текущей коробке."""
