@@ -204,7 +204,7 @@ class FakeVerifyService:
         """Возвращает успешную проверку с одним заказом."""
 
         self.calls.append(code)
-        code_id = self._ids_by_code.setdefault(code, len(self._ids_by_code) + 1)
+        code_id = self._ids_by_code.setdefault(code, self._code_id_for(code))
         return VerifyExistsResponseDto(
             ok=True,
             exists=True,
@@ -219,6 +219,14 @@ class FakeVerifyService:
                 order_dnp_name="26-0001/0001",
             ),
         )
+
+    def _code_id_for(self, code: str) -> int:
+        """Возвращает стабильный ID кода для fake-проверки."""
+
+        suffix = code.removeprefix("CODE")
+        if suffix.isdigit():
+            return int(suffix)
+        return len(self._ids_by_code) + 1
 
 
 class FakeBoxEditService:
@@ -587,6 +595,57 @@ def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path) -> Non
     assert verifier.calls == []
     assert "текущей коробке" in controller.state.status_message
     assert controller.state.error_message == ""
+
+
+def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path) -> None:
+    """Проверяет, что ошибка пачки удаляет только проблемный код из ВБ."""
+
+    service = FakePackingService()
+    service.current_box_result = _detail_box(items_count=1)
+    verifier = FakeVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+
+    def reject_batch(
+        box_id: int,
+        codes: list[str],
+        scanner_id: str,
+    ) -> ScanBatchToBoxResultDto:
+        """Возвращает отказ backend по одному коду пачки."""
+
+        service.batch_calls.append((box_id, codes, scanner_id))
+        return ScanBatchToBoxResultDto(
+            ok=False,
+            reason_code="code_in_other_box",
+            error="Код уже лежит в коробке SSCC-1",
+            box=_box(filled=1),
+            rejected_code_id=2,
+            rejected_raw_code="CODE2",
+        )
+
+    service.scan_batch_to_box = reject_batch  # type: ignore[method-assign]
+    controller.refresh_current_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned("CODE2")
+    controller.on_code_scanned("CODE3")
+
+    assert service.batch_calls == [(1, ["CODE2", "CODE3"], "desktop-com")]
+    assert [item.raw_code for item in controller.state.pending_items] == ["CODE3"]
+    assert controller.state.current_box is not None
+    assert len(controller.state.current_box.items) == 1
+    assert "CODE2" in controller.state.error_message
+    assert "SSCC-1" in controller.state.error_message
 
 
 def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:

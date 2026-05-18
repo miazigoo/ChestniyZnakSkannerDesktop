@@ -303,16 +303,6 @@ class AutoPackingController(QObject):
         normalized = (code or "").strip()
         if not normalized:
             return
-        if self._is_local_raw_duplicate(normalized):
-            self._set_state(
-                replace(
-                    self._state,
-                    result_message="Повторный скан уже есть в автоскана-боксе или очереди",
-                    error_message="Дубль локального бокса не добавлен",
-                    last_scanned_code=normalized,
-                )
-            )
-            return
         if self._box_contains_visible_code(normalized):
             self._set_state(
                 replace(
@@ -320,6 +310,16 @@ class AutoPackingController(QObject):
                     status_message="Код уже есть в текущей коробке",
                     result_message="Повторный скан пропущен",
                     error_message="",
+                    last_scanned_code=normalized,
+                )
+            )
+            return
+        if self._is_local_raw_duplicate(normalized):
+            self._set_state(
+                replace(
+                    self._state,
+                    result_message="Повторный скан уже есть в автоскана-боксе или очереди",
+                    error_message="Дубль локального бокса не добавлен",
                     last_scanned_code=normalized,
                 )
             )
@@ -523,14 +523,20 @@ class AutoPackingController(QObject):
         batch = self._expect(result, ScanBatchToBoxResultDto)
         if not batch.ok:
             message = batch.error or batch.reason_code
+            pending_items = self._pending_without_rejected_batch_item(batch)
             self._set_state(
                 replace(
                     self._state,
                     is_busy=False,
-                    pending_items=self._pending_without_known_box_duplicates(),
-                    current_box=self._box_to_ui(batch.box),
+                    pending_items=pending_items,
+                    current_box=self._merge_box_summary(batch.box),
                     status_message="Пачка не добавлена",
-                    error_message=message,
+                    result_message=(
+                        f"В автоскана-боксе осталось: {len(pending_items)}"
+                        if len(pending_items) != len(self._state.pending_items)
+                        else self._state.result_message
+                    ),
+                    error_message=self._batch_error_message(message, batch),
                 )
             )
             return
@@ -539,7 +545,7 @@ class AutoPackingController(QObject):
                 self._state,
                 is_busy=False,
                 pending_items=[],
-                current_box=self._box_to_ui(batch.box),
+                current_box=self._merge_box_summary(batch.box),
                 status_message="Пачка добавлена в коробку",
                 result_message=f"Добавлено кодов: {batch.added}",
                 error_message="",
@@ -751,6 +757,49 @@ class AutoPackingController(QObject):
         if not box_code_ids:
             return self._state.pending_items
         return [item for item in self._state.pending_items if item.code_id not in box_code_ids]
+
+    def _pending_without_rejected_batch_item(
+        self,
+        batch: ScanBatchToBoxResultDto,
+    ) -> list[AutoPackingBoxItemUi]:
+        """Удаляет из локального бокса только код, который backend отклонил."""
+
+        rejected_code_id = batch.rejected_code_id
+        rejected_raw_code = (batch.rejected_raw_code or "").strip()
+        if rejected_code_id is None and not rejected_raw_code:
+            return self._pending_without_known_box_duplicates()
+        return [
+            item
+            for item in self._state.pending_items
+            if item.code_id != rejected_code_id and item.raw_code.strip() != rejected_raw_code
+        ]
+
+    def _merge_box_summary(self, box: BoxDto) -> PackingBoxUi:
+        """Обновляет сводку коробки, не затирая локальный список кодов."""
+
+        if self._state.current_box is None or self._state.current_box.box_id != box.box_id:
+            return self._box_to_ui(box)
+        current = self._state.current_box
+        return replace(
+            current,
+            order_name=box.order_name or current.order_name,
+            sscc=box.sscc or current.sscc,
+            filled=box.filled,
+            capacity=box.capacity,
+            count_in_packing=box.count_in_packing,
+            is_closed=box.is_closed,
+            print_ok=box.print_ok,
+            print_error=box.print_error,
+        )
+
+    @staticmethod
+    def _batch_error_message(message: str, batch: ScanBatchToBoxResultDto) -> str:
+        """Формирует понятную ошибку пачки с проблемным кодом."""
+
+        rejected = batch.rejected_raw_code or ""
+        if rejected:
+            return f"{message}. Код удален из автоскана-бокса: {rejected}"
+        return message
 
     @staticmethod
     def _box_to_ui(box: BoxDto | BoxDetailDto) -> PackingBoxUi:

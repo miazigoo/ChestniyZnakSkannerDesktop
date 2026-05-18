@@ -81,6 +81,8 @@ class ScanBatchToBoxResultDto(BaseModel):
     added: int = 0
     box: BoxDto
     box_full_signal: bool | None = None
+    rejected_code_id: int | None = None
+    rejected_raw_code: str | None = None
 
 
 class CloseBoxResultDto(BaseModel):
