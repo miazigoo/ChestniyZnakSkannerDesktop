@@ -299,7 +299,7 @@ class AutoPackingController(QObject):
         )
 
     def on_code_scanned(self, code: str) -> None:
-        """Проверяет скан и добавляет его в локальный бокс."""
+        """Добавляет скан в локальный бокс после быстрых локальных проверок."""
 
         normalized = (code or "").strip()
         if not normalized:
@@ -348,18 +348,7 @@ class AutoPackingController(QObject):
                 )
             )
             return
-        self._active_scan_code = normalized
-        self._set_busy("Проверяем код по WebSocket...", normalized)
-        if self._ws_verify_service is not None:
-            request_id = self._ws_verify_service.verify_exists(
-                code=normalized,
-                scanner_id=self._scanner_id,
-                allow_duplicate=True,
-                box_id=self._state.current_box.box_id,
-            )
-            if request_id:
-                return
-        self._verify_code_http(normalized)
+        self._add_code_to_pending(normalized)
 
     def _verify_code_http(self, code: str) -> None:
         """Проверяет код через HTTP, если WS недоступен или не ответил."""
@@ -376,20 +365,47 @@ class AutoPackingController(QObject):
             self._on_error,
         )
 
+    def _add_code_to_pending(self, raw_code: str) -> None:
+        """Добавляет raw-код в ВБ без предварительной серверной проверки."""
+
+        item = AutoPackingBoxItemUi(
+            code_id=0,
+            raw_code=raw_code,
+            gtin="",
+            serial="Ожидает проверки",
+            visible_code=raw_code,
+            order_key="Проверка при отправке",
+        )
+        pending_items = [*self._state.pending_items, item]
+        next_state = replace(
+            self._state,
+            is_busy=False,
+            pending_items=pending_items,
+            status_message="Код добавлен в автоскана-бокс",
+            result_message=f"{len(pending_items)} / {self._state.codes_per_item}",
+            error_message="",
+            last_scanned_code=raw_code,
+        )
+        self._set_state(next_state)
+        if next_state.is_pending_full:
+            self._submit_pending_batch()
+            return
+        self._process_next_queued_scan()
+
     def _on_ws_verify_result(
         self,
         _request_id: str,
         raw_code: str,
         result: object,
     ) -> None:
-        """Принимает успешный ответ проверки автоскана по WS."""
+        """Игнорирует устаревшие WS-ответы предварительной проверки."""
 
-        self._on_verify_result(result, raw_code)
+        return None
 
     def _on_ws_verify_error(self, _request_id: str, raw_code: str, _error: str) -> None:
-        """Возвращается к HTTP-проверке при ошибке WS."""
+        """Игнорирует устаревшие ошибки WS-предпроверки."""
 
-        self._verify_code_http(raw_code)
+        return None
 
     def _on_verify_result(self, result: object, raw_code: str) -> None:
         """Обрабатывает проверку кода и при заполнении отправляет пачку."""

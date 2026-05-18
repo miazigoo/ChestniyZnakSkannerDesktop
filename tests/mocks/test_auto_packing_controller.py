@@ -357,8 +357,8 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
-def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
-    """Проверяет очередь быстрых HID-сканов автосканера."""
+def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
+    """Проверяет очередь быстрых HID-сканов во время отправки ВБ."""
 
     service = FakePackingService()
     verifier = FakeVerifyService()
@@ -379,7 +379,7 @@ def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
     )
     controller.open_box()
     runner.run_next()
-    controller.set_codes_per_item(2)
+    controller.set_codes_per_item(1)
 
     controller.on_code_scanned("CODE1")
     controller.on_code_scanned("CODE2")
@@ -391,28 +391,29 @@ def test_auto_packing_queues_fast_scans_while_verify_is_busy(tmp_path) -> None:
     runner.run_next()
 
     assert len(runner.tasks) == 1
-    assert verifier.calls == ["CODE1"]
+    assert verifier.calls == []
+    assert service.batch_calls == [(1, ["CODE1"], "desktop-com")]
 
     runner.run_next()
 
-    assert verifier.calls == ["CODE1", "CODE2"]
     assert len(runner.tasks) == 1
     assert controller.state.is_busy is True
     runner.run_next()
 
     assert controller.state.pending_count == 0
-    assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
+    assert service.batch_calls == [
+        (1, ["CODE1"], "desktop-com"),
+        (1, ["CODE2"], "desktop-com"),
+    ]
     assert controller.state.current_box is not None
-    assert controller.state.current_box.filled == 2
     assert controller.state.is_busy is True
     runner.run_next()
 
     assert controller.state.current_box is not None
-    assert len(controller.state.current_box.items) == 2
 
 
-def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
-    """Проверяет, что автоскан отправляет проверку через WebSocket."""
+def test_auto_packing_does_not_preverify_before_local_box_is_full(tmp_path) -> None:
+    """Проверяет, что автоскан не дергает verify до отправки полного ВБ."""
 
     service = FakePackingService()
     verifier = FakeVerifyService()
@@ -437,32 +438,15 @@ def test_auto_packing_uses_ws_verify_when_available(tmp_path) -> None:
 
     controller.on_code_scanned("CODE1")
 
-    assert ws_verifier.calls == [("CODE1", 1)]
+    assert ws_verifier.calls == []
     assert verifier.calls == []
-    assert controller.state.is_busy is True
-
-    result = VerifyExistsResponseDto(
-        ok=True,
-        exists=True,
-        status="ok",
-        message="Код найден",
-        order_name="26-0001/0001",
-        code=RemoteCodeDto(
-            id=1,
-            gtin="04646151697261",
-            serial="SERIAL1",
-            visible_code="CODE1",
-            order_dnp_name="26-0001/0001",
-        ),
-    )
-    ws_verifier.verified.emit("ws-1", "CODE1", result)
-
+    assert service.batch_calls == []
     assert controller.state.pending_count == 1
     assert sounds.events == []
 
 
-def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
-    """Проверяет HTTP fallback при ошибке WS-проверки."""
+def test_auto_packing_ignores_ws_failures_without_active_precheck(tmp_path) -> None:
+    """Проверяет, что WS-failure не влияет на ВБ без предварительной проверки."""
 
     service = FakePackingService()
     verifier = FakeVerifyService()
@@ -486,12 +470,12 @@ def test_auto_packing_falls_back_to_http_when_ws_fails(tmp_path) -> None:
     controller.on_code_scanned("CODE1")
     ws_verifier.failed.emit("ws-1", "CODE1", "timeout")
 
-    assert verifier.calls == ["CODE1"]
+    assert verifier.calls == []
     assert controller.state.pending_count == 1
 
 
-def test_auto_packing_treats_current_box_ws_duplicate_as_noop(tmp_path) -> None:
-    """Проверяет идемпотентный пропуск server-дубля текущей коробки."""
+def test_auto_packing_does_not_use_ws_duplicate_for_local_box(tmp_path) -> None:
+    """Проверяет, что старые WS-ответы не меняют ВБ без active request."""
 
     service = FakePackingService()
     verifier = FakeVerifyService()
@@ -529,10 +513,10 @@ def test_auto_packing_treats_current_box_ws_duplicate_as_noop(tmp_path) -> None:
     )
     ws_verifier.verified.emit("ws-1", "CODE1", result)
 
-    assert controller.state.pending_count == 0
+    assert controller.state.pending_count == 1
     assert service.batch_calls == []
     assert controller.state.error_message == ""
-    assert controller.state.result_message == "Повторный скан пропущен"
+    assert controller.state.result_message == "1 / 2"
 
 
 def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
@@ -555,7 +539,7 @@ def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
     )
     controller.open_box()
     runner.run_next()
-    controller.set_codes_per_item(2)
+    controller.set_codes_per_item(1)
 
     controller.on_code_scanned("CODE1")
     controller.on_code_scanned("CODE1")
@@ -563,9 +547,9 @@ def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
     assert "Дубль" in controller.state.error_message
     runner.run_next()
 
-    assert verifier.calls == ["CODE1"]
-    assert controller.state.pending_count == 1
-    assert len(runner.tasks) == 0
+    assert verifier.calls == []
+    assert controller.state.pending_count == 0
+    assert len(runner.tasks) == 1
 
 
 def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path) -> None:
@@ -710,41 +694,16 @@ def test_auto_packing_can_clear_and_delete_open_box(tmp_path) -> None:
     assert controller.state.current_box is None
 
 
-def test_auto_packing_rejects_mixed_order_before_backend_batch(tmp_path) -> None:
-    """Проверяет локальный запрет разных заказов в одном боксе."""
+def test_auto_packing_sends_mixed_order_to_backend_batch(tmp_path) -> None:
+    """Проверяет, что разные заказы проверяются только сервером полного ВБ."""
 
     controller, service, verifier, sounds = _controller_pair(tmp_path)
     controller.open_box()
     controller.set_codes_per_item(2)
     controller.on_code_scanned("CODE1")
-
-    def other_order(
-        code: str,
-        scanner_id: str,
-        allow_duplicate: bool = True,
-        save_scan: bool = True,
-    ) -> VerifyExistsResponseDto:
-        """Возвращает проверку кода другого заказа."""
-
-        return VerifyExistsResponseDto(
-            ok=True,
-            exists=True,
-            status="ok",
-            message="Код найден",
-            order_name="26-0002/0001",
-            code=RemoteCodeDto(
-                id=99,
-                gtin="04646151697261",
-                serial="SERIAL99",
-                visible_code=code,
-                order_dnp_name="26-0002/0001",
-            ),
-        )
-
-    verifier.verify_exists = other_order  # type: ignore[method-assign]
     controller.on_code_scanned("CODE2")
 
-    assert controller.state.pending_count == 1
-    assert service.batch_calls == []
-    assert "одного заказа" in controller.state.error_message
-    assert sounds.events == []
+    assert controller.state.pending_count == 0
+    assert verifier.calls == []
+    assert service.batch_calls == [(1, ["CODE1", "CODE2"], "desktop-com")]
+    assert sounds.events == [SoundEvent.OK]
