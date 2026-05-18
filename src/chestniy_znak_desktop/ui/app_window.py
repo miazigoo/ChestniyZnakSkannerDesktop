@@ -26,6 +26,7 @@ from chestniy_znak_desktop.controllers.printer_controller import PrinterControll
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
+from chestniy_znak_desktop.domain.scanner_input_guard import contains_cyrillic
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.services.scanner_command_service import (
@@ -505,6 +506,9 @@ class AppWindow(QMainWindow):
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
+        if contains_cyrillic(code):
+            self._show_cyrillic_scan_warning()
+            return
         command = parse_scanner_command(code)
         if command is not None and self._handle_scanner_command(command):
             return
@@ -525,6 +529,16 @@ class AppWindow(QMainWindow):
             return
         if self._scan_target == "auto_packing":
             self._auto_packing_controller.on_code_scanned(code)
+
+    def _show_cyrillic_scan_warning(self) -> None:
+        """Предупреждает оператора, что скан пришел в русской раскладке."""
+
+        QMessageBox.warning(
+            self,
+            "Неверная раскладка",
+            "Скан отклонен: в коде есть кириллица. Переключите раскладку на EN "
+            "и повторите сканирование.",
+        )
 
     def _handle_scanner_command(self, command: ScannerCommand) -> bool:
         """Выполняет служебную QR-команду сканера."""

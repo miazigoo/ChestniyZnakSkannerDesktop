@@ -17,12 +17,18 @@ class FakeCommandWindow:
 
         self.commands: list[ScannerCommand] = []
         self.auth_tokens: list[str] = []
+        self.cyrillic_warnings = 0
 
     def _handle_scanner_command(self, command: ScannerCommand) -> bool:
         """Запоминает служебную команду как обработанную."""
 
         self.commands.append(command)
         return True
+
+    def _show_cyrillic_scan_warning(self) -> None:
+        """Запоминает предупреждение о русской раскладке."""
+
+        self.cyrillic_warnings += 1
 
 
 def test_parse_scanner_command_accepts_known_tokens() -> None:
@@ -53,4 +59,16 @@ def test_service_command_is_intercepted_before_regular_routing() -> None:
     AppWindow._handle_scanned_code(window, "OpenNewBox")  # type: ignore[arg-type]
 
     assert window.commands == [ScannerCommand.OPEN_NEW_BOX]
+    assert window.auth_tokens == []
+
+
+def test_cyrillic_scan_is_rejected_before_regular_routing() -> None:
+    """Проверяет, что скан в русской раскладке не уходит в рабочие сценарии."""
+
+    window = FakeCommandWindow()
+
+    AppWindow._handle_scanned_code(window, "фыва123")  # type: ignore[arg-type]
+
+    assert window.cyrillic_warnings == 1
+    assert window.commands == []
     assert window.auth_tokens == []
