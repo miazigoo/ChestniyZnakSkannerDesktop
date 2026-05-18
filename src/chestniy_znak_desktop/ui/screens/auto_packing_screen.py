@@ -80,6 +80,8 @@ class AutoPackingScreen(QWidget):
         self._tables_tabs = QTabWidget()
         self._box_filled = 0
         self._box_items_count = 0
+        self._pending_table_signature: tuple[tuple[int, str, str, str, str, str], ...] = ()
+        self._box_items_table_signature: tuple[tuple[int, int, str, str, str], ...] = ()
         self._configure_actions()
         self._build_layout()
         self._set_busy(False)
@@ -109,8 +111,8 @@ class AutoPackingScreen(QWidget):
                 count_in_packing=box.count_in_packing,
                 is_closed=box.is_closed,
             )
-        self._fill_pending_table(state)
-        self._fill_box_items_table(state)
+        self._fill_pending_table_if_changed(state)
+        self._fill_box_items_table_if_changed(state)
         self._update_table_tabs(state)
         self._apply_pending_tone(state)
         self._status_detail.setText(
@@ -332,8 +334,23 @@ class AutoPackingScreen(QWidget):
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         return table
 
-    def _fill_pending_table(self, state: AutoPackingUiState) -> None:
-        """Заполняет таблицу кодами локального бокса."""
+    def _fill_pending_table_if_changed(self, state: AutoPackingUiState) -> None:
+        """Заполняет таблицу локального бокса только при изменении строк."""
+
+        signature = tuple(
+            (
+                item.code_id,
+                item.raw_code,
+                item.order_key,
+                item.gtin,
+                item.serial,
+                item.visible_code,
+            )
+            for item in state.pending_items
+        )
+        if signature == self._pending_table_signature:
+            return
+        self._pending_table_signature = signature
 
         self._pending_table.setRowCount(len(state.pending_items))
         for row, item in enumerate(state.pending_items):
@@ -350,10 +367,17 @@ class AutoPackingScreen(QWidget):
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._pending_table.setItem(row, column, cell)
 
-    def _fill_box_items_table(self, state: AutoPackingUiState) -> None:
-        """Заполняет таблицу кодов, уже добавленных в текущую коробку."""
+    def _fill_box_items_table_if_changed(self, state: AutoPackingUiState) -> None:
+        """Заполняет таблицу текущей коробки только при изменении строк."""
 
         items = state.current_box.items if state.current_box is not None else []
+        signature = tuple(
+            (item.id, item.code_id, item.gtin, item.serial, item.visible_code) for item in items
+        )
+        if signature == self._box_items_table_signature:
+            return
+        self._box_items_table_signature = signature
+
         self._box_items_table.setRowCount(len(items))
         for row, item in enumerate(items):
             values = [

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import re
+from collections import deque
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, TypeVar
 
@@ -27,6 +30,8 @@ from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 TAutoPackingResult = TypeVar("TAutoPackingResult")
+logger = logging.getLogger(__name__)
+GS1_CODE_START_RE = re.compile(r"01\d{14}21")
 
 
 class AutoPackingBackend(Protocol):
@@ -174,10 +179,13 @@ class AutoPackingController(QObject):
         self._scanner_id = scanner_id
         self._ws_verify_service = ws_verify_service
         self._sound_service = sound_service
-        self._scan_queue: list[str] = []
+        self._scan_queue: deque[str] = deque()
+        self._queued_raw_codes: set[str] = set()
         self._active_scan_code = ""
         self._accepted_raw_codes: set[str] = set()
         self._accepted_box_id: int | None = None
+        self._box_code_ids: set[int] = set()
+        self._box_visible_codes: set[str] = set()
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
@@ -373,6 +381,22 @@ class AutoPackingController(QObject):
         normalized = (code or "").strip()
         if not normalized:
             return
+        parts = self._split_scanner_payload(normalized)
+        if not parts:
+            self._reject_malformed_scan(normalized)
+            return
+        if len(parts) > 1:
+            logger.warning(
+                "Auto packing split glued scanner payload into %s codes: %r",
+                len(parts),
+                normalized,
+            )
+        for part in parts:
+            self._handle_single_code_scanned(part)
+
+    def _handle_single_code_scanned(self, normalized: str) -> None:
+        """Обрабатывает один уже выделенный код маркировки."""
+
         if self._box_contains_visible_code(normalized):
             self._set_state(
                 replace(
@@ -429,6 +453,34 @@ class AutoPackingController(QObject):
             )
             return
         self._add_code_to_pending(normalized)
+
+    def _split_scanner_payload(self, code: str) -> list[str]:
+        """Разделяет склеенные DataMatrix и отбрасывает обрезанные хвосты."""
+
+        starts = [match.start() for match in GS1_CODE_START_RE.finditer(code)]
+        if not starts:
+            return [] if code[0].isdigit() else [code]
+        starts.append(len(code))
+        return [
+            code[start:end].strip()
+            for start, end in zip(starts, starts[1:])
+            if code[start:end].strip()
+        ]
+
+    def _reject_malformed_scan(self, code: str) -> None:
+        """Показывает ошибку по обрезанному скану, не добавляя его в ВБ."""
+
+        logger.warning("Auto packing rejected malformed scanner payload: %r", code)
+        self._play(SoundEvent.WARNING)
+        self._set_state(
+            replace(
+                self._state,
+                status_message="Скан отброшен",
+                result_message="",
+                error_message="Пришел обрезанный DataMatrix без начала 01+GTIN+21",
+                last_scanned_code=code,
+            )
+        )
 
     def _verify_code_http(self, code: str) -> None:
         """Проверяет код через HTTP, если WS недоступен или не ответил."""
@@ -652,7 +704,7 @@ class AutoPackingController(QObject):
             )
         )
         self._play(SoundEvent.OK)
-        self.refresh_current_box()
+        self._continue_after_batch()
 
     def _on_box_edit_result(self, result: object) -> None:
         """Обрабатывает быструю правку текущей коробки автоскана."""
@@ -872,6 +924,7 @@ class AutoPackingController(QObject):
         """Сохраняет и публикует состояние автосканера."""
 
         self._state = state
+        self._rebuild_box_indexes(state.current_box)
         self.state_changed.emit(state)
 
     def _play(self, event: SoundEvent) -> None:
@@ -891,6 +944,7 @@ class AutoPackingController(QObject):
         ):
             return
         self._scan_queue.append(normalized)
+        self._queued_raw_codes.add(normalized)
         self._set_state(
             replace(
                 self._state,
@@ -904,7 +958,8 @@ class AutoPackingController(QObject):
 
         if self._state.is_busy or self._state.is_pending_full or not self._scan_queue:
             return
-        next_code = self._scan_queue.pop(0)
+        next_code = self._scan_queue.popleft()
+        self._queued_raw_codes.discard(next_code)
         self.on_code_scanned(next_code)
 
     def _is_local_raw_duplicate(self, code: str) -> bool:
@@ -915,16 +970,14 @@ class AutoPackingController(QObject):
             return False
         if self._active_scan_code == normalized:
             return True
-        if normalized in self._scan_queue:
+        if normalized in self._queued_raw_codes:
             return True
         return any(item.raw_code.strip() == normalized for item in self._state.pending_items)
 
     def _box_contains_code(self, code_id: int) -> bool:
         """Проверяет, лежит ли код уже в текущей открытой коробке."""
 
-        if self._state.current_box is None:
-            return False
-        return any(item.code_id == code_id for item in self._state.current_box.items)
+        return code_id in self._box_code_ids
 
     def _is_current_box_duplicate_response(self, verify: VerifyExistsResponseDto) -> bool:
         """Проверяет, что backend сообщил об уже добавленном коде текущей коробки."""
@@ -938,11 +991,7 @@ class AutoPackingController(QObject):
         """Проверяет raw-совпадение с кодами, уже показанными в текущей коробке."""
 
         normalized = code.strip()
-        if self._state.current_box is None or not normalized:
-            return False
-        return any(
-            item.visible_code.strip() == normalized for item in self._state.current_box.items
-        )
+        return bool(normalized) and normalized in self._box_visible_codes
 
     def _box_contains_accepted_raw_code(self, code: str) -> bool:
         """Проверяет raw-код среди уже принятых в текущую коробку пачек."""
@@ -997,6 +1046,60 @@ class AutoPackingController(QObject):
 
         self._accepted_box_id = None
         self._accepted_raw_codes.clear()
+        self._scan_queue.clear()
+        self._queued_raw_codes.clear()
+
+    def _continue_after_batch(self) -> None:
+        """Продолжает очередь сканов или обновляет детали коробки, когда поток стих."""
+
+        if self._scan_queue:
+            self._process_next_queued_scan()
+            return
+        self._refresh_current_box_after_batch()
+
+    def _refresh_current_box_after_batch(self) -> None:
+        """Фоново обновляет подробности коробки, не блокируя следующие сканы."""
+
+        self._task_runner.submit(
+            self._packing_service.current_box,
+            self._on_current_box_refreshed_after_batch,
+            self._on_background_refresh_error,
+        )
+
+    def _on_current_box_refreshed_after_batch(self, result: object) -> None:
+        """Применяет неблокирующий refresh, если экран уже не занят следующей пачкой."""
+
+        if self._state.is_busy or self._state.pending_items or result is None:
+            return
+        detail = self._expect(result, BoxDetailDto)
+        if self._state.current_box is not None and detail.box_id != self._state.current_box.box_id:
+            return
+        self._sync_accepted_box(detail.box_id)
+        self._set_state(
+            replace(
+                self._state,
+                current_box=self._box_to_ui(detail),
+                count_in_packing=detail.count_in_packing,
+            )
+        )
+
+    @staticmethod
+    def _on_background_refresh_error(exc: Exception) -> None:
+        """Логирует ошибку фонового refresh без остановки автоскана."""
+
+        logger.debug("Auto packing background current-box refresh failed: %s", exc)
+
+    def _rebuild_box_indexes(self, box: PackingBoxUi | None) -> None:
+        """Обновляет O(1)-индексы кодов текущей коробки."""
+
+        if box is None:
+            self._box_code_ids.clear()
+            self._box_visible_codes.clear()
+            return
+        self._box_code_ids = {item.code_id for item in box.items}
+        self._box_visible_codes = {
+            item.visible_code.strip() for item in box.items if item.visible_code.strip()
+        }
 
     def _pending_without_known_box_duplicates(self) -> list[AutoPackingBoxItemUi]:
         """Удаляет из локального бокса коды, которые уже видны в текущей коробке."""

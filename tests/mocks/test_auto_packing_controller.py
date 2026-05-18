@@ -386,6 +386,37 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
+def test_auto_packing_splits_glued_gs1_codes(tmp_path) -> None:
+    """Проверяет разделение двух DataMatrix, склеенных HID-вводом."""
+
+    controller, service, _verifier, sounds = _controller_pair(tmp_path)
+    code1 = "0104646151697261215WsaP?q-'MzgeTtRBYt"
+    code2 = '01046461516972612158h"-QaBSDXPDPMrMBXP93LtwN'
+    controller.open_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned(code1 + code2)
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == [(1, [code1, code2], "desktop-com")]
+    assert sounds.events == [SoundEvent.OK]
+
+
+def test_auto_packing_rejects_truncated_numeric_tail(tmp_path) -> None:
+    """Проверяет, что хвост DataMatrix без начала не попадает в ВБ."""
+
+    controller, service, _verifier, sounds = _controller_pair(tmp_path)
+    controller.open_box()
+    controller.set_codes_per_item(2)
+
+    controller.on_code_scanned('1215+"D(vJVn,zB?qKXlgXr93TgSh')
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == []
+    assert sounds.events == [SoundEvent.WARNING]
+    assert "обрезанный DataMatrix" in controller.state.error_message
+
+
 def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path) -> None:
     """Проверяет отправку ВБ, который стал полным после смены вместимости."""
 
@@ -498,7 +529,7 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
     runner.run_next()
 
     assert len(runner.tasks) == 1
-    assert controller.state.is_busy is True
+    assert controller.state.is_busy is False
     runner.run_next()
 
     assert controller.state.pending_count == 0
@@ -507,10 +538,7 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
         (1, ["CODE2"], "desktop-com"),
     ]
     assert controller.state.current_box is not None
-    assert controller.state.is_busy is True
-    runner.run_next()
-
-    assert controller.state.current_box is not None
+    assert controller.state.is_busy is False
 
 
 def test_auto_packing_does_not_preverify_before_local_box_is_full(tmp_path) -> None:
@@ -834,7 +862,7 @@ def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path) ->
     assert len(runner.tasks) == 1
     runner.run_next()
     assert controller.state.pending_count == 0
-    assert controller.state.is_busy is True
+    assert controller.state.is_busy is False
 
     for index in range(1, 19):
         controller.on_code_scanned(f"CODE{index}")

@@ -42,6 +42,8 @@ def test_available_themes_are_registered() -> None:
     assert set(names) == set(THEMES)
     assert all("QPushButton" in theme.stylesheet for theme in available_themes())
     assert all("QProgressBar" in theme.stylesheet for theme in available_themes())
+    assert all("QTabWidget" in theme.stylesheet for theme in available_themes())
+    assert all("QTabBar::tab:selected" in theme.stylesheet for theme in available_themes())
     assert all("#packingHero" in theme.stylesheet for theme in available_themes())
     assert all("#settingsComboPopup" in theme.stylesheet for theme in available_themes())
 

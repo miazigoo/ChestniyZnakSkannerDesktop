@@ -883,6 +883,60 @@ def _stylesheet(palette: ThemePalette) -> str:
             background: {palette.accent};
         }}
 
+        QTabWidget {{
+            background: transparent;
+            border: 0;
+        }}
+
+        QTabWidget::pane {{
+            background: {palette.panel};
+            border: 1px solid {palette.border};
+            border-radius: 8px;
+            top: -1px;
+        }}
+
+        QTabWidget::tab-bar {{
+            left: 0;
+        }}
+
+        QTabBar {{
+            background: transparent;
+        }}
+
+        QTabBar::tab {{
+            background: {palette.panel_alt};
+            color: {palette.text};
+            border: 1px solid {palette.border};
+            border-bottom-color: {palette.border};
+            padding: 8px 14px;
+            min-height: 20px;
+            font-weight: 600;
+        }}
+
+        QTabBar::tab:selected {{
+            background: {palette.panel};
+            color: {palette.text};
+            border-color: {palette.border};
+            border-bottom-color: {palette.panel};
+        }}
+
+        QTabBar::tab:!selected:hover {{
+            background: {palette.accent_soft};
+            color: {palette.text};
+        }}
+
+        QTabBar::tab:first {{
+            border-top-left-radius: 8px;
+        }}
+
+        QTabBar::tab:last {{
+            border-top-right-radius: 8px;
+        }}
+
+        QTabBar::tab:disabled {{
+            color: {palette.muted};
+        }}
+
         QTableWidget {{
             background: {palette.panel};
             alternate-background-color: {palette.panel_alt};
