@@ -357,6 +357,32 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
+def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path) -> None:
+    """Проверяет отправку ВБ, который стал полным после смены вместимости."""
+
+    controller, service, _verifier, sounds = _controller_pair(tmp_path)
+    controller.open_box()
+    controller.set_codes_per_item(12)
+
+    for index in range(13, 19):
+        controller.on_code_scanned(f"CODE{index}")
+
+    assert controller.state.pending_count == 6
+    assert service.batch_calls == []
+
+    controller.set_codes_per_item(6)
+
+    assert controller.state.pending_count == 0
+    assert service.batch_calls == [
+        (
+            1,
+            ["CODE13", "CODE14", "CODE15", "CODE16", "CODE17", "CODE18"],
+            "desktop-com",
+        )
+    ]
+    assert sounds.events == [SoundEvent.OK]
+
+
 def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
     """Проверяет очередь быстрых HID-сканов во время отправки ВБ."""
 

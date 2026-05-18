@@ -218,6 +218,12 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        if (
+            not self._state.is_busy
+            and self._state.current_box is not None
+            and self._state.is_pending_full
+        ):
+            self._submit_pending_batch()
 
     def clear_pending(self) -> None:
         """Очищает локальный автоскана-бокс без изменения коробки."""
