@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chestniy-znak-desktop"
-version = "0.1.0"
+version = "1.0.0"
 description = "Desktop-клиент Честного знака для COM/SPP-сканеров."
 readme = "README.md"
 requires-python = ">=3.11"

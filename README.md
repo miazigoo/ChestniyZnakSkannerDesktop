@@ -76,6 +76,20 @@ py -3.14 -c "import struct; print(struct.calcsize('P') * 8)"
 cd C:\path\to\ChestniyZnakDescktop
 ```
 
+Перед каждой сборкой сначала забрать свежий код:
+
+```powershell
+git fetch origin
+git status
+git pull --ff-only
+git log -1 --oneline
+py -3.14 -c "import sys; sys.path.insert(0, 'src'); import chestniy_znak_desktop; print(chestniy_znak_desktop.__version__)"
+```
+
+Последняя команда должна вывести актуальную версию приложения, например `1.0.0`.
+Если выводится старая версия, сборка идет не из свежего checkout или не из этой
+папки проекта.
+
 Создать виртуальное окружение:
 
 ```powershell
@@ -154,7 +168,7 @@ https://jrsoftware.org/isinfo.php
 Готовый установщик появится здесь:
 
 ```text
-installer\ChestniyZnakDesktopSetup-0.1.0.exe
+installer\ChestniyZnakDesktopSetup-1.0.0.exe
 ```
 
 Установщик делает:
@@ -213,14 +227,61 @@ dist\ChestniyZnakDesktop\
 
 ### Чистая пересборка
 
-Если нужно пересобрать с нуля:
+Если нужно пересобрать с нуля или на Windows собирается старая версия, сначала
+остановить приложение и удалить старые артефакты сборки:
 
 ```powershell
-Remove-Item -Recurse -Force build, dist
+Get-Process ChestniyZnakDesktop -ErrorAction SilentlyContinue | Stop-Process -Force
+Remove-Item -Recurse -Force build, dist, installer -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .pytest_cache, .mypy_cache -ErrorAction SilentlyContinue
+Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
 .\.venv\Scripts\python.exe scripts\build_windows.py
 ```
 
+Для максимально чистой пересборки можно пересоздать виртуальное окружение:
+
+```powershell
+Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U pip setuptools wheel
+.\.venv\Scripts\python.exe -m pip install --no-cache-dir -r requirements.txt
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe scripts\build_windows.py
+```
+
+Если собирается установщик:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_windows_installer.py
+```
+
+После установки `setup.exe` убедиться, что запускается новая установленная
+версия, а не старый portable `.exe` из другой папки. Если сомневаетесь, удалить
+старую установленную программу через `Параметры Windows -> Приложения` и
+поставить новый `installer\ChestniyZnakDesktopSetup-1.0.0.exe`.
+
 ### Частые проблемы
+
+Собирается старая версия:
+
+- Проверить, что PowerShell открыт именно в свежей папке проекта:
+
+```powershell
+pwd
+git log -1 --oneline
+git status
+```
+
+- Проверить версию из исходников:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import sys; sys.path.insert(0, 'src'); import chestniy_znak_desktop; print(chestniy_znak_desktop.__version__)"
+```
+
+- Удалить `build`, `dist`, `installer`, `__pycache__` и при необходимости
+  пересоздать `.venv` по инструкции `Чистая пересборка`.
+- Проверить, что запускается новый файл из `dist\ChestniyZnakDesktop\`, а не
+  старый `.exe` или старый ярлык после установки.
 
 `py -3.11` не найден:
 
