@@ -514,8 +514,8 @@ def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
     assert len(runner.tasks) == 0
 
 
-def test_auto_packing_rejects_code_already_in_current_box(tmp_path) -> None:
-    """Проверяет локальный отказ, если код уже виден в текущей коробке."""
+def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path) -> None:
+    """Проверяет идемпотентный пропуск кода, уже видимого в коробке."""
 
     service = FakePackingService()
     service.current_box_result = _detail_box(items_count=1)
@@ -539,7 +539,9 @@ def test_auto_packing_rejects_code_already_in_current_box(tmp_path) -> None:
 
     assert controller.state.pending_count == 0
     assert service.batch_calls == []
+    assert verifier.calls == []
     assert "текущей коробке" in controller.state.status_message
+    assert controller.state.error_message == ""
 
 
 def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
