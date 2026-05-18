@@ -819,11 +819,11 @@ class AutoPackingController(QObject):
 
         if batch.reason_code not in {"duplicate_in_box", "batch_already_in_box"}:
             return
-        rejected = (batch.rejected_raw_code or "").strip()
-        if self._state.current_box is None or not rejected:
+        rejected_codes = self._rejected_raw_codes(batch)
+        if self._state.current_box is None or not rejected_codes:
             return
         self._sync_accepted_box(self._state.current_box.box_id)
-        self._accepted_raw_codes.add(rejected)
+        self._accepted_raw_codes.update(rejected_codes)
 
     def _sync_accepted_box(self, box_id: int) -> None:
         """Сбрасывает raw-кеш при переходе на другую коробку."""
@@ -858,16 +858,19 @@ class AutoPackingController(QObject):
         self,
         batch: ScanBatchToBoxResultDto,
     ) -> list[AutoPackingBoxItemUi]:
-        """Удаляет из локального бокса только код, который backend отклонил."""
+        """Удаляет из локального бокса только коды, которые backend отклонил."""
 
-        rejected_code_id = batch.rejected_code_id
-        rejected_raw_code = (batch.rejected_raw_code or "").strip()
-        if rejected_code_id is None and not rejected_raw_code:
+        rejected_code_ids = set(batch.rejected_code_ids)
+        if batch.rejected_code_id is not None:
+            rejected_code_ids.add(batch.rejected_code_id)
+        rejected_raw_codes = self._rejected_raw_codes(batch)
+        if not rejected_code_ids and not rejected_raw_codes:
             return self._pending_without_known_box_duplicates()
         return [
             item
             for item in self._state.pending_items
-            if item.code_id != rejected_code_id and item.raw_code.strip() != rejected_raw_code
+            if item.code_id not in rejected_code_ids
+            and item.raw_code.strip() not in rejected_raw_codes
         ]
 
     def _merge_box_summary(self, box: BoxDto) -> PackingBoxUi:
@@ -893,9 +896,25 @@ class AutoPackingController(QObject):
         """Формирует понятную ошибку пачки с проблемным кодом."""
 
         rejected = batch.rejected_raw_code or ""
+        rejected_codes = sorted(AutoPackingController._rejected_raw_codes(batch))
+        if rejected_codes:
+            codes_preview = ", ".join(rejected_codes[:3])
+            if len(rejected_codes) > 3:
+                codes_preview = f"{codes_preview} и еще {len(rejected_codes) - 3}"
+            return f"{message}. Удалено из автоскана-бокса: {codes_preview}"
         if rejected:
             return f"{message}. Код удален из автоскана-бокса: {rejected}"
         return message
+
+    @staticmethod
+    def _rejected_raw_codes(batch: ScanBatchToBoxResultDto) -> set[str]:
+        """Возвращает набор raw-кодов, которые backend попросил убрать из ВБ."""
+
+        rejected_codes = {code.strip() for code in batch.rejected_raw_codes if code.strip()}
+        single_code = (batch.rejected_raw_code or "").strip()
+        if single_code:
+            rejected_codes.add(single_code)
+        return rejected_codes
 
     @staticmethod
     def _box_to_ui(box: BoxDto | BoxDetailDto) -> PackingBoxUi:

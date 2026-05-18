@@ -83,6 +83,8 @@ class ScanBatchToBoxResultDto(BaseModel):
     box_full_signal: bool | None = None
     rejected_code_id: int | None = None
     rejected_raw_code: str | None = None
+    rejected_code_ids: list[int] = Field(default_factory=list)
+    rejected_raw_codes: list[str] = Field(default_factory=list)
 
 
 class CloseBoxResultDto(BaseModel):

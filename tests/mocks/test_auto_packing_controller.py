@@ -633,6 +633,78 @@ def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path) -> 
     assert "SSCC-1" in controller.state.error_message
 
 
+def test_auto_packing_removes_multiple_rejected_items_after_batch_error(tmp_path) -> None:
+    """Проверяет удаление всех rejected-кодов из ВБ одним ответом backend."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+    )
+
+    def reject_batch(
+        box_id: int,
+        codes: list[str],
+        scanner_id: str,
+    ) -> ScanBatchToBoxResultDto:
+        """Возвращает отказ backend по нескольким кодам пачки."""
+
+        service.batch_calls.append((box_id, codes, scanner_id))
+        return ScanBatchToBoxResultDto(
+            ok=False,
+            reason_code="duplicate_in_box",
+            error="Часть кодов уже лежит в этой коробке",
+            box=_box(filled=12),
+            rejected_raw_codes=[f"CODE{index}" for index in range(1, 7)],
+        )
+
+    service.scan_batch_to_box = reject_batch  # type: ignore[method-assign]
+    controller.open_box()
+    controller.set_codes_per_item(12)
+
+    for index in range(1, 13):
+        controller.on_code_scanned(f"CODE{index}")
+
+    assert service.batch_calls == [
+        (
+            1,
+            [
+                "CODE1",
+                "CODE2",
+                "CODE3",
+                "CODE4",
+                "CODE5",
+                "CODE6",
+                "CODE7",
+                "CODE8",
+                "CODE9",
+                "CODE10",
+                "CODE11",
+                "CODE12",
+            ],
+            "desktop-com",
+        )
+    ]
+    assert [item.raw_code for item in controller.state.pending_items] == [
+        "CODE7",
+        "CODE8",
+        "CODE9",
+        "CODE10",
+        "CODE11",
+        "CODE12",
+    ]
+    assert "Удалено" in controller.state.error_message
+
+
 def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path) -> None:
     """Проверяет, что повторы принятой пачки не добивают следующий ВБ."""
 
