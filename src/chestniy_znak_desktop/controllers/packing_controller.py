@@ -8,6 +8,7 @@ from typing import Protocol, TypeVar
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.packing import (
+    BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
     BoxItemDto,
@@ -35,6 +36,9 @@ class PackingBackend(Protocol):
 
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
         """Закрывает коробку."""
+
+    def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
+        """Переключает учет коробки в упаковке."""
 
 
 class SoundPlayer(Protocol):
@@ -175,8 +179,19 @@ class PackingController(QObject):
         )
 
     def set_count_in_packing(self, enabled: bool) -> None:
-        """Обновляет локальный флаг учета коробки в упаковке."""
+        """Обновляет флаг учета коробки в упаковке."""
 
+        if self._state.is_busy:
+            return
+        if self._state.current_box is not None:
+            box_id = self._state.current_box.box_id
+            self._set_busy("Обновляем учет коробки в упаковке...")
+            self._task_runner.submit(
+                lambda: self._packing_service.set_count_in_packing(box_id, enabled),
+                self._on_count_in_packing_changed,
+                self._on_error,
+            )
+            return
         self._state = PackingUiState(
             is_busy=self._state.is_busy,
             current_box=self._state.current_box,
@@ -263,6 +278,34 @@ class PackingController(QObject):
                 error_message="" if scan_result.ok else message,
                 last_scanned_code=self._state.last_scanned_code,
                 count_in_packing=scan_result.box.count_in_packing,
+            )
+        )
+
+    def _on_count_in_packing_changed(self, result: object) -> None:
+        """Обрабатывает результат переключения учета текущей коробки."""
+
+        edit_result = self._expect(result, BoxActionResultDto)
+        message = edit_result.error or edit_result.reason_code
+        if not edit_result.ok:
+            self._set_state(
+                PackingUiState(
+                    current_box=self._state.current_box,
+                    status_message="Учет коробки не изменен",
+                    result_message=self._state.result_message,
+                    error_message=message,
+                    last_scanned_code=self._state.last_scanned_code,
+                    count_in_packing=self._state.count_in_packing,
+                )
+            )
+            return
+        count_in_packing = edit_result.box.count_in_packing
+        self._set_state(
+            PackingUiState(
+                current_box=self._box_with_count_in_packing(count_in_packing),
+                status_message="Учет коробки обновлен",
+                result_message=message,
+                last_scanned_code=self._state.last_scanned_code,
+                count_in_packing=count_in_packing,
             )
         )
 
@@ -408,6 +451,24 @@ class PackingController(QObject):
             print_ok=box.print_ok,
             print_error=box.print_error,
             items=[],
+        )
+
+    def _box_with_count_in_packing(self, count_in_packing: bool) -> PackingBoxUi | None:
+        """Возвращает текущую коробку с обновленным флагом учета."""
+
+        if self._state.current_box is None:
+            return None
+        return PackingBoxUi(
+            box_id=self._state.current_box.box_id,
+            order_name=self._state.current_box.order_name,
+            sscc=self._state.current_box.sscc,
+            filled=self._state.current_box.filled,
+            capacity=self._state.current_box.capacity,
+            count_in_packing=count_in_packing,
+            is_closed=self._state.current_box.is_closed,
+            print_ok=self._state.current_box.print_ok,
+            print_error=self._state.current_box.print_error,
+            items=self._state.current_box.items,
         )
 
     @staticmethod

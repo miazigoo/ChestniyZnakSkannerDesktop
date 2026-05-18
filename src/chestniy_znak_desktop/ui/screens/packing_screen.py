@@ -255,4 +255,4 @@ class PackingScreen(QWidget):
         self._refresh_button.setEnabled(not is_busy)
         self._open_box_button.setEnabled(is_ready)
         self._close_box_button.setEnabled(is_ready and self._has_box)
-        self._count_in_packing.setEnabled(not is_busy and not self._has_box)
+        self._count_in_packing.setEnabled(not is_busy)

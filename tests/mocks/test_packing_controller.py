@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from chestniy_znak_desktop.api.models.packing import (
+    BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
     CloseBoxResultDto,
@@ -57,6 +58,7 @@ class FakePackingService:
         self.current_box_result: BoxDetailDto | None = None
         self.last_scan: tuple[int, str, str] | None = None
         self.close_result: CloseBoxResultDto | None = None
+        self.count_calls: list[tuple[int, bool]] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает fake текущую коробку."""
@@ -93,6 +95,16 @@ class FakePackingService:
             reason_code="box_closed",
             box=_box(filled=20, is_closed=True),
             print_ok=True,
+        )
+
+    def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
+        """Возвращает fake результат переключения учета коробки."""
+
+        self.count_calls.append((box_id, count_in_packing))
+        return BoxActionResultDto(
+            ok=True,
+            reason_code="count_in_packing_updated",
+            box=_box(count_in_packing=count_in_packing),
         )
 
 
@@ -143,6 +155,34 @@ def test_packing_controller_open_box_updates_state() -> None:
     assert controller.state.current_box.box_id == 1
     assert controller.state.status_message == "Коробка открыта"
     assert sounds.events == [SoundEvent.OK]
+
+
+def test_packing_controller_uses_count_flag_when_opening_box() -> None:
+    """Проверяет, что чекбокс учета влияет на открытие коробки."""
+
+    controller, _service, _sounds = _controller_pair()
+    controller.set_count_in_packing(False)
+
+    controller.open_box()
+
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.count_in_packing is False
+    assert controller.state.count_in_packing is False
+
+
+def test_packing_controller_updates_count_flag_for_open_box() -> None:
+    """Проверяет, что чекбокс учета меняет уже открытую коробку через backend."""
+
+    controller, service, _sounds = _controller_pair()
+    controller.open_box()
+
+    controller.set_count_in_packing(False)
+
+    assert service.count_calls == [(1, False)]
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.count_in_packing is False
+    assert controller.state.count_in_packing is False
+    assert controller.state.status_message == "Учет коробки обновлен"
 
 
 def test_packing_controller_warns_when_scan_without_box() -> None:

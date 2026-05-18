@@ -141,6 +141,7 @@ class FakePackingService:
         self.current_box_result: BoxDetailDto | None = None
         self.batch_calls: list[tuple[int, list[str], str]] = []
         self.close_calls: list[tuple[int, str]] = []
+        self.count_calls: list[tuple[int, bool]] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую коробку."""
@@ -154,7 +155,7 @@ class FakePackingService:
             ok=True,
             created=True,
             has_active_boxes=False,
-            box=_box(filled=0),
+            box=_box(filled=0, count_in_packing=count_in_packing),
         )
 
     def scan_batch_to_box(
@@ -196,6 +197,16 @@ class FakePackingService:
             reason_code="box_closed",
             box=_box(filled=12, capacity=12),
             print_ok=True,
+        )
+
+    def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
+        """Запоминает переключение учета коробки."""
+
+        self.count_calls.append((box_id, count_in_packing))
+        return BoxActionResultDto(
+            ok=True,
+            reason_code="count_in_packing_updated",
+            box=_box(count_in_packing=count_in_packing),
         )
 
 
@@ -290,7 +301,12 @@ class FakeBoxEditService:
         )
 
 
-def _box(*, filled: int = 0, capacity: int = 20) -> BoxDto:
+def _box(
+    *,
+    filled: int = 0,
+    capacity: int = 20,
+    count_in_packing: bool = True,
+) -> BoxDto:
     """Создает DTO коробки для тестов."""
 
     return BoxDto(
@@ -299,7 +315,7 @@ def _box(*, filled: int = 0, capacity: int = 20) -> BoxDto:
         sscc="",
         capacity=capacity,
         filled=filled,
-        count_in_packing=True,
+        count_in_packing=count_in_packing,
         allow_duplicate_scans=False,
         is_closed=False,
         is_edit_mode=False,
@@ -411,6 +427,34 @@ def test_auto_packing_closes_current_box(tmp_path) -> None:
     assert len(events) == 1
     assert events[0].ok is True
     assert sounds.events == [SoundEvent.VICTORY]
+
+
+def test_auto_packing_uses_count_flag_when_opening_box(tmp_path) -> None:
+    """Проверяет, что чекбокс учета влияет на открытие коробки автоскана."""
+
+    controller, _service, _verifier, _sounds = _controller_pair(tmp_path)
+    controller.set_count_in_packing(False)
+
+    controller.open_box()
+
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.count_in_packing is False
+    assert controller.state.count_in_packing is False
+
+
+def test_auto_packing_updates_count_flag_for_open_box(tmp_path) -> None:
+    """Проверяет переключение учета уже открытой коробки автоскана."""
+
+    controller, service, _verifier, _sounds = _controller_pair(tmp_path)
+    controller.open_box()
+
+    controller.set_count_in_packing(False)
+
+    assert service.count_calls == [(1, False)]
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.count_in_packing is False
+    assert controller.state.count_in_packing is False
+    assert controller.state.status_message == "Учет коробки обновлен"
 
 
 def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:

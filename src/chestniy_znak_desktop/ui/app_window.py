@@ -197,6 +197,9 @@ class AppWindow(QMainWindow):
         self._main_screen.auto_packing_screen.close_box_requested.connect(
             self._request_auto_close_current_box
         )
+        self._main_screen.auto_packing_screen.count_in_packing_changed.connect(
+            self._auto_packing_controller.set_count_in_packing
+        )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending
         )

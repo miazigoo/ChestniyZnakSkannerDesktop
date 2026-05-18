@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QFrame,
     QGridLayout,
     QHeaderView,
@@ -40,6 +41,7 @@ class AutoPackingScreen(QWidget):
     clear_box_requested = Signal()
     delete_box_requested = Signal()
     codes_per_item_changed = Signal(int)
+    count_in_packing_changed = Signal(bool)
 
     def __init__(self) -> None:
         """Создает экран автосканерной упаковки."""
@@ -51,6 +53,7 @@ class AutoPackingScreen(QWidget):
         self._has_box = False
         self._summary_card = PackingSummaryCard()
         self._capacity_spin = QSpinBox()
+        self._count_in_packing = QCheckBox("Учитывать коробку в упаковке")
         self._refresh_button = QPushButton("Обновить")
         self._open_box_button = QPushButton("Открыть коробку")
         self._close_box_button = QPushButton("Закрыть коробку")
@@ -87,6 +90,9 @@ class AutoPackingScreen(QWidget):
         self._capacity_spin.blockSignals(True)
         self._capacity_spin.setValue(state.codes_per_item)
         self._capacity_spin.blockSignals(False)
+        self._count_in_packing.blockSignals(True)
+        self._count_in_packing.setChecked(state.count_in_packing)
+        self._count_in_packing.blockSignals(False)
         self._has_box = state.current_box is not None
         self._box_filled = state.current_box.filled if state.current_box is not None else 0
         self._box_items_count = len(state.current_box.items) if state.current_box is not None else 0
@@ -135,6 +141,9 @@ class AutoPackingScreen(QWidget):
         self._capacity_spin.setObjectName("settingsInput")
         self._capacity_spin.setRange(1, 99)
         self._capacity_spin.valueChanged.connect(self.codes_per_item_changed.emit)
+        self._count_in_packing.setObjectName("packingCheckBox")
+        self._count_in_packing.setChecked(True)
+        self._count_in_packing.toggled.connect(self.count_in_packing_changed.emit)
         self._refresh_button.setObjectName("packingSecondaryButton")
         self._open_box_button.setObjectName("packingPrimaryButton")
         self._close_box_button.setObjectName("packingDangerButton")
@@ -232,6 +241,7 @@ class AutoPackingScreen(QWidget):
         layout.addWidget(self._capacity_spin)
         layout.addLayout(quick)
         layout.addLayout(actions)
+        layout.addWidget(self._count_in_packing)
         layout.addWidget(self._scanner_status)
         return panel
 
@@ -410,6 +420,7 @@ class AutoPackingScreen(QWidget):
         self._open_box_button.setEnabled(is_ready)
         self._close_box_button.setEnabled(is_ready and self._has_box)
         self._capacity_spin.setEnabled(not is_busy)
+        self._count_in_packing.setEnabled(not is_busy)
         for button in self._quick_buttons:
             button.setEnabled(not is_busy)
         self._clear_button.setEnabled(not is_busy)

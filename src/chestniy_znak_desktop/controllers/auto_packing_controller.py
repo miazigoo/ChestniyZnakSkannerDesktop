@@ -49,6 +49,9 @@ class AutoPackingBackend(Protocol):
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
         """Закрывает коробку."""
 
+    def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
+        """Переключает учет коробки в упаковке."""
+
 
 class AutoPackingVerifier(Protocol):
     """Контракт сервиса проверки DataMatrix перед локальным боксом."""
@@ -123,6 +126,7 @@ class AutoPackingUiState:
     result_message: str = ""
     error_message: str = ""
     last_scanned_code: str = ""
+    count_in_packing: bool = True
 
     @property
     def pending_count(self) -> int:
@@ -204,8 +208,12 @@ class AutoPackingController(QObject):
         if self._state.is_busy:
             return
         self._set_busy("Открываем коробку...")
+        count_in_packing = self._state.count_in_packing
         self._task_runner.submit(
-            lambda: self._packing_service.open_box(device_id=self._device_id),
+            lambda: self._packing_service.open_box(
+                device_id=self._device_id,
+                count_in_packing=count_in_packing,
+            ),
             self._on_box_opened,
             self._on_error,
         )
@@ -249,6 +257,34 @@ class AutoPackingController(QObject):
             and self._state.is_pending_full
         ):
             self._submit_pending_batch()
+
+    def set_count_in_packing(self, enabled: bool) -> None:
+        """Обновляет флаг учета коробки в упаковке."""
+
+        if self._state.is_busy:
+            return
+        if self._state.current_box is not None:
+            box_id = self._state.current_box.box_id
+            self._set_busy("Обновляем учет коробки в упаковке...")
+            self._task_runner.submit(
+                lambda: self._packing_service.set_count_in_packing(box_id, enabled),
+                self._on_count_in_packing_changed,
+                self._on_error,
+            )
+            return
+        self._set_state(
+            replace(
+                self._state,
+                count_in_packing=enabled,
+                status_message="Учет следующей коробки обновлен",
+                result_message=(
+                    "Коробка будет учитываться в упаковке"
+                    if enabled
+                    else "Коробка будет без учета упаковки"
+                ),
+                error_message="",
+            )
+        )
 
     def clear_pending(self) -> None:
         """Очищает локальный автоскана-бокс без изменения коробки."""
@@ -673,6 +709,34 @@ class AutoPackingController(QObject):
         )
         self._forget_accepted_codes()
 
+    def _on_count_in_packing_changed(self, result: object) -> None:
+        """Обрабатывает результат переключения учета текущей коробки."""
+
+        edit_result = self._expect(result, BoxActionResultDto)
+        message = edit_result.error or edit_result.reason_code
+        if not edit_result.ok:
+            self._set_state(
+                replace(
+                    self._state,
+                    is_busy=False,
+                    status_message="Учет коробки не изменен",
+                    error_message=message,
+                )
+            )
+            return
+        count_in_packing = edit_result.box.count_in_packing
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                current_box=self._box_with_count_in_packing(count_in_packing),
+                count_in_packing=count_in_packing,
+                status_message="Учет коробки обновлен",
+                result_message=message,
+                error_message="",
+            )
+        )
+
     def _on_box_closed(self, result: object) -> None:
         """Обрабатывает результат закрытия коробки автоскана."""
 
@@ -738,6 +802,7 @@ class AutoPackingController(QObject):
                 current_box=self._box_to_ui(detail),
                 status_message="Коробка загружена",
                 error_message="",
+                count_in_packing=detail.count_in_packing,
             )
         )
         self._process_next_queued_scan()
@@ -757,6 +822,7 @@ class AutoPackingController(QObject):
                 ),
                 result_message=f"Коробка #{opened.box.box_id}",
                 error_message="",
+                count_in_packing=opened.box.count_in_packing,
             )
         )
         self._process_next_queued_scan()
@@ -786,6 +852,13 @@ class AutoPackingController(QObject):
                 last_scanned_code=last_scanned_code or self._state.last_scanned_code,
             )
         )
+
+    def _box_with_count_in_packing(self, count_in_packing: bool) -> PackingBoxUi | None:
+        """Возвращает текущую коробку с обновленным флагом учета."""
+
+        if self._state.current_box is None:
+            return None
+        return replace(self._state.current_box, count_in_packing=count_in_packing)
 
     def _set_state(self, state: AutoPackingUiState) -> None:
         """Сохраняет и публикует состояние автосканера."""
