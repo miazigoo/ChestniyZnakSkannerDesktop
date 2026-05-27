@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.packing import BoxActionResultDto
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -44,7 +45,7 @@ class BoxEditUiState:
     """Состояние действий редактирования коробки."""
 
     is_busy: bool = False
-    status_message: str = "Редактирование не запущено"
+    status_message: str = field(default_factory=lambda: tr("boxes.editIdle"))
     error_message: str = ""
 
 
@@ -83,7 +84,7 @@ class BoxEditController(QObject):
 
         self._submit_box_action(
             box_id=box_id,
-            message=f"Открываем редактирование коробки #{box_id}...",
+            message=tr("boxes.edit.opening", box_id=box_id),
             task=lambda: self._edit_service.open_edit(box_id, reason),
         )
 
@@ -92,7 +93,7 @@ class BoxEditController(QObject):
 
         self._submit_box_action(
             box_id=box_id,
-            message=f"Закрываем редактирование коробки #{box_id}...",
+            message=tr("boxes.edit.closing", box_id=box_id),
             task=lambda: self._edit_service.close_edit(box_id),
         )
 
@@ -101,7 +102,7 @@ class BoxEditController(QObject):
 
         self._submit_box_action(
             box_id=box_id,
-            message=f"Удаляем код #{item_id} из коробки #{box_id}...",
+            message=tr("boxes.edit.removingCode", item_id=item_id, box_id=box_id),
             task=lambda: self._edit_service.remove_item(box_id, item_id),
         )
 
@@ -110,7 +111,7 @@ class BoxEditController(QObject):
 
         self._submit_box_action(
             box_id=box_id,
-            message=f"Очищаем коробку #{box_id}...",
+            message=tr("boxes.edit.clearing", box_id=box_id),
             task=lambda: self._edit_service.clear_box(box_id),
         )
 
@@ -119,7 +120,7 @@ class BoxEditController(QObject):
 
         self._submit_box_action(
             box_id=box_id,
-            message=f"Удаляем пустую коробку #{box_id}...",
+            message=tr("boxes.edit.deletingEmpty", box_id=box_id),
             task=lambda: self._edit_service.delete_empty_box(box_id),
             delete_action=True,
         )
@@ -165,7 +166,7 @@ class BoxEditController(QObject):
         self._play(SoundEvent.ERROR)
         self._set_state(
             BoxEditUiState(
-                status_message="Ошибка редактирования коробки",
+                status_message=tr("boxes.edit.error"),
                 error_message=str(exc),
             )
         )
@@ -187,13 +188,15 @@ class BoxEditController(QObject):
         """Возвращает текст статуса по backend reason_code."""
 
         messages = {
-            "edit_opened": "Редактирование открыто",
-            "edit_already_open": "Редактирование уже открыто",
-            "box_already_open": "Коробка уже открыта",
-            "edit_closed": "Редактирование закрыто",
-            "edit_already_closed": "Редактирование уже закрыто",
-            "item_removed": "Код удален из коробки",
-            "box_cleared": "Коробка очищена",
-            "empty_box_deleted": "Пустая коробка удалена",
+            "edit_opened": tr("boxes.edit.opened"),
+            "edit_already_open": tr("boxes.edit.alreadyOpen"),
+            "box_already_open": tr("boxes.edit.boxAlreadyOpen"),
+            "edit_closed": tr("boxes.edit.closed"),
+            "edit_already_closed": tr("boxes.edit.alreadyClosed"),
+            "item_removed": tr("boxes.edit.itemRemoved"),
+            "box_cleared": tr("boxes.edit.boxCleared"),
+            "empty_box_deleted": tr("boxes.edit.emptyDeleted"),
+            "code_in_other_box": tr("boxes.edit.codeInOtherBox"),
+            "mark_code_already_packed": tr("boxes.edit.codeInOtherBox"),
         }
         return messages.get(reason_code, reason_code)

@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from chestniy_znak_desktop.app.settings_store import SettingsStore, UserSettings
+from chestniy_znak_desktop.i18n import normalize_language, set_current_language, tr
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
 
@@ -18,6 +19,7 @@ class SettingsFormData:
 
     api_base_url: str
     device_id: str
+    language: str
     theme_name: str
     sound_enabled: bool
     sound_volume: float
@@ -33,6 +35,7 @@ class SettingsUiState:
 
     api_base_url: str
     device_id: str
+    language: str
     theme_name: str
     sound_enabled: bool
     sound_volume: float
@@ -50,6 +53,7 @@ class SettingsController(QObject):
 
     state_changed = Signal(SettingsUiState)
     settings_saved = Signal(str)
+    language_changed = Signal(str)
 
     def __init__(
         self,
@@ -78,24 +82,27 @@ class SettingsController(QObject):
     def publish_state(self) -> None:
         """Публикует состояние настроек для первичного заполнения UI."""
 
-        self._emit_state(status_message="Настройки загружены")
+        self._emit_state(status_message=tr("settings.loaded"))
 
     def save_form(self, form_data: SettingsFormData) -> None:
         """Валидирует и сохраняет значения основной формы настроек."""
 
         api_base_url = form_data.api_base_url.strip()
         device_id = form_data.device_id.strip()
+        language = normalize_language(form_data.language)
+        set_current_language(language)
         if not api_base_url:
-            self._emit_state(error_message="Backend URL не может быть пустым")
+            self._emit_state(error_message=tr("settings.backendRequired"))
             return
         if not device_id:
-            self._emit_state(error_message="Device ID не может быть пустым")
+            self._emit_state(error_message=tr("settings.deviceRequired"))
             return
-        message = self._save_message_for(form_data, api_base_url, device_id)
+        message = self._save_message_for(form_data, api_base_url, device_id, language)
         self._settings = replace(
             self._settings,
             api_base_url=api_base_url,
             device_id=device_id,
+            language=language,
             theme_name=form_data.theme_name,
             sound_enabled=form_data.sound_enabled,
             sound_volume=form_data.sound_volume,
@@ -106,19 +113,20 @@ class SettingsController(QObject):
         )
         self._apply_live_settings()
         self._save(message)
+        self.language_changed.emit(language)
         self.settings_saved.emit(message)
 
     def set_scanner_port(self, port: str) -> None:
         """Сохраняет выбранный COM/SPP-порт сканера."""
 
         self._settings = replace(self._settings, scanner_port=port)
-        self._save("Порт сканера сохранен")
+        self._save(tr("settings.scannerPortSaved"))
 
     def set_scanner_baudrate(self, baudrate: int) -> None:
         """Сохраняет скорость COM/SPP-порта сканера."""
 
         self._settings = replace(self._settings, scanner_baudrate=baudrate)
-        self._save("Скорость сканера сохранена")
+        self._save(tr("settings.scannerBaudrateSaved"))
 
     def set_theme(self, theme_name: str) -> None:
         """Сохраняет и сразу применяет выбранную тему интерфейса."""
@@ -126,16 +134,16 @@ class SettingsController(QObject):
         theme = self._theme_manager.get_theme(theme_name)
         self._settings = replace(self._settings, theme_name=theme.name)
         self._theme_manager.set_theme(theme.name, self._qt_app)
-        self._save(f"Тема применена: {theme.title}")
+        self._save(tr("settings.themeApplied", theme=theme.title))
 
     def preview_sound_file(self, filename: str) -> None:
         """Проигрывает выбранный звук из настроек."""
 
         if filename not in SoundService.available_sound_files():
-            self._emit_state(error_message="Файл звука не найден")
+            self._emit_state(error_message=tr("settings.soundMissing"))
             return
         self._sound_service.preview_file(filename)
-        self._emit_state(status_message=f"Прослушивание: {filename}")
+        self._emit_state(status_message=tr("settings.soundPreview", filename=filename))
 
     def _apply_live_settings(self) -> None:
         """Применяет настройки, которые можно изменить без пересоздания API."""
@@ -159,16 +167,19 @@ class SettingsController(QObject):
         form_data: SettingsFormData,
         api_base_url: str,
         device_id: str,
+        language: str,
     ) -> str:
         """Возвращает понятный текст для модалки сохранения."""
 
         if api_base_url != self._settings.api_base_url or device_id != self._settings.device_id:
-            return "Настройки сохранены. Backend и Device ID применятся после перезапуска."
+            return tr("settings.savedRestart")
+        if language != self._settings.language:
+            return tr("settings.languageSaved")
         if self._sound_settings_changed(form_data):
-            return "Звуковые настройки сохранены и применены."
+            return tr("settings.soundSaved")
         if form_data.theme_name != self._settings.theme_name:
-            return "Настройки сохранены. Тема применена."
-        return "Настройки сохранены."
+            return tr("settings.themeSaved")
+        return tr("settings.saved")
 
     def _sound_settings_changed(self, form_data: SettingsFormData) -> bool:
         """Проверяет, менялись ли настройки звука."""
@@ -199,6 +210,7 @@ class SettingsController(QObject):
             SettingsUiState(
                 api_base_url=self._settings.api_base_url,
                 device_id=self._settings.device_id,
+                language=self._settings.language,
                 theme_name=self._settings.theme_name,
                 sound_enabled=self._settings.sound_enabled,
                 sound_volume=self._settings.sound_volume,

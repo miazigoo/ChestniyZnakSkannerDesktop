@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.screens.auto_packing_screen import AutoPackingScreen
 from chestniy_znak_desktop.ui.screens.box_lookup_screen import BoxLookupScreen
@@ -198,7 +199,7 @@ class MainScreen(QWidget):
 
         brand = QLabel("CZ Desktop")
         brand.setObjectName("mainBrand")
-        section = QLabel("Рабочее место")
+        section = QLabel(tr("main.workplace"))
         section.setObjectName("mainSection")
         layout.addWidget(brand)
         layout.addWidget(section)
@@ -207,7 +208,7 @@ class MainScreen(QWidget):
         for item in self._main_nav_items():
             layout.addWidget(item)
         layout.addStretch(1)
-        utility = QLabel("Сервис")
+        utility = QLabel(tr("main.service"))
         utility.setObjectName("mainSection")
         layout.addWidget(utility)
         for item in self._utility_nav_items():
@@ -247,9 +248,9 @@ class MainScreen(QWidget):
     def _workspace_header(self) -> QHBoxLayout:
         """Создает шапку рабочей области."""
 
-        title = QLabel("Операционный центр")
+        title = QLabel(tr("main.title"))
         title.setObjectName("workspaceTitle")
-        subtitle = QLabel("Сканер, упаковка, проверка и сервисные действия")
+        subtitle = QLabel(tr("main.subtitle"))
         subtitle.setObjectName("workspaceSubtitle")
         title_box = QVBoxLayout()
         title_box.setContentsMargins(0, 0, 0, 0)
@@ -271,28 +272,64 @@ class MainScreen(QWidget):
         """Создает основные пункты навигации."""
 
         return [
-            self._nav_item("Упаковка", "Текущая коробка", VectorIconName.BOX, 0, "packing"),
             self._nav_item(
-                "Автоупаковка",
-                "Мультиплаты",
+                tr("main.nav.packing"),
+                tr("main.nav.packingHint"),
+                VectorIconName.BOX,
+                0,
+                "packing",
+            ),
+            self._nav_item(
+                tr("main.nav.autoPacking"),
+                tr("main.nav.autoPackingHint"),
                 VectorIconName.SCANNER,
                 1,
                 "auto_packing",
             ),
-            self._nav_item("Коробки", "Список и детали", VectorIconName.BOX, 2, "boxes"),
-            self._nav_item("Поиск коробки", "SSCC или ID", VectorIconName.SCANNER, 3, "box_lookup"),
-            self._nav_item("Проверка", "DataMatrix", VectorIconName.TOKEN, 4, "verify"),
-            self._nav_item("Брак", "Отметка кодов", VectorIconName.WARNING, 5, "defect"),
+            self._nav_item(
+                tr("main.nav.boxes"),
+                tr("main.nav.boxesHint"),
+                VectorIconName.BOX,
+                2,
+                "boxes",
+            ),
+            self._nav_item(
+                tr("main.nav.lookup"),
+                tr("main.nav.lookupHint"),
+                VectorIconName.SCANNER,
+                3,
+                "box_lookup",
+            ),
+            self._nav_item(
+                tr("main.nav.verify"),
+                tr("main.nav.verifyHint"),
+                VectorIconName.TOKEN,
+                4,
+                "verify",
+            ),
+            self._nav_item(
+                tr("main.nav.defect"),
+                tr("main.nav.defectHint"),
+                VectorIconName.WARNING,
+                5,
+                "defect",
+            ),
         ]
 
     def _utility_nav_items(self) -> list[NavItem]:
         """Создает сервисные пункты навигации."""
 
         return [
-            self._nav_item("Настройки", "Устройство", VectorIconName.SETTINGS, 6, "settings"),
             self._nav_item(
-                "Диагностика",
-                "Логи и статус",
+                tr("main.nav.settings"),
+                tr("main.nav.settingsHint"),
+                VectorIconName.SETTINGS,
+                6,
+                "settings",
+            ),
+            self._nav_item(
+                tr("main.nav.diagnostics"),
+                tr("main.nav.diagnosticsHint"),
                 VectorIconName.DIAGNOSTICS,
                 7,
                 "diagnostics",

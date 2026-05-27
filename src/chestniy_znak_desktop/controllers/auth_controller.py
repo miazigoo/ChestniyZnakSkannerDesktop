@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.errors import ApiError, UnauthorizedError
+from chestniy_znak_desktop.api.errors import (
+    ApiError,
+    PlantSubscriptionExpiredError,
+    UnauthorizedError,
+)
 from chestniy_znak_desktop.api.models.auth import AccountDto, AuthCheckDto
 from chestniy_znak_desktop.domain.auth_token_extractor import extract_auth_token
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 
@@ -34,7 +39,7 @@ class AuthUiState:
     """Состояние экрана авторизации."""
 
     is_submitting: bool = False
-    status_message: str = "Ожидание токена авторизации"
+    status_message: str = field(default_factory=lambda: tr("login.waitStatus"))
     error_message: str = ""
     token_preview: str = ""
 
@@ -68,12 +73,12 @@ class AuthController(QObject):
         return self._state
 
     def restore_session(self) -> None:
-        """Пробует восстановить cookie-сессию при старте приложения."""
+        """Пробует восстановить локальную app-сессию при старте приложения."""
 
         self._set_state(
             AuthUiState(
                 is_submitting=True,
-                status_message="Проверяем сохраненную сессию...",
+                status_message=tr("auth.restore"),
             )
         )
         self._task_runner.submit(
@@ -91,15 +96,15 @@ class AuthController(QObject):
         if not token:
             self._set_state(
                 AuthUiState(
-                    status_message="Считайте другой токен.",
-                    error_message="QR-код не содержит токен авторизации",
+                    status_message=tr("auth.scanAnother"),
+                    error_message=tr("auth.tokenMissing"),
                 )
             )
             return
         self._set_state(
             AuthUiState(
                 is_submitting=True,
-                status_message="Токен считан. Выполняем вход...",
+                status_message=tr("auth.signingInStatus"),
                 token_preview=self._mask_token(token),
             )
         )
@@ -124,7 +129,7 @@ class AuthController(QObject):
         self._runtime_controller.clear_session()
         self._set_state(
             AuthUiState(
-                status_message="Сессия истекла. Войдите снова.",
+                status_message=tr("auth.sessionExpired"),
                 error_message=message,
             )
         )
@@ -135,20 +140,32 @@ class AuthController(QObject):
 
         auth_check = self._as_type(result, AuthCheckDto)
         if auth_check.authenticated:
-            self._runtime_controller.set_authenticated_user(auth_check.user)
-            self._set_state(AuthUiState(status_message="Сессия восстановлена."))
+            self._runtime_controller.set_authenticated_user(
+                auth_check.user,
+                plant_id=auth_check.plant_id,
+                device_id=auth_check.device_id,
+                supplier_id=auth_check.supplier_id,
+                supplier_name=auth_check.supplier_name,
+                plant_name=auth_check.plant_name,
+                client_device_id=auth_check.client_device_id,
+                subscription_status=auth_check.subscription_status,
+            )
+            self._set_state(AuthUiState(status_message=tr("auth.restored")))
             self.authenticated.emit(auth_check.user)
             return
         self._runtime_controller.clear_session()
-        self._set_state(AuthUiState(status_message="Отсканируйте токен авторизации."))
+        self._set_state(AuthUiState(status_message=tr("auth.scanToken")))
         self.unauthenticated.emit()
 
     def _on_restore_failed(self, exc: Exception) -> None:
         """Обрабатывает ошибку восстановления сессии."""
 
         self._runtime_controller.clear_session()
-        message = "Отсканируйте токен авторизации."
-        error = "" if isinstance(exc, UnauthorizedError) else str(exc)
+        message = tr("auth.scanToken")
+        if isinstance(exc, PlantSubscriptionExpiredError):
+            error = str(exc)
+        else:
+            error = "" if isinstance(exc, UnauthorizedError) else str(exc)
         self._set_state(AuthUiState(status_message=message, error_message=error))
         self.unauthenticated.emit()
 
@@ -156,17 +173,26 @@ class AuthController(QObject):
         """Обрабатывает успешный вход по токену."""
 
         account = self._as_type(result, AccountDto)
-        self._runtime_controller.set_authenticated_user(account.display_name)
-        self._set_state(AuthUiState(status_message="Вход выполнен."))
+        self._runtime_controller.set_authenticated_user(
+            account.display_name,
+            plant_id=account.plant_id,
+            device_id=account.device_id,
+            supplier_id=account.supplier_id,
+            supplier_name=account.supplier_name,
+            plant_name=account.plant_name,
+            client_device_id=account.client_device_id,
+            subscription_status=account.subscription_status,
+        )
+        self._set_state(AuthUiState(status_message=tr("auth.loginOk")))
         self.authenticated.emit(account.display_name)
 
     def _on_login_failed(self, exc: Exception) -> None:
         """Обрабатывает ошибку входа по токену."""
 
-        message = str(exc) if isinstance(exc, ApiError) else "Не удалось войти"
+        message = str(exc) if isinstance(exc, ApiError) else tr("auth.loginFailed")
         self._set_state(
             AuthUiState(
-                status_message="Авторизация не выполнена.",
+                status_message=tr("auth.authFailed"),
                 error_message=message,
                 token_preview=self._state.token_preview,
             )
@@ -176,7 +202,7 @@ class AuthController(QObject):
         """Обрабатывает успешное завершение сессии."""
 
         self._runtime_controller.clear_session()
-        self._set_state(AuthUiState(status_message="Сессия завершена."))
+        self._set_state(AuthUiState(status_message=tr("auth.loggedOut")))
         self.unauthenticated.emit()
 
     def _on_logout_failed(self, exc: Exception) -> None:
@@ -185,7 +211,7 @@ class AuthController(QObject):
         self._runtime_controller.clear_session()
         self._set_state(
             AuthUiState(
-                status_message="Сессия сброшена локально.",
+                status_message=tr("auth.localReset"),
                 error_message=str(exc),
             )
         )
@@ -202,7 +228,7 @@ class AuthController(QObject):
         """Возвращает короткое безопасное отображение токена."""
 
         if len(token) <= 8:
-            return "Токен принят"
+            return tr("auth.tokenAccepted")
         return f"{token[:4]}...{token[-4:]}"
 
     @staticmethod

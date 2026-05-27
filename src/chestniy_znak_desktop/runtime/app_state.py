@@ -45,10 +45,31 @@ class AppState:
             scanner=self.scanner,
         )
 
-    def set_authenticated_user(self, user_name: str) -> None:
+    def set_authenticated_user(
+        self,
+        user_name: str,
+        *,
+        plant_id: str = "",
+        device_id: str = "",
+        supplier_id: str = "",
+        supplier_name: str = "",
+        plant_name: str = "",
+        client_device_id: str = "",
+        subscription_status: str = "",
+    ) -> None:
         """Помечает текущую сессию как авторизованную."""
 
-        self.session = SessionState(status=SessionStatus.AUTHENTICATED, user_name=user_name)
+        self.session = SessionState(
+            status=SessionStatus.AUTHENTICATED,
+            user_name=user_name,
+            plant_id=plant_id,
+            device_id=device_id,
+            supplier_id=supplier_id,
+            supplier_name=supplier_name,
+            plant_name=plant_name,
+            client_device_id=client_device_id,
+            subscription_status=subscription_status,
+        )
 
     def clear_user(self) -> None:
         """Сбрасывает текущую пользовательскую сессию."""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from serial.tools import list_ports
+from serial.tools import list_ports as list_ports
 
 from chestniy_znak_desktop.scanner.base import ScannerPort
 

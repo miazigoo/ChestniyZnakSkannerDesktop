@@ -7,6 +7,7 @@ from PySide6.QtGui import QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
     create_back_button,
     create_card,
@@ -48,7 +49,7 @@ class ThemeOptionCard(QFrame):
         title.setObjectName("settingsThemeTitle")
         meta = QLabel(theme.name)
         meta.setObjectName("settingsThemeMeta")
-        self._state_label = QLabel("Доступна")
+        self._state_label = QLabel(tr("settings.theme.available"))
         self._state_label.setObjectName("settingsThemeCheck")
 
         text = QVBoxLayout()
@@ -85,7 +86,9 @@ class ThemeOptionCard(QFrame):
         """Обновляет визуальное состояние выбранной темы."""
 
         self.setProperty("selected", selected)
-        self._state_label.setText("Активна" if selected else "Доступна")
+        self._state_label.setText(
+            tr("settings.theme.active") if selected else tr("settings.theme.available")
+        )
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
@@ -129,14 +132,14 @@ class ThemeSettingsPage(QWidget):
             item.clicked.connect(self._select_theme)
 
         header = create_page_header(
-            title="Тема",
-            subtitle="Выберите визуальный стиль рабочего интерфейса.",
+            title=tr("settings.theme.title"),
+            subtitle=tr("settings.theme.subtitle"),
             icon_name=VectorIconName.SETTINGS,
             icon_color="#8fb8ff",
         )
         card, card_layout = create_card(
-            title="Оформление",
-            subtitle="Тема применяется сразу после выбора.",
+            title=tr("settings.theme.cardTitle"),
+            subtitle=tr("settings.theme.cardSubtitle"),
             icon_name=VectorIconName.SHIELD,
             icon_color="#66d2c7",
         )

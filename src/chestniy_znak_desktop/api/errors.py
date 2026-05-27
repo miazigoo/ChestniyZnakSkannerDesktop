@@ -9,3 +9,7 @@ class ApiError(RuntimeError):
 
 class UnauthorizedError(ApiError):
     """Ошибка истекшей или отсутствующей сессии."""
+
+
+class PlantSubscriptionExpiredError(UnauthorizedError):
+    """Ошибка доступа при истекшей подписке завода."""

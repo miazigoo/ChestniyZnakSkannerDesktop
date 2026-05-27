@@ -8,6 +8,7 @@ from typing import Protocol
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.verify import VerifyExistsResponseDto
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -38,7 +39,7 @@ class VerifyUiState:
     """Состояние экрана проверки DataMatrix-кода."""
 
     is_busy: bool = False
-    status_message: str = "Ожидание скана кода"
+    status_message: str = field(default_factory=lambda: tr("verify.waitScan"))
     result_message: str = ""
     error_message: str = ""
     last_visible_code: str = ""
@@ -89,7 +90,7 @@ class VerifyController(QObject):
         self._set_state(
             VerifyUiState(
                 is_busy=True,
-                status_message="Проверяем код...",
+                status_message=tr("verify.checking"),
                 last_visible_code=code,
                 check_duplicates=check_duplicates,
                 log=self._state.log,
@@ -123,7 +124,7 @@ class VerifyController(QObject):
         log = self._prepend_log(f"{visible_code}: {result_message}")
         self._set_state(
             VerifyUiState(
-                status_message="Код обработан",
+                status_message=tr("verify.processed"),
                 result_message=result_message,
                 error_message="" if result.ok else result_message,
                 last_visible_code=visible_code,
@@ -144,7 +145,7 @@ class VerifyController(QObject):
         log = self._prepend_log(f"{self._state.last_visible_code}: {exc}")
         self._set_state(
             VerifyUiState(
-                status_message="Ошибка проверки кода",
+                status_message=tr("verify.errorStatus"),
                 error_message=str(exc),
                 last_visible_code=self._state.last_visible_code,
                 check_duplicates=self._state.check_duplicates,
@@ -174,8 +175,8 @@ class VerifyController(QObject):
         """Возвращает человекочитаемый результат проверки."""
 
         if result.ok:
-            return result.message or "Код найден"
-        return result.message or "Код не найден"
+            return result.message or tr("verify.found")
+        return result.message or tr("verify.notFound")
 
     @staticmethod
     def _visible_code(result: VerifyExistsResponseDto) -> str:

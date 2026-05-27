@@ -37,11 +37,46 @@ def test_parse_restores_missing_gs_after_long_serial() -> None:
     assert parsed.ai_parts == {"92": "0001"}
 
 
+def test_parse_short_44_code_without_gs() -> None:
+    """Проверяет короткий код ЧЗ без явного GS."""
+
+    parsed = parse_marking_code("010460700123456721SERIAL1234567890123493ABCD")
+    assert parsed.gtin == "04607001234567"
+    assert parsed.serial == "SERIAL12345678901234"
+    assert parsed.ai_parts == {"93": "ABCD"}
+    assert parsed.visible_code == "010460700123456721SERIAL12345678901234<GS>93ABCD"
+    assert parsed.gs_restored is True
+
+
+def test_parse_long_crypto_tail_without_gs() -> None:
+    """Проверяет длинный код ЧЗ без GS между serial, 91 и 92."""
+
+    parsed = parse_marking_code("010460700123456721SERIAL1234567890123491KEY192" + "X" * 44)
+    assert parsed.serial == "SERIAL12345678901234"
+    assert parsed.ai_parts == {"91": "KEY1", "92": "X" * 44}
+    assert parsed.visible_code == (
+        "010460700123456721SERIAL12345678901234<GS>91KEY1<GS>92" + "X" * 44
+    )
+    assert parsed.gs_restored is True
+
+
+def test_parse_longer_crypto_tail_without_gs() -> None:
+    """Проверяет удлиненный криптохвост без привязки к общей длине кода."""
+
+    parsed = parse_marking_code("010460700123456721SERIAL1234567890123491KEY192" + "Y" * 49)
+    assert parsed.serial == "SERIAL12345678901234"
+    assert parsed.ai_parts == {"91": "KEY1", "92": "Y" * 49}
+    assert "<GS>91KEY1<GS>92" in parsed.visible_code
+    assert parsed.gs_restored is True
+
+
 def test_normalize_accepts_visible_gs_aliases() -> None:
     """Проверяет замену видимых алиасов GS на управляющий символ."""
 
-    normalized, native_gs, _ = normalize_scanner_input("010460123456789021S<GS>92TAIL\r\n")
-    assert normalized == f"010460123456789021S{GS}92TAIL"
+    normalized, native_gs, _ = normalize_scanner_input(
+        f" {GS}010460123456789021S{{GS}}91ABCD\\03592TAIL\r\n"
+    )
+    assert normalized == f"010460123456789021S{GS}91ABCD{GS}92TAIL"
     assert native_gs is True
 
 

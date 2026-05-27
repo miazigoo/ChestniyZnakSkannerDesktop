@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.box_lookup_controller import BoxLookupUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -29,13 +30,13 @@ class BoxLookupScreen(QWidget):
 
         super().__init__()
         self.setObjectName("boxLookupScreen")
-        self._title = QLabel("Поиск коробки")
-        self._status = QLabel("Сканируйте штрихкод коробки")
-        self._scanner_status = QLabel("Сканер: проверяем состояние")
+        self._title = QLabel(tr("lookup.title"))
+        self._status = QLabel(tr("lookup.scanBox"))
+        self._scanner_status = QLabel(tr("verify.scannerChecking"))
         self._error = QLabel("")
-        self._last_code = QLabel("Последний скан: -")
-        self._found = QLabel("Коробка: -")
-        self._reset_button = QPushButton("Сбросить статус")
+        self._last_code = QLabel(tr("lookup.lastScan", code="-"))
+        self._found = QLabel(tr("lookup.found", value="-"))
+        self._reset_button = QPushButton(tr("lookup.reset"))
         self._log = QTextEdit()
         self._log.setReadOnly(True)
 
@@ -48,8 +49,8 @@ class BoxLookupScreen(QWidget):
         self._status.setText(state.status_message)
         self._error.setText(state.error_message)
         self._error.setVisible(bool(state.error_message))
-        self._last_code.setText(f"Последний скан: {self._preview(state.last_scanned_code)}")
-        self._found.setText(f"Коробка: {state.found_box_summary or '-'}")
+        self._last_code.setText(tr("lookup.lastScan", code=self._preview(state.last_scanned_code)))
+        self._found.setText(tr("lookup.found", value=state.found_box_summary or "-"))
         self._found.setProperty("tone", "found" if state.found_box_id is not None else "empty")
         self._found.style().unpolish(self._found)
         self._found.style().polish(self._found)
@@ -60,10 +61,12 @@ class BoxLookupScreen(QWidget):
         """Обновляет подсказку о доступности сканера для поиска."""
 
         if snapshot.scanner.is_running:
-            self._scanner_status.setText(f"Сканер готов: {snapshot.scanner.port or '-'}")
+            self._scanner_status.setText(
+                tr("verify.scannerReady", port=snapshot.scanner.port or "-")
+            )
             self._scanner_status.setProperty("tone", "active")
         else:
-            self._scanner_status.setText("Сканер не запущен. Поиск коробки заблокирован.")
+            self._scanner_status.setText(tr("lookup.scannerBlocked"))
             self._scanner_status.setProperty("tone", "error")
         self._scanner_status.style().unpolish(self._scanner_status)
         self._scanner_status.style().polish(self._scanner_status)
@@ -111,10 +114,7 @@ class BoxLookupScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("lookupHero")
         icon = VectorIcon(VectorIconName.SCANNER, "#8fb8ff")
-        subtitle = QLabel(
-            "Сканируйте SSCC или ID коробки. После успешного поиска откроются детали "
-            "в общем списке коробок."
-        )
+        subtitle = QLabel(tr("lookup.heroSubtitle"))
         subtitle.setObjectName("lookupHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -133,9 +133,9 @@ class BoxLookupScreen(QWidget):
 
         card = QFrame()
         card.setObjectName("lookupCard")
-        title = QLabel("Источник данных")
+        title = QLabel(tr("lookup.source"))
         title.setObjectName("lookupCardTitle")
-        note = QLabel("Ручной ввод отключен")
+        note = QLabel(tr("lookup.sourceNote"))
         note.setObjectName("lookupMutedText")
         note.setWordWrap(True)
 
@@ -158,7 +158,7 @@ class BoxLookupScreen(QWidget):
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.BOX, "#f3c969"))
         header_text = QVBoxLayout()
-        title = QLabel("Результат поиска")
+        title = QLabel(tr("lookup.resultTitle"))
         title.setObjectName("lookupCardTitle")
         header_text.addWidget(title)
         header_text.addWidget(self._status)
@@ -180,9 +180,9 @@ class BoxLookupScreen(QWidget):
         panel = QFrame()
         panel.setObjectName("lookupLogPanel")
         header = QHBoxLayout()
-        title = QLabel("Журнал сканов")
+        title = QLabel(tr("lookup.logTitle"))
         title.setObjectName("lookupCardTitle")
-        hint = QLabel("Последние попытки поиска коробок")
+        hint = QLabel(tr("lookup.logHint"))
         hint.setObjectName("lookupMutedText")
         text = QVBoxLayout()
         text.addWidget(title)

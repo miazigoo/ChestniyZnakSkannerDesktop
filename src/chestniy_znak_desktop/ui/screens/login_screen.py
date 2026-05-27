@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPain
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -59,20 +60,17 @@ class LoginScreen(QWidget):
         super().__init__()
         self.setObjectName("loginScreen")
         self.setMinimumSize(640, 460)
-        self._title_label = QLabel("Честный знак")
+        self._title_label = QLabel(tr("login.product"))
         self._title_label.setObjectName("loginHeroTitle")
-        self._subtitle_label = QLabel("Desktop-клиент оператора")
+        self._subtitle_label = QLabel(tr("login.subtitle"))
         self._subtitle_label.setObjectName("loginHeroSubtitle")
-        self._description_label = QLabel(
-            "Авторизация выполняется только сканером. Считайте QR-токен, "
-            "чтобы открыть рабочие сценарии упаковки, проверки и брака."
-        )
+        self._description_label = QLabel(tr("login.description"))
         self._description_label.setObjectName("loginHeroDescription")
         self._description_label.setWordWrap(True)
 
-        self._status_badge = QLabel("Ожидание токена")
+        self._status_badge = QLabel(tr("login.waitBadge"))
         self._status_badge.setObjectName("loginStatusBadge")
-        self._status_label = QLabel("Ожидание токена авторизации")
+        self._status_label = QLabel(tr("login.waitStatus"))
         self._status_label.setObjectName("loginPrimaryStatus")
         self._status_label.setWordWrap(True)
         self._error_label = QLabel("")
@@ -81,26 +79,26 @@ class LoginScreen(QWidget):
 
         self._connection_row = LoginStatusRow(
             VectorIconName.LINK,
-            "Связь",
-            "Проверяем соединение с сервером",
+            tr("login.connection"),
+            tr("login.connectionChecking"),
             "#6ee7d8",
         )
         self._scanner_row = LoginStatusRow(
             VectorIconName.SCANNER,
-            "Сканер",
-            "Проверяем подключение сканера",
+            tr("login.scanner"),
+            tr("login.scannerChecking"),
             "#e0b15e",
         )
         self._token_row = LoginStatusRow(
             VectorIconName.TOKEN,
-            "Последний скан",
+            tr("login.lastScan"),
             "-",
             "#8ab4ff",
         )
         self._security_row = LoginStatusRow(
             VectorIconName.SHIELD,
-            "Сессия",
-            "Токен будет отправлен в backend по защищенной cookie-сессии",
+            tr("login.session"),
+            tr("login.security"),
             "#95d5b2",
         )
         self._build_layout()
@@ -112,20 +110,20 @@ class LoginScreen(QWidget):
         self._error_label.setText(state.error_message)
         self._token_row.set_value(state.token_preview or "-")
         if state.is_submitting:
-            self._status_badge.setText("Выполняем вход")
+            self._status_badge.setText(tr("login.signingIn"))
         elif state.error_message:
-            self._status_badge.setText("Требуется новый токен")
+            self._status_badge.setText(tr("login.needToken"))
         else:
-            self._status_badge.setText("Готов к скану")
+            self._status_badge.setText(tr("login.ready"))
 
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет подсказку о доступности сканера для входа."""
 
         self._connection_row.set_value(snapshot.connection.message)
         if snapshot.scanner.is_running:
-            self._scanner_row.set_value(f"Готов к чтению: {snapshot.scanner.port}")
+            self._scanner_row.set_value(tr("login.scannerReady", port=snapshot.scanner.port))
             return
-        self._scanner_row.set_value("Сканер не запущен. Вход невозможен без сканера.")
+        self._scanner_row.set_value(tr("login.scannerStopped"))
 
     def paintEvent(self, _event: QPaintEvent) -> None:
         """Рисует векторный фон экрана входа."""
@@ -157,9 +155,9 @@ class LoginScreen(QWidget):
         panel_layout = QVBoxLayout(panel)
         panel_layout.setContentsMargins(30, 30, 30, 30)
         panel_layout.setSpacing(14)
-        panel_title = QLabel("Вход по QR-токену")
+        panel_title = QLabel(tr("login.panelTitle"))
         panel_title.setObjectName("loginPanelTitle")
-        panel_hint = QLabel("Поднесите QR авторизации к подключенному COM/SPP-сканеру.")
+        panel_hint = QLabel(tr("login.panelHint"))
         panel_hint.setObjectName("loginPanelHint")
         panel_hint.setWordWrap(True)
         panel_layout.addWidget(panel_title)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from chestniy_znak_desktop.api.client import ApiClient
 from chestniy_znak_desktop.api.errors import ApiError
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
@@ -13,12 +12,13 @@ from chestniy_znak_desktop.api.models.packing import (
     ScanBatchToBoxResultDto,
     ScanToBoxResultDto,
 )
+from chestniy_znak_desktop.api.services.api_client_protocol import ApiClientProtocol
 
 
 class PackingService:
     """Работает с backend-сценариями коробок Честного знака."""
 
-    def __init__(self, api_client: ApiClient) -> None:
+    def __init__(self, api_client: ApiClientProtocol) -> None:
         """Сохраняет API-клиент сервиса."""
 
         self._api_client = api_client
@@ -56,12 +56,28 @@ class PackingService:
         result = BoxActionResultDto.model_validate(payload)
         return BoxDetailDto.model_validate(result.box.model_dump())
 
-    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+    def open_box(
+        self,
+        device_id: str,
+        count_in_packing: bool = True,
+        order_id: str | None = None,
+        order_line_id: str | None = None,
+        code_value: str | None = None,
+        sscc: str | None = None,
+    ) -> OpenBoxResultDto:
         """Открывает новую коробку или возвращает активную коробку пользователя."""
 
+        request = {"device_id": device_id, "count_in_packing": count_in_packing}
+        optional_fields = {
+            "order_id": order_id,
+            "order_line_id": order_line_id,
+            "code_value": code_value,
+            "sscc": sscc,
+        }
+        request.update({key: value for key, value in optional_fields.items() if value})
         payload = self._api_client.post(
             "chestniy-znak/packing/boxes/open",
-            json={"device_id": device_id, "count_in_packing": count_in_packing},
+            json=request,
         )
         return OpenBoxResultDto.model_validate(payload)
 
@@ -89,7 +105,7 @@ class PackingService:
         return ScanBatchToBoxResultDto.model_validate(payload)
 
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
-        """Закрывает коробку и запускает печать этикетки."""
+        """Закрывает коробку без локальной печати на рабочем месте."""
 
         payload = self._api_client.post(
             f"chestniy-znak/packing/boxes/{box_id}/close",

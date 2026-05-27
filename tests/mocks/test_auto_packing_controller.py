@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
+from chestniy_znak_desktop.api.models.orders import (
+    OrderLineDto,
+    OrderProductDto,
+    WorkOrderDto,
+    WorkOrderPageDto,
+)
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -17,6 +24,7 @@ from chestniy_znak_desktop.api.models.verify import RemoteCodeDto, VerifyExistsR
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
+from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
@@ -142,15 +150,25 @@ class FakePackingService:
         self.batch_calls: list[tuple[int, list[str], str]] = []
         self.close_calls: list[tuple[int, str]] = []
         self.count_calls: list[tuple[int, bool]] = []
+        self.open_calls: list[tuple[str, bool, str | None, str | None]] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую коробку."""
 
         return self.current_box_result
 
-    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+    def open_box(
+        self,
+        device_id: str,
+        count_in_packing: bool = True,
+        order_id: str | None = None,
+        order_line_id: str | None = None,
+        code_value: str | None = None,
+        sscc: str | None = None,
+    ) -> OpenBoxResultDto:
         """Возвращает открытую коробку."""
 
+        self.open_calls.append((device_id, count_in_packing, order_id, order_line_id))
         return OpenBoxResultDto(
             ok=True,
             created=True,
@@ -196,7 +214,6 @@ class FakePackingService:
             ok=True,
             reason_code="box_closed",
             box=_box(filled=12, capacity=12),
-            print_ok=True,
         )
 
     def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
@@ -301,6 +318,26 @@ class FakeBoxEditService:
         )
 
 
+class FakeOrderService:
+    """Fake сервис рабочих заказов для проверки выбора номенклатуры."""
+
+    def __init__(self, page: WorkOrderPageDto) -> None:
+        """Создает сервис с фиксированной страницей заказов."""
+
+        self.page = page
+
+    def list_orders(
+        self,
+        status: str | None = None,
+        search: str = "",
+        page: int = 1,
+        per_page: int = 20,
+    ) -> WorkOrderPageDto:
+        """Возвращает заданную страницу заказов."""
+
+        return self.page
+
+
 def _box(
     *,
     filled: int = 0,
@@ -319,6 +356,38 @@ def _box(
         allow_duplicate_scans=False,
         is_closed=False,
         is_edit_mode=False,
+    )
+
+
+def _work_order(*, scan_required: bool = True) -> WorkOrderPageDto:
+    """Создает страницу с одной активной строкой заказа."""
+
+    return WorkOrderPageDto(
+        data=[
+            WorkOrderDto(
+                id="order-1",
+                plant_id="plant-1",
+                supplier_id="supplier-1",
+                order_number="ORDER-1",
+                status="issued_to_supplier",
+                scan_required=scan_required,
+                lines=[
+                    OrderLineDto(
+                        id="line-1",
+                        order_id="order-1",
+                        product_id="product-1",
+                        quantity=10,
+                        required_code_quantity=10,
+                        status="active",
+                        product=OrderProductDto(
+                            id="product-1",
+                            sku="SKU-1",
+                            name="Номенклатура 1",
+                        ),
+                    ),
+                ],
+            )
+        ],
     )
 
 
@@ -342,7 +411,7 @@ def _detail_box(*, items_count: int = 2) -> BoxDetailDto:
 
 
 def _controller_pair(
-    tmp_path,
+    tmp_path: Path,
 ) -> tuple[AutoPackingController, FakePackingService, FakeVerifyService, FakeSoundService]:
     """Создает контроллер с fake-зависимостями."""
 
@@ -365,7 +434,7 @@ def _controller_pair(
     return controller, service, verifier, sounds
 
 
-def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
+def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path: Path) -> None:
     """Проверяет отправку пачки только после заполнения локального бокса."""
 
     controller, service, _verifier, sounds = _controller_pair(tmp_path)
@@ -386,7 +455,7 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
-def test_auto_packing_splits_glued_gs1_codes(tmp_path) -> None:
+def test_auto_packing_splits_glued_gs1_codes(tmp_path: Path) -> None:
     """Проверяет разделение двух DataMatrix, склеенных HID-вводом."""
 
     controller, service, _verifier, sounds = _controller_pair(tmp_path)
@@ -402,7 +471,7 @@ def test_auto_packing_splits_glued_gs1_codes(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
-def test_auto_packing_rejects_truncated_numeric_tail(tmp_path) -> None:
+def test_auto_packing_rejects_truncated_numeric_tail(tmp_path: Path) -> None:
     """Проверяет, что хвост DataMatrix без начала не попадает в ВБ."""
 
     controller, service, _verifier, sounds = _controller_pair(tmp_path)
@@ -417,7 +486,7 @@ def test_auto_packing_rejects_truncated_numeric_tail(tmp_path) -> None:
     assert "обрезанный DataMatrix" in controller.state.error_message
 
 
-def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path) -> None:
+def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path: Path) -> None:
     """Проверяет отправку ВБ, который стал полным после смены вместимости."""
 
     controller, service, _verifier, sounds = _controller_pair(tmp_path)
@@ -443,11 +512,11 @@ def test_auto_packing_sends_batch_after_capacity_reduction(tmp_path) -> None:
     assert sounds.events == [SoundEvent.OK]
 
 
-def test_auto_packing_closes_current_box(tmp_path) -> None:
+def test_auto_packing_closes_current_box(tmp_path: Path) -> None:
     """Проверяет закрытие текущей коробки из сценария автоскана."""
 
     controller, service, _verifier, sounds = _controller_pair(tmp_path)
-    events = []
+    events: list[CloseBoxUiEvent] = []
     controller.close_completed.connect(events.append)
     controller.open_box()
 
@@ -460,7 +529,7 @@ def test_auto_packing_closes_current_box(tmp_path) -> None:
     assert sounds.events == [SoundEvent.VICTORY]
 
 
-def test_auto_packing_uses_count_flag_when_opening_box(tmp_path) -> None:
+def test_auto_packing_uses_count_flag_when_opening_box(tmp_path: Path) -> None:
     """Проверяет, что чекбокс учета влияет на открытие коробки автоскана."""
 
     controller, _service, _verifier, _sounds = _controller_pair(tmp_path)
@@ -473,7 +542,7 @@ def test_auto_packing_uses_count_flag_when_opening_box(tmp_path) -> None:
     assert controller.state.count_in_packing is False
 
 
-def test_auto_packing_updates_count_flag_for_open_box(tmp_path) -> None:
+def test_auto_packing_updates_count_flag_for_open_box(tmp_path: Path) -> None:
     """Проверяет переключение учета уже открытой коробки автоскана."""
 
     controller, service, _verifier, _sounds = _controller_pair(tmp_path)
@@ -486,10 +555,41 @@ def test_auto_packing_updates_count_flag_for_open_box(tmp_path) -> None:
     assert controller.state.current_box.count_in_packing is False
     assert controller.state.count_in_packing is False
     assert controller.state.status_message == "Учет коробки обновлен"
-    assert controller.state.result_message == "Коробка не учитывается в упаковке"
+    assert controller.state.result_message == "Без учета упаковки"
 
 
-def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
+def test_auto_packing_blocks_box_for_no_scan_order(tmp_path: Path) -> None:
+    """Проверяет, что автоупаковка не открывает коробку для заказа без сканирования."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=FakeOrderService(_work_order(scan_required=False)),
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+
+    controller.refresh_orders()
+    controller.open_box()
+
+    assert controller.state.selected_order_scan_required is False
+    assert service.open_calls == []
+    assert controller.state.status_message == "Сканирование по заказу отключено"
+    assert "web-кабинете поставщика" in controller.state.result_message
+    assert sounds.events == [SoundEvent.WARNING]
+
+
+def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path: Path) -> None:
     """Проверяет очередь быстрых HID-сканов во время отправки ВБ."""
 
     service = FakePackingService()
@@ -517,7 +617,7 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
     controller.on_code_scanned("CODE2")
 
     assert len(runner.tasks) == 1
-    assert controller.state.is_busy is True
+    assert bool(controller.state.is_busy)
     assert controller.state.result_message == "Сканов в очереди: 1"
 
     runner.run_next()
@@ -529,7 +629,7 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
     runner.run_next()
 
     assert len(runner.tasks) == 1
-    assert controller.state.is_busy is False
+    assert not bool(controller.state.is_busy)
     runner.run_next()
 
     assert controller.state.pending_count == 0
@@ -541,7 +641,7 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path) -> None:
     assert controller.state.is_busy is False
 
 
-def test_auto_packing_does_not_preverify_before_local_box_is_full(tmp_path) -> None:
+def test_auto_packing_does_not_preverify_before_local_box_is_full(tmp_path: Path) -> None:
     """Проверяет, что автоскан не дергает verify до отправки полного ВБ."""
 
     service = FakePackingService()
@@ -574,7 +674,7 @@ def test_auto_packing_does_not_preverify_before_local_box_is_full(tmp_path) -> N
     assert sounds.events == []
 
 
-def test_auto_packing_ignores_ws_failures_without_active_precheck(tmp_path) -> None:
+def test_auto_packing_ignores_ws_failures_without_active_precheck(tmp_path: Path) -> None:
     """Проверяет, что WS-failure не влияет на ВБ без предварительной проверки."""
 
     service = FakePackingService()
@@ -603,7 +703,7 @@ def test_auto_packing_ignores_ws_failures_without_active_precheck(tmp_path) -> N
     assert controller.state.pending_count == 1
 
 
-def test_auto_packing_does_not_use_ws_duplicate_for_local_box(tmp_path) -> None:
+def test_auto_packing_does_not_use_ws_duplicate_for_local_box(tmp_path: Path) -> None:
     """Проверяет, что старые WS-ответы не меняют ВБ без active request."""
 
     service = FakePackingService()
@@ -648,7 +748,7 @@ def test_auto_packing_does_not_use_ws_duplicate_for_local_box(tmp_path) -> None:
     assert controller.state.result_message == "1 / 2"
 
 
-def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
+def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path: Path) -> None:
     """Проверяет, что быстрый дубль raw-кода не попадает в очередь."""
 
     service = FakePackingService()
@@ -681,7 +781,7 @@ def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path) -> None:
     assert len(runner.tasks) == 1
 
 
-def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path) -> None:
+def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path: Path) -> None:
     """Проверяет идемпотентный пропуск кода, уже видимого в коробке."""
 
     service = FakePackingService()
@@ -711,7 +811,7 @@ def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path) -> Non
     assert controller.state.error_message == ""
 
 
-def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path) -> None:
+def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path: Path) -> None:
     """Проверяет, что ошибка пачки удаляет только проблемный код из ВБ."""
 
     service = FakePackingService()
@@ -762,7 +862,7 @@ def test_auto_packing_removes_only_rejected_item_after_batch_error(tmp_path) -> 
     assert "SSCC-1" in controller.state.error_message
 
 
-def test_auto_packing_removes_multiple_rejected_items_after_batch_error(tmp_path) -> None:
+def test_auto_packing_removes_multiple_rejected_items_after_batch_error(tmp_path: Path) -> None:
     """Проверяет удаление всех rejected-кодов из ВБ одним ответом backend."""
 
     service = FakePackingService()
@@ -834,7 +934,7 @@ def test_auto_packing_removes_multiple_rejected_items_after_batch_error(tmp_path
     assert "Удалено" in controller.state.error_message
 
 
-def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path) -> None:
+def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path: Path) -> None:
     """Проверяет, что повторы принятой пачки не добивают следующий ВБ."""
 
     service = FakePackingService()
@@ -900,7 +1000,7 @@ def test_auto_packing_filters_accepted_batch_codes_while_refreshing(tmp_path) ->
     ]
 
 
-def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
+def test_auto_packing_can_remove_item_from_open_box(tmp_path: Path) -> None:
     """Проверяет удаление кода из открытой коробки на экране автоскана."""
 
     service = FakePackingService()
@@ -928,7 +1028,7 @@ def test_auto_packing_can_remove_item_from_open_box(tmp_path) -> None:
     assert len(controller.state.current_box.items) == 1
 
 
-def test_auto_packing_can_clear_and_delete_open_box(tmp_path) -> None:
+def test_auto_packing_can_clear_and_delete_open_box(tmp_path: Path) -> None:
     """Проверяет очистку и удаление открытой коробки из автоупаковки."""
 
     service = FakePackingService()
@@ -961,7 +1061,7 @@ def test_auto_packing_can_clear_and_delete_open_box(tmp_path) -> None:
     assert controller.state.current_box is None
 
 
-def test_auto_packing_sends_mixed_order_to_backend_batch(tmp_path) -> None:
+def test_auto_packing_sends_mixed_order_to_backend_batch(tmp_path: Path) -> None:
     """Проверяет, что разные заказы проверяются только сервером полного ВБ."""
 
     controller, service, verifier, sounds = _controller_pair(tmp_path)

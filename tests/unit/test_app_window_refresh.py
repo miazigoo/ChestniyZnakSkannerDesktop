@@ -177,7 +177,6 @@ def test_boxes_screen_refreshes_list_and_selected_detail() -> None:
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=Counter(),
-        _printer_controller=Counter(),
         _scanner_controller=Counter(),
     )
 
@@ -197,7 +196,6 @@ def test_auto_packing_screen_refreshes_current_box() -> None:
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=Counter(),
-        _printer_controller=Counter(),
         _scanner_controller=Counter(),
     )
 
@@ -252,10 +250,9 @@ def test_clear_inactive_screen_data_clears_screen_controllers() -> None:
 
 
 def test_settings_screen_refreshes_device_sources() -> None:
-    """Проверяет обновление настроек, принтеров и портов сканера."""
+    """Проверяет обновление настроек и портов сканера."""
 
     settings = Counter()
-    printer = Counter()
     scanner = Counter()
     window = SimpleNamespace(
         _packing_controller=Counter(),
@@ -263,12 +260,10 @@ def test_settings_screen_refreshes_device_sources() -> None:
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=settings,
-        _printer_controller=printer,
         _scanner_controller=scanner,
     )
 
     AppWindow._refresh_screen_data(window, "settings")  # type: ignore[arg-type]
 
     assert settings.count == 1
-    assert printer.count == 1
     assert scanner.count == 1

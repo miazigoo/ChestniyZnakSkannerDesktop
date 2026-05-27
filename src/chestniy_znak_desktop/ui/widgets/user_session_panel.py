@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import (
     ConnectionStatus,
     RuntimeSnapshot,
@@ -25,13 +26,13 @@ class UserSessionPanel(QWidget):
         self.setObjectName("userSessionPanel")
         self.setFixedHeight(124)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._user_label = QLabel("Оператор: нет сессии")
+        self._user_label = QLabel(tr("session.operatorNone"))
         self._user_label.setObjectName("sessionUser")
-        self._connection_label = QLabel("Backend: неизвестно")
+        self._connection_label = QLabel(tr("session.backendUnknown"))
         self._connection_label.setObjectName("sessionMeta")
-        self._scanner_label = QLabel("Сканер: остановлен")
+        self._scanner_label = QLabel(tr("session.scannerStopped"))
         self._scanner_label.setObjectName("sessionMeta")
-        self._logout_button = QPushButton("Выйти")
+        self._logout_button = QPushButton(tr("session.logout"))
         self._logout_button.setObjectName("sessionLogout")
         self._logout_button.clicked.connect(self.logout_requested.emit)
         layout = QVBoxLayout(self)
@@ -55,23 +56,29 @@ class UserSessionPanel(QWidget):
         """Форматирует строку текущего оператора."""
 
         if snapshot.session.status == SessionStatus.AUTHENTICATED:
-            return f"Оператор: {snapshot.session.user_name}"
-        return "Оператор: нет сессии"
+            user = snapshot.session.user_name
+            if snapshot.session.plant_name:
+                user = f"{user} / {snapshot.session.plant_name}"
+            elif snapshot.session.plant_id:
+                plant = tr("session.plant", plant_id=snapshot.session.plant_id[:8])
+                user = f"{user} / {plant}"
+            return tr("session.operator", user=user)
+        return tr("session.operatorNone")
 
     @staticmethod
     def _format_connection(snapshot: RuntimeSnapshot) -> str:
         """Форматирует строку состояния backend-связи."""
 
         if snapshot.connection.status == ConnectionStatus.CONNECTED:
-            return "Backend: подключен"
-        return f"Backend: {snapshot.connection.message}"
+            return tr("session.backendConnected")
+        return tr("session.backend", message=snapshot.connection.message)
 
     @staticmethod
     def _format_scanner(snapshot: RuntimeSnapshot) -> str:
         """Форматирует строку состояния сканера."""
 
         if snapshot.scanner.status == ScannerStatus.RUNNING:
-            return f"Сканер: {snapshot.scanner.port}"
+            return tr("session.scannerPort", port=snapshot.scanner.port)
         if snapshot.scanner.status == ScannerStatus.ERROR:
-            return f"Сканер: ошибка - {snapshot.scanner.message}"
-        return "Сканер: остановлен"
+            return tr("session.scannerError", message=snapshot.scanner.message)
+        return tr("session.scannerStopped")

@@ -22,11 +22,11 @@ from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent, PackingController
-from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
 from chestniy_znak_desktop.domain.scanner_input_guard import contains_cyrillic
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.services.scanner_command_service import (
@@ -61,7 +61,6 @@ class AppWindow(QMainWindow):
         defect_controller: DefectController,
         verify_controller: VerifyController,
         diagnostics_controller: DiagnosticsController,
-        printer_controller: PrinterController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
     ) -> None:
@@ -79,7 +78,6 @@ class AppWindow(QMainWindow):
         self._defect_controller = defect_controller
         self._verify_controller = verify_controller
         self._diagnostics_controller = diagnostics_controller
-        self._printer_controller = printer_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
         self._scan_target = "packing"
@@ -134,9 +132,6 @@ class AppWindow(QMainWindow):
         self._main_screen.diagnostics_screen.logs_clear_requested.connect(
             self._diagnostics_controller.clear_logs
         )
-        self._printer_controller.state_changed.connect(
-            self._main_screen.settings_screen.apply_printer_state
-        )
         self._boxes_controller.state_changed.connect(self._main_screen.boxes_screen.apply_state)
         self._box_edit_controller.state_changed.connect(
             self._main_screen.boxes_screen.apply_edit_state
@@ -154,9 +149,6 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.boxes_screen.box_detail_requested.connect(
             self._boxes_controller.load_detail
-        )
-        self._main_screen.boxes_screen.print_label_requested.connect(
-            self._boxes_controller.print_selected_label
         )
         self._main_screen.boxes_screen.edit_open_requested.connect(
             self._box_edit_controller.open_edit
@@ -179,6 +171,9 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.refresh_requested.connect(
             self._packing_controller.refresh_current_box
         )
+        self._main_screen.packing_screen.refresh_requested.connect(
+            self._packing_controller.refresh_orders
+        )
         self._main_screen.packing_screen.open_box_requested.connect(
             self._packing_controller.open_box
         )
@@ -188,8 +183,17 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.count_in_packing_changed.connect(
             self._packing_controller.set_count_in_packing
         )
+        self._main_screen.packing_screen.order_search_changed.connect(
+            self._packing_controller.refresh_orders
+        )
+        self._main_screen.packing_screen.order_line_selected.connect(
+            self._packing_controller.select_order_line
+        )
         self._main_screen.auto_packing_screen.refresh_requested.connect(
             self._auto_packing_controller.refresh_current_box
+        )
+        self._main_screen.auto_packing_screen.refresh_requested.connect(
+            self._auto_packing_controller.refresh_orders
         )
         self._main_screen.auto_packing_screen.open_box_requested.connect(
             self._auto_packing_controller.open_box
@@ -199,6 +203,12 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.auto_packing_screen.count_in_packing_changed.connect(
             self._auto_packing_controller.set_count_in_packing
+        )
+        self._main_screen.auto_packing_screen.order_search_changed.connect(
+            self._auto_packing_controller.refresh_orders
+        )
+        self._main_screen.auto_packing_screen.order_line_selected.connect(
+            self._auto_packing_controller.select_order_line
         )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending
@@ -234,12 +244,6 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.settings_screen.sound_preview_requested.connect(
             self._settings_controller.preview_sound_file
-        )
-        self._main_screen.settings_screen.printer_refresh_requested.connect(
-            self._printer_controller.refresh
-        )
-        self._main_screen.settings_screen.printer_selected.connect(
-            self._printer_controller.select_printer
         )
         self._main_screen.settings_screen.scanner_ports_refresh_requested.connect(
             self._scanner_controller.refresh_ports
@@ -324,7 +328,6 @@ class AppWindow(QMainWindow):
             return
         if screen_name == "settings":
             self._settings_controller.publish_state()
-            self._printer_controller.refresh()
             self._scanner_controller.refresh_ports()
 
     def _clear_inactive_screen_data(self, screen_name: str) -> None:
@@ -352,10 +355,10 @@ class AppWindow(QMainWindow):
         state = self._packing_controller.state
         box = state.current_box
         if state.is_busy:
-            self._show_message("Операция выполняется", state.status_message)
+            self._show_message(tr("common.operationBusy"), state.status_message)
             return
         if box is None:
-            self._show_message("Коробка не открыта", "Сначала откройте коробку.")
+            self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxFirst"))
             return
         if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
             return
@@ -379,12 +382,12 @@ class AppWindow(QMainWindow):
         state = self._auto_packing_controller.state
         box = state.current_box
         if box is None or row < 0 or row >= len(box.items):
-            self._show_message("Код не выбран", "Выберите код во вкладке текущей коробки.")
+            self._show_message(tr("appWindow.selectCodeTitle"), tr("appWindow.selectCodeText"))
             return
         item = box.items[row]
         if self._confirm_action(
-            "Удалить код из коробки",
-            f"Удалить код #{item.id} из открытой коробки #{box.box_id}?",
+            tr("appWindow.removeCodeTitle"),
+            tr("appWindow.removeCodeText", item_id=item.id, box_id=box.box_id),
         ):
             self._auto_packing_controller.remove_box_item_at(row)
 
@@ -393,11 +396,11 @@ class AppWindow(QMainWindow):
 
         box = self._auto_packing_controller.state.current_box
         if box is None:
-            self._show_message("Коробка не открыта", "Открытая коробка не найдена.")
+            self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxMissing"))
             return
         if self._confirm_action(
-            "Очистить коробку",
-            f"Удалить все коды из открытой коробки #{box.box_id}?",
+            tr("appWindow.clearBoxTitle"),
+            tr("appWindow.clearBoxText", box_id=box.box_id),
         ):
             self._auto_packing_controller.clear_current_box()
 
@@ -406,17 +409,17 @@ class AppWindow(QMainWindow):
 
         box = self._auto_packing_controller.state.current_box
         if box is None:
-            self._show_message("Коробка не открыта", "Открытая коробка не найдена.")
+            self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxMissing"))
             return
         if box.filled > 0:
             self._show_message(
-                "Коробка не пустая",
-                "Перед удалением коробки удалите коды или очистите коробку.",
+                tr("appWindow.boxNotEmptyTitle"),
+                tr("appWindow.boxNotEmptyText"),
             )
             return
         if self._confirm_action(
-            "Удалить пустую коробку",
-            f"Удалить открытую пустую коробку #{box.box_id}?",
+            tr("appWindow.deleteEmptyTitle"),
+            tr("appWindow.deleteEmptyText", box_id=box.box_id),
         ):
             self._auto_packing_controller.delete_current_box()
 
@@ -426,15 +429,15 @@ class AppWindow(QMainWindow):
         state = self._auto_packing_controller.state
         box = state.current_box
         if state.is_busy:
-            self._show_message("Операция выполняется", state.status_message)
+            self._show_message(tr("common.operationBusy"), state.status_message)
             return
         if box is None:
-            self._show_message("Коробка не открыта", "Сначала откройте коробку.")
+            self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxFirst"))
             return
         if state.pending_items:
             self._show_message(
-                "Локальный бокс не пуст",
-                "Сначала отправьте заполненный автоскана-бокс или очистите его.",
+                tr("appWindow.localBoxNotEmptyTitle"),
+                tr("appWindow.localBoxNotEmptyText"),
             )
             return
         if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
@@ -485,7 +488,7 @@ class AppWindow(QMainWindow):
     def _handle_box_deleted(self, _box_id: int) -> None:
         """Сбрасывает карточку и обновляет список после удаления коробки."""
 
-        self._boxes_controller.clear_detail("Коробка удалена")
+        self._boxes_controller.clear_detail(tr("boxes.deleted"))
         self._boxes_controller.refresh()
 
     def _show_close_progress_dialog(self) -> None:
@@ -575,9 +578,8 @@ class AppWindow(QMainWindow):
 
         QMessageBox.warning(
             self,
-            "Неверная раскладка",
-            "Скан отклонен: в коде есть кириллица. Переключите раскладку на EN "
-            "и повторите сканирование.",
+            tr("appWindow.keyboardTitle"),
+            tr("appWindow.keyboardText"),
         )
 
     def _handle_scanner_command(self, command: ScannerCommand) -> bool:

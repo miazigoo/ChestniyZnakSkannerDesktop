@@ -9,10 +9,10 @@ from PySide6.QtWidgets import QApplication
 from chestniy_znak_desktop.api.client import ApiClient
 from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.auth_service import AuthService
+from chestniy_znak_desktop.api.services.order_service import OrderService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
-from chestniy_znak_desktop.api.services.printer_service import PrinterService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
-from chestniy_znak_desktop.api.session_store import FileCookieStore
+from chestniy_znak_desktop.api.session_store import FileBearerTokenStore, FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
@@ -23,9 +23,9 @@ from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
-from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
+from chestniy_znak_desktop.i18n import set_current_language
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
@@ -46,6 +46,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     qt_app.setOrganizationName(config.organization_name)
     settings_store = SettingsStore.from_config(config)
     settings = settings_store.load(defaults=config)
+    set_current_language(settings.language)
     config = replace(
         config,
         api_base_url=settings.api_base_url,
@@ -62,6 +63,8 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     api_client = ApiClient(
         config=config,
         cookie_store=FileCookieStore(config.data_dir / "cookies.txt"),
+        bearer_store=FileBearerTokenStore(config.data_dir / "saas_session.json"),
+        language=settings.language,
     )
     task_runner = QtTaskRunner()
     sound_service = SoundService(
@@ -88,7 +91,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         ),
     )
     packing_service = PackingService(api_client)
-    printer_service = PrinterService(api_client)
+    order_service = OrderService(api_client)
     chz_service = ChestniyZnakService(api_client)
     box_edit_service = BoxEditService(api_client)
     auto_pack_ws_verifier = AutoPackWsVerifier(connection_monitor=connection_monitor)
@@ -96,6 +99,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         packing_service=packing_service,
         task_runner=api_task_runner,
         device_id=settings.device_id,
+        order_service=order_service,
         sound_service=sound_service,
     )
     auto_packing_controller = AutoPackingController(
@@ -106,25 +110,19 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         settings_store=settings_store,
         settings_defaults=config,
         device_id=settings.device_id,
+        order_service=order_service,
         ws_verify_service=auto_pack_ws_verifier,
         sound_service=sound_service,
     )
     boxes_controller = BoxesController(
         boxes_service=packing_service,
-        printer_service=printer_service,
         task_runner=api_task_runner,
-        device_id=settings.device_id,
         sound_service=sound_service,
     )
     box_lookup_controller = BoxLookupController(
         boxes_service=packing_service,
         task_runner=api_task_runner,
         sound_service=sound_service,
-    )
-    printer_controller = PrinterController(
-        printer_service=printer_service,
-        task_runner=api_task_runner,
-        device_id=settings.device_id,
     )
     box_edit_controller = BoxEditController(
         edit_service=box_edit_service,
@@ -159,6 +157,8 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         sound_service=sound_service,
         qt_app=qt_app,
     )
+    settings_controller.language_changed.connect(api_client.set_language)
+    settings_controller.language_changed.connect(set_current_language)
     window = AppWindow(
         app_state=state,
         runtime_controller=runtime_controller,
@@ -171,7 +171,6 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         defect_controller=defect_controller,
         verify_controller=verify_controller,
         diagnostics_controller=diagnostics_controller,
-        printer_controller=printer_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )
@@ -180,10 +179,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: api_client.close())
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
+    auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_orders())
     auth_controller.authenticated.connect(
         lambda _user: auto_packing_controller.refresh_current_box()
     )
-    auth_controller.authenticated.connect(lambda _user: printer_controller.refresh())
+    auth_controller.authenticated.connect(lambda _user: auto_packing_controller.refresh_orders())
     runtime_controller.start()
     scanner_controller.refresh_ports()
     scanner_controller.start_hid_keyboard()
@@ -200,7 +200,8 @@ def _handle_unauthorized_api_error(
     auth_controller: AuthController,
     exc: Exception,
 ) -> None:
-    """Очищает cookies и переводит приложение на экран авторизации."""
+    """Очищает локальную сессию и переводит приложение на экран авторизации."""
 
     api_client.clear_cookies()
+    api_client.clear_bearer_tokens()
     auth_controller.handle_session_expired(str(exc))

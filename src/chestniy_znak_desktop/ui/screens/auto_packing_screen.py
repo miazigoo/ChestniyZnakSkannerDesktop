@@ -6,11 +6,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QSpinBox,
@@ -24,6 +26,7 @@ from PySide6.QtWidgets import (
 from chestniy_znak_desktop.controllers.auto_packing_controller import (
     AutoPackingUiState,
 )
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.packing_cards import PackingSummaryCard
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
@@ -42,6 +45,8 @@ class AutoPackingScreen(QWidget):
     delete_box_requested = Signal()
     codes_per_item_changed = Signal(int)
     count_in_packing_changed = Signal(bool)
+    order_search_changed = Signal(str)
+    order_line_selected = Signal(str)
 
     def __init__(self) -> None:
         """Создает экран автосканерной упаковки."""
@@ -51,27 +56,32 @@ class AutoPackingScreen(QWidget):
         self._is_busy = False
         self._scanner_ready = False
         self._has_box = False
+        self._has_order_selection = False
+        self._selected_order_scan_required = True
         self._summary_card = PackingSummaryCard()
         self._capacity_spin = QSpinBox()
-        self._count_in_packing = QCheckBox("Учитывать коробку в упаковке")
-        self._refresh_button = QPushButton("Обновить")
-        self._open_box_button = QPushButton("Открыть коробку")
-        self._close_box_button = QPushButton("Закрыть коробку")
-        self._clear_button = QPushButton("Очистить бокс")
-        self._remove_button = QPushButton("Удалить код")
-        self._remove_box_item_button = QPushButton("Удалить код из коробки")
-        self._clear_box_button = QPushButton("Очистить коробку")
-        self._delete_box_button = QPushButton("Удалить пустую коробку")
+        self._order_search = QLineEdit()
+        self._order_combo = QComboBox()
+        self._order_line_ids: list[str] = []
+        self._count_in_packing = QCheckBox(tr("packing.countInPacking"))
+        self._refresh_button = QPushButton(tr("packing.refresh"))
+        self._open_box_button = QPushButton(tr("packing.openBox"))
+        self._close_box_button = QPushButton(tr("packing.closeBox"))
+        self._clear_button = QPushButton(tr("autoPacking.clearBoxShort"))
+        self._remove_button = QPushButton(tr("autoPacking.removeCode"))
+        self._remove_box_item_button = QPushButton(tr("autoPacking.removeFromBox"))
+        self._clear_box_button = QPushButton(tr("autoPacking.clearServerBox"))
+        self._delete_box_button = QPushButton(tr("autoPacking.deleteEmptyBox"))
         self._quick_buttons: list[QPushButton] = []
-        self._status_title = QLabel("Автоскана-бокс пуст")
+        self._status_title = QLabel(tr("autoPacking.emptyTitle"))
         self._status_title.setObjectName("autoPackingStatusTitle")
-        self._status_detail = QLabel("Ожидаем коды от COM/SPP-сканера")
+        self._status_detail = QLabel(tr("autoPacking.waitCodes"))
         self._status_detail.setObjectName("autoPackingStatusDetail")
         self._status_detail.setWordWrap(True)
         self._error_label = QLabel("")
         self._error_label.setObjectName("packingError")
         self._error_label.setWordWrap(True)
-        self._scanner_status = QLabel("Сканер не запущен")
+        self._scanner_status = QLabel(tr("autoPacking.scannerStopped"))
         self._scanner_status.setObjectName("packingScannerStatus")
         self._pending_table = self._create_pending_table()
         self._box_items_table = self._create_box_items_table()
@@ -95,6 +105,8 @@ class AutoPackingScreen(QWidget):
         self._count_in_packing.blockSignals(True)
         self._count_in_packing.setChecked(state.count_in_packing)
         self._count_in_packing.blockSignals(False)
+        self._apply_order_options(state)
+        self._selected_order_scan_required = state.selected_order_scan_required
         self._has_box = state.current_box is not None
         self._box_filled = state.current_box.filled if state.current_box is not None else 0
         self._box_items_count = len(state.current_box.items) if state.current_box is not None else 0
@@ -127,7 +139,9 @@ class AutoPackingScreen(QWidget):
 
         self._scanner_ready = snapshot.scanner.is_running
         self._scanner_status.setText(
-            f"Сканер: {snapshot.scanner.port}" if self._scanner_ready else "Сканер не запущен"
+            tr("session.scannerPort", port=snapshot.scanner.port)
+            if self._scanner_ready
+            else tr("autoPacking.scannerStopped")
         )
         self._scanner_status.setProperty(
             "tone",
@@ -143,13 +157,19 @@ class AutoPackingScreen(QWidget):
         self._capacity_spin.setObjectName("settingsInput")
         self._capacity_spin.setRange(1, 99)
         self._capacity_spin.valueChanged.connect(self.codes_per_item_changed.emit)
+        self._order_search.setObjectName("settingsInput")
+        self._order_search.setPlaceholderText(tr("packing.searchPlaceholder"))
+        self._order_combo.setObjectName("settingsInput")
+        self._order_combo.setMinimumWidth(260)
+        self._order_search.textChanged.connect(self.order_search_changed.emit)
+        self._order_combo.currentIndexChanged.connect(self._emit_order_line_selected)
         self._count_in_packing.setObjectName("packingCheckBox")
         self._count_in_packing.setChecked(True)
         self._count_in_packing.toggled.connect(self.count_in_packing_changed.emit)
         self._refresh_button.setObjectName("packingSecondaryButton")
         self._open_box_button.setObjectName("packingPrimaryButton")
         self._close_box_button.setObjectName("packingDangerButton")
-        self._clear_button.setText("Очистить локальный бокс")
+        self._clear_button.setText(tr("autoPacking.clearBoxLocal"))
         self._clear_button.setObjectName("packingDangerButton")
         self._remove_button.setObjectName("packingSecondaryButton")
         self._remove_box_item_button.setObjectName("packingDangerButton")
@@ -198,12 +218,9 @@ class AutoPackingScreen(QWidget):
 
         hero = QFrame()
         hero.setObjectName("packingHero")
-        title = QLabel("Автоупаковка мультиплат")
+        title = QLabel(tr("autoPacking.heroTitle"))
         title.setObjectName("packingHeroTitle")
-        subtitle = QLabel(
-            "Коды сначала копятся в локальном боксе изделия. "
-            "В коробку они уходят только после заполнения бокса."
-        )
+        subtitle = QLabel(tr("autoPacking.heroSubtitle"))
         subtitle.setObjectName("packingHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -222,9 +239,9 @@ class AutoPackingScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("packingActionsPanel")
-        title = QLabel("Настройка изделия")
+        title = QLabel(tr("autoPacking.itemSettings"))
         title.setObjectName("packingCardTitle")
-        capacity_label = QLabel("DataMatrix на изделии")
+        capacity_label = QLabel(tr("autoPacking.codesPerItem"))
         capacity_label.setObjectName("packingMutedText")
         quick = QHBoxLayout()
         quick.setSpacing(8)
@@ -242,10 +259,47 @@ class AutoPackingScreen(QWidget):
         layout.addWidget(capacity_label)
         layout.addWidget(self._capacity_spin)
         layout.addLayout(quick)
+        layout.addWidget(QLabel(tr("packing.orderAndProduct")))
+        layout.addWidget(self._order_search)
+        layout.addWidget(self._order_combo)
         layout.addLayout(actions)
         layout.addWidget(self._count_in_packing)
         layout.addWidget(self._scanner_status)
         return panel
+
+    def _apply_order_options(self, state: AutoPackingUiState) -> None:
+        """Обновляет список выбора заказа и номенклатуры."""
+
+        self._has_order_selection = bool(state.selected_order_line_id)
+        self._order_search.blockSignals(True)
+        if self._order_search.text() != state.order_search:
+            self._order_search.setText(state.order_search)
+        self._order_search.blockSignals(False)
+
+        self._order_combo.blockSignals(True)
+        self._order_combo.clear()
+        self._order_line_ids = [option.order_line_id for option in state.order_options]
+        if state.orders_loading:
+            self._order_combo.addItem(tr("packing.ordersLoading"))
+        elif not state.order_options:
+            self._order_combo.addItem(tr("packing.ordersEmpty"))
+        else:
+            for option in state.order_options:
+                self._order_combo.addItem(option.label)
+            selected_index = (
+                self._order_line_ids.index(state.selected_order_line_id)
+                if state.selected_order_line_id in self._order_line_ids
+                else 0
+            )
+            self._order_combo.setCurrentIndex(selected_index)
+        self._order_combo.blockSignals(False)
+
+    def _emit_order_line_selected(self, index: int) -> None:
+        """Публикует выбранный идентификатор строки заказа."""
+
+        if index < 0 or index >= len(self._order_line_ids):
+            return
+        self.order_line_selected.emit(self._order_line_ids[index])
 
     def _create_local_box_panel(self) -> QFrame:
         """Создает красно-зеленую карточку локального автоскана-бокса."""
@@ -275,11 +329,11 @@ class AutoPackingScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("packingTablePanel")
-        title = QLabel("Коды автоскана и текущей коробки")
+        title = QLabel(tr("autoPacking.tableTitle"))
         title.setObjectName("packingCardTitle")
         self._tables_tabs.setObjectName("packingTablesTabs")
-        self._tables_tabs.addTab(self._pending_table, "Локальный бокс")
-        self._tables_tabs.addTab(self._box_items_table, "Текущая коробка")
+        self._tables_tabs.addTab(self._pending_table, tr("autoPacking.localBox"))
+        self._tables_tabs.addTab(self._box_items_table, tr("autoPacking.currentBox"))
         actions = QHBoxLayout()
         actions.setSpacing(10)
         actions.addWidget(self._remove_box_item_button)
@@ -300,7 +354,9 @@ class AutoPackingScreen(QWidget):
 
         table = QTableWidget(0, 5)
         table.setObjectName("packingItemsTable")
-        table.setHorizontalHeaderLabels(["#", "Заказ", "GTIN", "Serial", "Код"])
+        table.setHorizontalHeaderLabels(
+            ["#", tr("packing.column.order"), "GTIN", "Serial", tr("packing.column.code")]
+        )
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -320,7 +376,7 @@ class AutoPackingScreen(QWidget):
 
         table = QTableWidget(0, 4)
         table.setObjectName("packingItemsTable")
-        table.setHorizontalHeaderLabels(["#", "GTIN", "Serial", "Код"])
+        table.setHorizontalHeaderLabels(["#", "GTIN", "Serial", tr("packing.column.code")])
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -398,9 +454,16 @@ class AutoPackingScreen(QWidget):
         box_count = len(state.current_box.items) if state.current_box is not None else 0
         self._tables_tabs.setTabText(
             self._pending_tab_index,
-            f"Локальный бокс ({state.pending_count}/{state.codes_per_item})",
+            tr(
+                "autoPacking.localBoxCount",
+                count=state.pending_count,
+                capacity=state.codes_per_item,
+            ),
         )
-        self._tables_tabs.setTabText(self._box_tab_index, f"Текущая коробка ({box_count})")
+        self._tables_tabs.setTabText(
+            self._box_tab_index,
+            tr("autoPacking.currentBoxCount", count=box_count),
+        )
         if state.pending_items:
             self._tables_tabs.setCurrentIndex(self._pending_tab_index)
         elif box_count:
@@ -411,9 +474,17 @@ class AutoPackingScreen(QWidget):
 
         tone = "full" if state.is_pending_full else "partial"
         self._status_title.setText(
-            f"Бокс заполнен: {state.pending_count} / {state.codes_per_item}"
+            tr(
+                "autoPacking.boxFull",
+                count=state.pending_count,
+                capacity=state.codes_per_item,
+            )
             if state.is_pending_full
-            else f"Бокс не заполнен: {state.pending_count} / {state.codes_per_item}"
+            else tr(
+                "autoPacking.boxPartial",
+                count=state.pending_count,
+                capacity=state.codes_per_item,
+            )
         )
         parent = self._status_title.parentWidget()
         while parent is not None and parent.objectName() != "autoPackingBoxPanel":
@@ -440,9 +511,14 @@ class AutoPackingScreen(QWidget):
 
         self._is_busy = is_busy
         is_ready = not is_busy and self._scanner_ready
+        can_open_selected_order = self._has_order_selection and self._selected_order_scan_required
         self._refresh_button.setEnabled(not is_busy)
-        self._open_box_button.setEnabled(is_ready)
+        self._open_box_button.setEnabled(is_ready and (self._has_box or can_open_selected_order))
         self._close_box_button.setEnabled(is_ready and self._has_box)
+        self._order_search.setEnabled(not is_busy and not self._has_box)
+        self._order_combo.setEnabled(
+            not is_busy and not self._has_box and self._has_order_selection
+        )
         self._capacity_spin.setEnabled(not is_busy)
         self._count_in_packing.setEnabled(not is_busy)
         for button in self._quick_buttons:

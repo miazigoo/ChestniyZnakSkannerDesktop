@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from typing import cast
+
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -33,8 +36,8 @@ def qapp() -> QApplication:
     return cast(QApplication, app)
 
 
-def _controller(  # type: ignore[no-untyped-def]
-    tmp_path,
+def _controller(
+    tmp_path: Path,
 ) -> tuple[SettingsController, SettingsStore]:
     """Создает контроллер настроек с INI-хранилищем."""
 
@@ -62,7 +65,7 @@ def _controller(  # type: ignore[no-untyped-def]
     return controller, store
 
 
-def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_settings_controller_saves_form(tmp_path: Path) -> None:
     """Проверяет сохранение основной формы настроек."""
 
     controller, store = _controller(tmp_path)
@@ -75,6 +78,7 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
         SettingsFormData(
             api_base_url="https://new-backend/api/v2/",
             device_id="desktop-2",
+            language="ru",
             theme_name="dark",
             sound_enabled=False,
             sound_volume=0.4,
@@ -100,8 +104,8 @@ def test_settings_controller_saves_form(tmp_path) -> None:  # type: ignore[no-un
     ]
 
 
-def test_settings_controller_reports_sound_save_message(  # type: ignore[no-untyped-def]
-    tmp_path,
+def test_settings_controller_reports_sound_save_message(
+    tmp_path: Path,
 ) -> None:
     """Проверяет понятную модалку при сохранении звука."""
 
@@ -113,6 +117,7 @@ def test_settings_controller_reports_sound_save_message(  # type: ignore[no-unty
         SettingsFormData(
             api_base_url="http://backend/api/v2/",
             device_id="pc-1",
+            language="ru",
             theme_name="light",
             sound_enabled=True,
             sound_volume=0.6,
@@ -126,8 +131,8 @@ def test_settings_controller_reports_sound_save_message(  # type: ignore[no-unty
     assert saved_messages == ["Звуковые настройки сохранены и применены."]
 
 
-def test_settings_controller_reports_generic_save_message(  # type: ignore[no-untyped-def]
-    tmp_path,
+def test_settings_controller_reports_generic_save_message(
+    tmp_path: Path,
 ) -> None:
     """Проверяет нейтральную модалку при сохранении без изменений."""
 
@@ -139,6 +144,7 @@ def test_settings_controller_reports_generic_save_message(  # type: ignore[no-un
         SettingsFormData(
             api_base_url="http://backend/api/v2/",
             device_id="pc-1",
+            language="ru",
             theme_name="light",
             sound_enabled=True,
             sound_volume=0.85,
@@ -152,7 +158,36 @@ def test_settings_controller_reports_generic_save_message(  # type: ignore[no-un
     assert saved_messages == ["Настройки сохранены."]
 
 
-def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_settings_controller_saves_language(tmp_path: Path) -> None:
+    """Проверяет сохранение языка API-ответов."""
+
+    controller, store = _controller(tmp_path)
+    changed_languages: list[str] = []
+    saved_messages: list[str] = []
+    controller.language_changed.connect(changed_languages.append)
+    controller.settings_saved.connect(saved_messages.append)
+
+    controller.save_form(
+        SettingsFormData(
+            api_base_url="http://backend/api/v2/",
+            device_id="pc-1",
+            language="zh-CN",
+            theme_name="light",
+            sound_enabled=True,
+            sound_volume=0.85,
+            sound_ok_file="ok_02.mp3",
+            sound_warning_file="other.mp3",
+            sound_error_file="error.mp3",
+            sound_victory_file="victory.mp3",
+        )
+    )
+
+    assert store.load(AppConfig()).language == "zh"
+    assert changed_languages == ["zh"]
+    assert saved_messages == ["语言已保存，并会用于新的请求。"]
+
+
+def test_settings_rejects_empty_backend(tmp_path: Path) -> None:
     """Проверяет валидацию пустого backend URL."""
 
     controller, store = _controller(tmp_path)
@@ -163,6 +198,7 @@ def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-un
         SettingsFormData(
             api_base_url="",
             device_id="desktop-2",
+            language="ru",
             theme_name="dark",
             sound_enabled=False,
             sound_volume=0.4,
@@ -178,7 +214,7 @@ def test_settings_rejects_empty_backend(tmp_path) -> None:  # type: ignore[no-un
     assert states[-1].error_message == "Backend URL не может быть пустым"
 
 
-def test_settings_controller_saves_scanner_values(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_settings_controller_saves_scanner_values(tmp_path: Path) -> None:
     """Проверяет сохранение порта и скорости сканера."""
 
     controller, store = _controller(tmp_path)
@@ -191,8 +227,8 @@ def test_settings_controller_saves_scanner_values(tmp_path) -> None:  # type: ig
     assert loaded.scanner_baudrate == 115200
 
 
-def test_settings_controller_applies_theme_immediately(  # type: ignore[no-untyped-def]
-    tmp_path,
+def test_settings_controller_applies_theme_immediately(
+    tmp_path: Path,
 ) -> None:
     """Проверяет быстрое сохранение темы без полной формы настроек."""
 
@@ -208,9 +244,9 @@ def test_settings_controller_applies_theme_immediately(  # type: ignore[no-untyp
     assert states[-1].status_message == "Тема применена: Graphite Pro"
 
 
-def test_settings_controller_previews_sound_file(  # type: ignore[no-untyped-def]
-    tmp_path,
-    monkeypatch,
+def test_settings_controller_previews_sound_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Проверяет прослушивание выбранного звука."""
 
@@ -229,8 +265,8 @@ def test_settings_controller_previews_sound_file(  # type: ignore[no-untyped-def
     assert saved_messages == []
 
 
-def test_settings_controller_rejects_missing_sound_file(  # type: ignore[no-untyped-def]
-    tmp_path,
+def test_settings_controller_rejects_missing_sound_file(
+    tmp_path: Path,
 ) -> None:
     """Проверяет ошибку прослушивания неизвестного файла."""
 

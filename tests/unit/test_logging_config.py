@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from chestniy_znak_desktop.app.logging_config import configure_logging
 
 
 def test_configure_logging_uses_one_day_rotation(
-    tmp_path,
-    monkeypatch,
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Проверяет ротацию desktop.log в пределах суток."""
 
     captured: dict[str, Any] = {}

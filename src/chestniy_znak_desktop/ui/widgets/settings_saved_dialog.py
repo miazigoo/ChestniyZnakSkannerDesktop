@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.i18n import tr
+
 
 class SvgBackdrop(QLabel):
     """Показывает декоративный SVG-фон внутри модалки."""
@@ -91,14 +93,14 @@ class SettingsSavedDialog(QDialog):
 
         super().__init__(parent)
         self.setObjectName("settingsSavedDialog")
-        self.setWindowTitle("Настройки сохранены")
+        self.setWindowTitle(tr("settings.savedTitle"))
         self.setModal(True)
         self.setMinimumSize(700, 330)
         self.resize(760, 360)
 
         backdrop = SvgBackdrop()
 
-        title = QLabel("Настройки сохранены")
+        title = QLabel(tr("settings.savedTitle"))
         title.setObjectName("settingsSavedTitle")
         title.setWordWrap(True)
 
@@ -106,10 +108,10 @@ class SettingsSavedDialog(QDialog):
         body.setObjectName("settingsSavedMessage")
         body.setWordWrap(True)
 
-        badge = QLabel("Применено")
+        badge = QLabel(tr("settings.savedBadge"))
         badge.setObjectName("settingsSavedBadge")
 
-        ok_button = QPushButton("OK")
+        ok_button = QPushButton(tr("common.ok"))
         ok_button.setObjectName("settingsSavedButton")
         ok_button.clicked.connect(self.accept)
 

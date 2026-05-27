@@ -8,6 +8,7 @@ from typing import Protocol
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.verify import DefectResponseDto
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -31,7 +32,7 @@ class DefectUiState:
     """Состояние экрана отправки кода в брак."""
 
     is_busy: bool = False
-    status_message: str = "Ожидание скана кода"
+    status_message: str = field(default_factory=lambda: tr("defect.waitScan"))
     result_message: str = ""
     error_message: str = ""
     last_visible_code: str = ""
@@ -78,7 +79,7 @@ class DefectController(QObject):
         self._set_state(
             DefectUiState(
                 is_busy=True,
-                status_message="Отправляем код в брак...",
+                status_message=tr("defect.sending"),
                 last_visible_code=code,
                 log=self._state.log,
             )
@@ -105,7 +106,7 @@ class DefectController(QObject):
         log = [f"{visible_code}: {result_message}", *self._state.log][:50]
         self._set_state(
             DefectUiState(
-                status_message="Код обработан",
+                status_message=tr("defect.processed"),
                 result_message=result_message,
                 error_message="" if result.ok else result_message,
                 last_visible_code=visible_code,
@@ -124,7 +125,7 @@ class DefectController(QObject):
         log = [f"{self._state.last_visible_code}: {exc}", *self._state.log][:50]
         self._set_state(
             DefectUiState(
-                status_message="Ошибка отправки в брак",
+                status_message=tr("defect.errorStatus"),
                 error_message=str(exc),
                 last_visible_code=self._state.last_visible_code,
                 log=log,
@@ -158,12 +159,12 @@ class DefectController(QObject):
         """Возвращает человекочитаемый текст результата."""
 
         if result.ok:
-            return result.error or "Код отправлен в брак"
+            return result.error or tr("defect.sent")
         if result.error:
             return result.error
         if result.verify is not None:
             return result.verify.message
-        return "Не удалось отправить код в брак"
+        return tr("defect.failed")
 
     @staticmethod
     def _visible_code(result: DefectResponseDto) -> str:
@@ -197,4 +198,4 @@ class DefectController(QObject):
             return ""
         box = result.removed_from_box
         sscc = f" | {box.sscc}" if box.sscc else ""
-        return f"Удалено из коробки #{box.box_id}{sscc} | остаток {box.filled}"
+        return tr("defect.removedLog", box_id=box.box_id, sscc=sscc, filled=box.filled)

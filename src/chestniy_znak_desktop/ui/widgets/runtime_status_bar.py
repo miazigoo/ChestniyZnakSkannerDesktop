@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from chestniy_znak_desktop import __version__
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 
 
@@ -15,10 +16,10 @@ class RuntimeStatusBar(QWidget):
         """Создает компактную статусную панель."""
 
         super().__init__()
-        self._connection_label = QLabel("Связь: остановлена")
-        self._session_label = QLabel("Сессия: неизвестно")
-        self._scanner_label = QLabel("Сканер: остановлен")
-        self._version_label = QLabel(f"Версия: v{__version__}")
+        self._connection_label = QLabel(tr("runtime.connectionStopped"))
+        self._session_label = QLabel(tr("runtime.sessionUnknown"))
+        self._scanner_label = QLabel(tr("runtime.scannerStopped"))
+        self._version_label = QLabel(tr("runtime.version", version=__version__))
         for label in (
             self._connection_label,
             self._session_label,
@@ -39,8 +40,14 @@ class RuntimeStatusBar(QWidget):
     def update_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет тексты панели из runtime snapshot."""
 
-        self._connection_label.setText(f"Связь: {snapshot.connection.message}")
+        self._connection_label.setText(
+            tr("runtime.connection", message=snapshot.connection.message)
+        )
         user = snapshot.session.user_name or snapshot.session.status.value
-        self._session_label.setText(f"Сессия: {user}")
+        if snapshot.session.plant_name:
+            user = f"{user} / {snapshot.session.plant_name}"
+        elif snapshot.session.plant_id:
+            user = f"{user} / {tr('session.plant', plant_id=snapshot.session.plant_id[:8])}"
+        self._session_label.setText(tr("runtime.session", user=user))
         scanner = snapshot.scanner.port or snapshot.scanner.status.value
-        self._scanner_label.setText(f"Сканер: {scanner}")
+        self._scanner_label.setText(tr("runtime.scanner", scanner=scanner))

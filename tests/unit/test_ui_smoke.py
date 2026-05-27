@@ -210,8 +210,6 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
                 capacity=12,
                 count_in_packing=True,
                 is_closed=False,
-                print_ok=False,
-                print_error="",
                 items=[
                     PackingItemUi(
                         id=11,
@@ -248,7 +246,6 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
                     filled="2 / 10",
                     status="Открыта",
                     operator="Operator",
-                    print_status="Напечатано",
                 )
             ],
             selected_box_id=77,
@@ -261,7 +258,6 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
                 status="Открыта",
                 count_in_packing="Да",
                 operator="Operator",
-                print_status="Напечатано",
                 items=[
                     BoxDetailItemUi(
                         id=501,
@@ -278,7 +274,6 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
 
     assert screen._table.rowCount() == 1  # noqa: SLF001
     assert screen._detail_items_table.rowCount() == 1  # noqa: SLF001
-    assert screen._print_label_button.isEnabled() is True  # noqa: SLF001
 
 
 def test_boxes_screen_loads_detail_on_single_click() -> None:
@@ -299,7 +294,6 @@ def test_boxes_screen_loads_detail_on_single_click() -> None:
                     filled="2 / 10",
                     status="Открыта",
                     operator="Operator",
-                    print_status="Напечатано",
                 )
             ],
             status_message="Коробки загружены",
@@ -497,8 +491,6 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
                 capacity=10,
                 count_in_packing=True,
                 is_closed=False,
-                print_ok=False,
-                print_error="",
                 items=[
                     PackingItemUi(
                         id=1,
@@ -533,7 +525,6 @@ def test_close_box_dialog_uses_android_assets() -> None:
             is_full=True,
             title="Коробка закрыта",
             message="Коробка #42 закрыта",
-            print_ok=True,
         )
     )
 
@@ -594,7 +585,7 @@ def test_settings_screen_has_grouped_pages() -> None:
     qapp()
     screen = SettingsScreen()
 
-    assert screen._stack.count() == 6  # noqa: SLF001
+    assert screen._stack.count() == 5  # noqa: SLF001
     assert len(screen._theme_page.findChildren(ThemeOptionCard)) == 10  # noqa: SLF001
 
 
@@ -609,6 +600,7 @@ def test_settings_theme_card_emits_immediate_selection() -> None:
         SettingsUiState(
             api_base_url="http://backend/api/v2/",
             device_id="pc-1",
+            language="ru",
             theme_name="light",
             sound_enabled=True,
             sound_volume=0.85,
@@ -637,6 +629,7 @@ def test_settings_screen_emits_sound_preview() -> None:
         SettingsUiState(
             api_base_url="http://backend/api/v2/",
             device_id="pc-1",
+            language="ru",
             theme_name="light",
             sound_enabled=True,
             sound_volume=0.85,

@@ -4,15 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from chestniy_znak_desktop.api.models.orders import (
+    OrderLineDto,
+    OrderProductDto,
+    WorkOrderDto,
+    WorkOrderPageDto,
+)
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
     BoxDto,
+    BoxItemDto,
     CloseBoxResultDto,
     OpenBoxResultDto,
     ScanToBoxResultDto,
 )
-from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent, PackingController
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
@@ -59,15 +66,25 @@ class FakePackingService:
         self.last_scan: tuple[int, str, str] | None = None
         self.close_result: CloseBoxResultDto | None = None
         self.count_calls: list[tuple[int, bool]] = []
+        self.open_calls: list[tuple[str, bool, str | None, str | None]] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает fake текущую коробку."""
 
         return self.current_box_result
 
-    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+    def open_box(
+        self,
+        device_id: str,
+        count_in_packing: bool = True,
+        order_id: str | None = None,
+        order_line_id: str | None = None,
+        code_value: str | None = None,
+        sscc: str | None = None,
+    ) -> OpenBoxResultDto:
         """Возвращает fake результат открытия коробки."""
 
+        self.open_calls.append((device_id, count_in_packing, order_id, order_line_id))
         return OpenBoxResultDto(
             ok=True,
             created=True,
@@ -94,7 +111,6 @@ class FakePackingService:
             ok=True,
             reason_code="box_closed",
             box=_box(filled=20, is_closed=True),
-            print_ok=True,
         )
 
     def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
@@ -106,6 +122,26 @@ class FakePackingService:
             reason_code="count_in_packing_updated",
             box=_box(count_in_packing=count_in_packing),
         )
+
+
+class FakeOrderService:
+    """Fake сервис рабочих заказов для проверки выбора номенклатуры."""
+
+    def __init__(self, page: WorkOrderPageDto) -> None:
+        """Создает сервис с фиксированной страницей заказов."""
+
+        self.page = page
+
+    def list_orders(
+        self,
+        status: str | None = None,
+        search: str = "",
+        page: int = 1,
+        per_page: int = 20,
+    ) -> WorkOrderPageDto:
+        """Возвращает заданную страницу заказов."""
+
+        return self.page
 
 
 def _box(
@@ -130,7 +166,41 @@ def _box(
     )
 
 
-def _controller_pair() -> tuple[PackingController, FakePackingService, FakeSoundService]:
+def _work_order(*, scan_required: bool = True) -> WorkOrderPageDto:
+    """Создает страницу с одной активной строкой заказа."""
+
+    return WorkOrderPageDto(
+        data=[
+            WorkOrderDto(
+                id="order-1",
+                plant_id="plant-1",
+                supplier_id="supplier-1",
+                order_number="ORDER-1",
+                status="issued_to_supplier",
+                scan_required=scan_required,
+                lines=[
+                    OrderLineDto(
+                        id="line-1",
+                        order_id="order-1",
+                        product_id="product-1",
+                        quantity=10,
+                        required_code_quantity=10,
+                        status="active",
+                        product=OrderProductDto(
+                            id="product-1",
+                            sku="SKU-1",
+                            name="Номенклатура 1",
+                        ),
+                    ),
+                ],
+            )
+        ],
+    )
+
+
+def _controller_pair(
+    order_service: FakeOrderService | None = None,
+) -> tuple[PackingController, FakePackingService, FakeSoundService]:
     """Создает controller с fake-зависимостями."""
 
     service = FakePackingService()
@@ -139,6 +209,7 @@ def _controller_pair() -> tuple[PackingController, FakePackingService, FakeSound
         packing_service=service,
         task_runner=ImmediateTaskRunner(),
         device_id="pc-1",
+        order_service=order_service,
         scanner_id="desktop-com",
         sound_service=sounds,
     )
@@ -183,7 +254,23 @@ def test_packing_controller_updates_count_flag_for_open_box() -> None:
     assert controller.state.current_box.count_in_packing is False
     assert controller.state.count_in_packing is False
     assert controller.state.status_message == "Учет коробки обновлен"
-    assert controller.state.result_message == "Коробка не учитывается в упаковке"
+    assert controller.state.result_message == "Без учета упаковки"
+
+
+def test_packing_controller_blocks_box_for_no_scan_order() -> None:
+    """Проверяет, что заказ без сканирования не открывает упаковочную коробку."""
+
+    order_service = FakeOrderService(_work_order(scan_required=False))
+    controller, service, sounds = _controller_pair(order_service)
+
+    controller.refresh_orders()
+    controller.open_box()
+
+    assert controller.state.selected_order_scan_required is False
+    assert service.open_calls == []
+    assert controller.state.status_message == "Сканирование по заказу отключено"
+    assert "web-кабинете поставщика" in controller.state.result_message
+    assert sounds.events == [SoundEvent.WARNING]
 
 
 def test_packing_controller_warns_when_scan_without_box() -> None:
@@ -214,7 +301,7 @@ def test_packing_controller_close_box_clears_current_box() -> None:
     """Проверяет закрытие коробки."""
 
     controller, _service, sounds = _controller_pair()
-    events = []
+    events: list[CloseBoxUiEvent] = []
     controller.close_completed.connect(events.append)
     controller.open_box()
     controller.close_current_box()
@@ -230,14 +317,12 @@ def test_packing_controller_close_failed_keeps_current_box() -> None:
     """Проверяет, что ошибка закрытия оставляет коробку активной."""
 
     controller, service, sounds = _controller_pair()
-    events = []
+    events: list[CloseBoxUiEvent] = []
     service.close_result = CloseBoxResultDto(
         ok=False,
-        reason_code="printer_unavailable",
-        error="Принтер недоступен",
+        reason_code="close_failed",
+        error="Не удалось закрыть коробку",
         box=_box(filled=5, capacity=20, is_closed=False),
-        print_ok=False,
-        print_error="Нет связи с принтером",
     )
     controller.close_completed.connect(events.append)
 
@@ -249,7 +334,7 @@ def test_packing_controller_close_failed_keeps_current_box() -> None:
     assert controller.state.status_message == "Коробка не закрыта"
     assert sounds.events[-1] == SoundEvent.ERROR
     assert events[-1].ok is False
-    assert events[-1].error_message == "Принтер недоступен"
+    assert events[-1].error_message == "Не удалось закрыть коробку"
 
 
 def test_packing_controller_refresh_current_box_with_items() -> None:
@@ -259,13 +344,13 @@ def test_packing_controller_refresh_current_box_with_items() -> None:
     service.current_box_result = BoxDetailDto(
         **_box(filled=1).model_dump(),
         items=[
-            {
-                "id": 10,
-                "code_id": 100,
-                "gtin": "04601234567890",
-                "serial": "SERIAL",
-                "visible_code": "010460123456789021SERIAL",
-            }
+            BoxItemDto(
+                id=10,
+                code_id=100,
+                gtin="04601234567890",
+                serial="SERIAL",
+                visible_code="010460123456789021SERIAL",
+            )
         ],
     )
     controller.refresh_current_box()

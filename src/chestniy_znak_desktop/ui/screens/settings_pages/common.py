@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -110,6 +111,6 @@ def create_form_row(title: str, widget: QWidget) -> QFrame:
 def create_back_button() -> QPushButton:
     """Создает стандартную кнопку возврата к группам настроек."""
 
-    button = QPushButton("Назад к настройкам")
+    button = QPushButton(tr("settings.back"))
     button.setObjectName("settingsSecondaryButton")
     return button

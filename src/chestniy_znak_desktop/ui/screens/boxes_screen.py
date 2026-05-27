@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditUiState
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.widgets.box_detail_panel import BoxDetailPanel
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -37,7 +38,6 @@ class BoxesScreen(QWidget):
     next_page_requested = Signal()
     previous_page_requested = Signal()
     box_detail_requested = Signal(int)
-    print_label_requested = Signal(int)
     edit_open_requested = Signal(int)
     edit_close_requested = Signal(int)
     remove_item_requested = Signal(int, int)
@@ -50,23 +50,22 @@ class BoxesScreen(QWidget):
         super().__init__()
         self.setObjectName("boxesScreen")
         self._detail_loaded = False
-        self._title = QLabel("Коробки")
-        self._status_label = QLabel("Загрузите список коробок")
+        self._title = QLabel(tr("boxes.title"))
+        self._status_label = QLabel(tr("boxes.initialStatus"))
         self._error_label = QLabel("")
         self._search_input = QLineEdit()
         self._status_filter = self._create_status_filter()
-        self._search_button = QPushButton("Найти")
-        self._refresh_button = QPushButton("Обновить")
-        self._previous_button = QPushButton("Назад")
-        self._next_button = QPushButton("Дальше")
+        self._search_button = QPushButton(tr("boxes.find"))
+        self._refresh_button = QPushButton(tr("packing.refresh"))
+        self._previous_button = QPushButton(tr("boxes.previous"))
+        self._next_button = QPushButton(tr("boxes.next"))
         self._page_label = QLabel("0 / 0")
-        self._detail_button = QPushButton("Открыть детали")
-        self._print_label_button = QPushButton("Печать этикетки")
-        self._edit_open_button = QPushButton("Открыть редактирование")
-        self._edit_close_button = QPushButton("Закрыть редактирование")
-        self._remove_item_button = QPushButton("Удалить код")
-        self._clear_box_button = QPushButton("Очистить коробку")
-        self._delete_empty_button = QPushButton("Удалить пустую")
+        self._detail_button = QPushButton(tr("boxes.openDetails"))
+        self._edit_open_button = QPushButton(tr("boxes.openEdit"))
+        self._edit_close_button = QPushButton(tr("boxes.closeEdit"))
+        self._remove_item_button = QPushButton(tr("boxes.removeCode"))
+        self._clear_box_button = QPushButton(tr("boxes.clearBox"))
+        self._delete_empty_button = QPushButton(tr("boxes.deleteEmpty"))
         self._table = self._create_boxes_table()
         self._detail_panel = BoxDetailPanel()
         self._detail_items_table = self._create_detail_items_table()
@@ -87,7 +86,6 @@ class BoxesScreen(QWidget):
         self._previous_button.setEnabled(not state.is_busy and state.has_previous)
         self._next_button.setEnabled(not state.is_busy and state.has_more)
         self._detail_button.setEnabled(not state.is_detail_busy and bool(state.rows))
-        self._print_label_button.setEnabled(not state.is_action_busy and state.detail is not None)
         self._set_edit_buttons_enabled(state.detail is not None)
         self._fill_boxes_table(state)
         self._select_state_row(state)
@@ -103,12 +101,12 @@ class BoxesScreen(QWidget):
         """Создает фильтр статуса коробок."""
 
         status_filter = QComboBox()
-        status_filter.addItem("Все", "all")
-        status_filter.addItem("Активные", "active")
-        status_filter.addItem("Открытые", "open")
-        status_filter.addItem("На редактировании", "edit")
-        status_filter.addItem("Закрытые", "closed")
-        status_filter.addItem("Пустые", "empty")
+        status_filter.addItem(tr("boxes.filterAll"), "all")
+        status_filter.addItem(tr("boxes.filterActive"), "active")
+        status_filter.addItem(tr("boxes.filterOpen"), "open")
+        status_filter.addItem(tr("boxes.filterEdit"), "edit")
+        status_filter.addItem(tr("boxes.filterClosed"), "closed")
+        status_filter.addItem(tr("boxes.filterEmpty"), "empty")
         return status_filter
 
     def _configure_controls(self) -> None:
@@ -120,7 +118,7 @@ class BoxesScreen(QWidget):
         self._page_label.setObjectName("boxesPageLabel")
         self._status_filter.setObjectName("boxesCombo")
         self._search_input.setObjectName("boxesSearchInput")
-        self._search_input.setPlaceholderText("Поиск по SSCC, заказу или ID")
+        self._search_input.setPlaceholderText(tr("boxes.searchPlaceholder"))
         self._search_input.returnPressed.connect(self._emit_search)
         self._status_filter.currentIndexChanged.connect(self._emit_status_filter)
         self._search_button.setObjectName("boxesPrimaryButton")
@@ -128,7 +126,6 @@ class BoxesScreen(QWidget):
         self._previous_button.setObjectName("boxesSecondaryButton")
         self._next_button.setObjectName("boxesSecondaryButton")
         self._detail_button.setObjectName("boxesPrimaryButton")
-        self._print_label_button.setObjectName("boxesPrimaryButton")
         self._edit_open_button.setObjectName("boxesSecondaryButton")
         self._edit_close_button.setObjectName("boxesSecondaryButton")
         self._remove_item_button.setObjectName("boxesDangerButton")
@@ -139,7 +136,6 @@ class BoxesScreen(QWidget):
         self._previous_button.clicked.connect(self.previous_page_requested.emit)
         self._next_button.clicked.connect(self.next_page_requested.emit)
         self._detail_button.clicked.connect(self._emit_selected_box_detail)
-        self._print_label_button.clicked.connect(self._emit_print_label)
         self._edit_open_button.clicked.connect(self._emit_edit_open)
         self._edit_close_button.clicked.connect(self._emit_edit_close)
         self._remove_item_button.clicked.connect(self._emit_remove_item)
@@ -173,9 +169,7 @@ class BoxesScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("boxesHero")
         icon = VectorIcon(VectorIconName.BOX, "#66d2c7")
-        subtitle = QLabel(
-            "Контроль открытых и закрытых коробок, повторная печать и edit-mode операции."
-        )
+        subtitle = QLabel(tr("boxes.heroSubtitle"))
         subtitle.setObjectName("boxesHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -213,7 +207,7 @@ class BoxesScreen(QWidget):
         panel = QFrame()
         panel.setObjectName("boxesListPanel")
         header = QHBoxLayout()
-        title = QLabel("Список коробок")
+        title = QLabel(tr("boxes.listTitle"))
         title.setObjectName("boxesPanelTitle")
         header.addWidget(VectorIcon(VectorIconName.TOKEN, "#f3c969"))
         header.addWidget(title)
@@ -225,7 +219,6 @@ class BoxesScreen(QWidget):
         actions = QHBoxLayout()
         actions.setSpacing(10)
         actions.addWidget(self._detail_button)
-        actions.addWidget(self._print_label_button)
         actions.addStretch(1)
 
         layout = QVBoxLayout(panel)
@@ -256,9 +249,9 @@ class BoxesScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("boxesActionsPanel")
-        title = QLabel("Операции")
+        title = QLabel(tr("boxes.operations"))
         title.setObjectName("boxesPanelTitle")
-        hint = QLabel("Опасные действия требуют подтверждения")
+        hint = QLabel(tr("boxes.dangerHint"))
         hint.setObjectName("boxesMutedText")
         hint.setWordWrap(True)
 
@@ -284,7 +277,7 @@ class BoxesScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("boxesItemsPanel")
-        title = QLabel("Состав коробки")
+        title = QLabel(tr("boxes.itemsTitle"))
         title.setObjectName("boxesPanelTitle")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 18, 20, 20)
@@ -296,10 +289,17 @@ class BoxesScreen(QWidget):
     def _create_boxes_table(self) -> QTableWidget:
         """Создает таблицу списка коробок."""
 
-        table = QTableWidget(0, 7)
+        table = QTableWidget(0, 6)
         table.setObjectName("boxesTable")
         table.setHorizontalHeaderLabels(
-            ["ID", "Заказ", "SSCC", "Заполнено", "Статус", "Оператор", "Печать"]
+            [
+                tr("boxes.table.id"),
+                tr("packing.column.order"),
+                "SSCC",
+                tr("packing.column.filled"),
+                tr("packing.column.status"),
+                tr("packing.column.operator"),
+            ]
         )
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -312,7 +312,6 @@ class BoxesScreen(QWidget):
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         table.setColumnWidth(0, 72)
         table.cellClicked.connect(self._emit_row_detail)
         table.cellDoubleClicked.connect(self._emit_row_detail)
@@ -324,7 +323,14 @@ class BoxesScreen(QWidget):
 
         table = QTableWidget(0, 4)
         table.setObjectName("boxesItemsTable")
-        table.setHorizontalHeaderLabels(["ID", "GTIN", "Serial", "Код"])
+        table.setHorizontalHeaderLabels(
+            [
+                tr("boxes.table.id"),
+                tr("boxes.table.gtin"),
+                tr("boxes.table.serial"),
+                tr("packing.column.code"),
+            ]
+        )
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -361,7 +367,6 @@ class BoxesScreen(QWidget):
                 row.filled,
                 row.status,
                 row.operator,
-                row.print_status,
             ]
             for column_index, value in enumerate(values):
                 cell = QTableWidgetItem(value)
@@ -417,13 +422,6 @@ class BoxesScreen(QWidget):
             return
         self.box_detail_requested.emit(int(item.text()))
 
-    def _emit_print_label(self) -> None:
-        """Публикует запрос повторной печати этикетки выбранной коробки."""
-
-        box_id = self._selected_box_id()
-        if box_id is not None:
-            self.print_label_requested.emit(box_id)
-
     def _emit_edit_open(self) -> None:
         """Публикует запрос открытия режима редактирования."""
 
@@ -447,8 +445,8 @@ class BoxesScreen(QWidget):
             box_id is not None
             and item_id is not None
             and self._confirm(
-                title="Удалить код",
-                text=f"Удалить код #{item_id} из коробки #{box_id}?",
+                title=tr("boxes.confirmRemoveTitle"),
+                text=tr("boxes.confirmRemoveText", item_id=item_id, box_id=box_id),
             )
         ):
             self.remove_item_requested.emit(box_id, item_id)
@@ -458,11 +456,8 @@ class BoxesScreen(QWidget):
 
         box_id = self._selected_box_id()
         if box_id is not None and self._confirm(
-            title="Очистить коробку",
-            text=(
-                f"Удалить все коды из коробки #{box_id} на сервере?\n\n"
-                "Это не очистка локального автоскана-бокса."
-            ),
+            title=tr("boxes.confirmClearTitle"),
+            text=tr("boxes.confirmClearText", box_id=box_id),
         ):
             self.clear_box_requested.emit(box_id)
 
@@ -471,8 +466,8 @@ class BoxesScreen(QWidget):
 
         box_id = self._selected_box_id()
         if box_id is not None and self._confirm(
-            title="Удалить пустую коробку",
-            text=f"Удалить пустую коробку #{box_id}?",
+            title=tr("boxes.confirmDeleteEmptyTitle"),
+            text=tr("boxes.confirmDeleteEmptyText", box_id=box_id),
         ):
             self.delete_empty_box_requested.emit(box_id)
 

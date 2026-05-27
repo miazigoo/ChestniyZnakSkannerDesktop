@@ -13,6 +13,7 @@ def test_settings_store_loads_defaults(tmp_path) -> None:  # type: ignore[no-unt
     settings = store.load(AppConfig(api_base_url="http://test/api/v2/", device_id="pc-1"))
     assert settings.api_base_url == "http://test/api/v2/"
     assert settings.device_id == "pc-1"
+    assert settings.language == "ru"
     assert settings.theme_name == "light"
     assert settings.auto_pack_codes_per_item == 1
 
@@ -26,6 +27,7 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
         UserSettings(
             api_base_url="https://backend/api/v2/",
             device_id="desktop-1",
+            language="en",
             theme_name="dark",
             scanner_port="COM7",
             scanner_baudrate=115200,
@@ -39,6 +41,7 @@ def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignor
         )
     )
     loaded = SettingsStore.from_file(str(settings_path)).load(AppConfig())
+    assert loaded.language == "en"
     assert loaded.theme_name == "dark"
     assert loaded.scanner_port == "COM7"
     assert loaded.scanner_baudrate == 115200

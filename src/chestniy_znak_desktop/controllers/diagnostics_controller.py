@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.app.config import AppConfig
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.services.log_service import LogService
 
 
@@ -20,7 +21,7 @@ class DiagnosticsUiState:
     data_dir: str
     log_file: str
     log_text: str = ""
-    status_message: str = "Диагностика готова"
+    status_message: str = field(default_factory=lambda: tr("diagnostics.ready"))
     error_message: str = ""
 
 
@@ -62,7 +63,7 @@ class DiagnosticsController(QObject):
             self._set_state(
                 self._base_state(
                     log_text=self._state.log_text,
-                    status_message="Ошибка чтения логов",
+                    status_message=tr("diagnostics.logsReadError"),
                     error_message=str(exc),
                 )
             )
@@ -70,7 +71,7 @@ class DiagnosticsController(QObject):
         self._set_state(
             self._base_state(
                 log_text=log_text,
-                status_message="Логи обновлены",
+                status_message=tr("diagnostics.logsUpdated"),
             )
         )
 
@@ -83,7 +84,7 @@ class DiagnosticsController(QObject):
             self._set_state(
                 self._base_state(
                     log_text=self._state.log_text,
-                    status_message="Ошибка очистки логов",
+                    status_message=tr("diagnostics.logsClearError"),
                     error_message=str(exc),
                 )
             )
@@ -91,14 +92,14 @@ class DiagnosticsController(QObject):
         self._set_state(
             self._base_state(
                 log_text="",
-                status_message="Логи очищены",
+                status_message=tr("diagnostics.logsCleared"),
             )
         )
 
     def _base_state(
         self,
         log_text: str = "",
-        status_message: str = "Диагностика готова",
+        status_message: str = "",
         error_message: str = "",
     ) -> DiagnosticsUiState:
         """Создает состояние с неизменяемыми параметрами приложения."""
@@ -110,7 +111,7 @@ class DiagnosticsController(QObject):
             data_dir=str(self._config.data_dir),
             log_file=str(self._log_service.log_file),
             log_text=log_text,
-            status_message=status_message,
+            status_message=status_message or tr("diagnostics.ready"),
             error_message=error_message,
         )
 

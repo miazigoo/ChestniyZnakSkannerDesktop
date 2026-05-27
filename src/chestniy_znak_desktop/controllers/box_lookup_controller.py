@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.api.models.packing import BoxDto, BoxListDto
 from chestniy_znak_desktop.domain.box_lookup import build_box_lookup_candidates
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -38,7 +39,7 @@ class BoxLookupUiState:
     """Состояние экрана поиска коробки."""
 
     is_busy: bool = False
-    status_message: str = "Сканируйте штрихкод коробки"
+    status_message: str = field(default_factory=lambda: tr("lookup.scanBox"))
     error_message: str = ""
     last_scanned_code: str = ""
     found_box_id: int | None = None
@@ -90,7 +91,7 @@ class BoxLookupController(QObject):
         self._set_state(
             BoxLookupUiState(
                 is_busy=True,
-                status_message="Ищем коробку...",
+                status_message=tr("lookup.searching"),
                 last_scanned_code=normalized,
                 log=self._state.log,
             )
@@ -137,11 +138,14 @@ class BoxLookupController(QObject):
             raise TypeError("Ожидался результат BoxLookupResult")
         if result.box is None:
             self._play(SoundEvent.ERROR)
-            log = [f"{result.scanned_code}: коробка не найдена", *self._state.log][:50]
+            log = [
+                tr("lookup.notFoundLog", code=result.scanned_code),
+                *self._state.log,
+            ][:50]
             self._set_state(
                 BoxLookupUiState(
-                    status_message="Коробка не найдена",
-                    error_message="Коробка не найдена",
+                    status_message=tr("lookup.notFound"),
+                    error_message=tr("lookup.notFound"),
                     last_scanned_code=result.scanned_code,
                     log=log,
                 )
@@ -153,7 +157,7 @@ class BoxLookupController(QObject):
         log = [f"{result.scanned_code}: {summary}", *self._state.log][:50]
         self._set_state(
             BoxLookupUiState(
-                status_message=f"Коробка #{result.box.box_id} найдена",
+                status_message=tr("lookup.foundStatus", box_id=result.box.box_id),
                 last_scanned_code=result.scanned_code,
                 found_box_id=result.box.box_id,
                 found_box_summary=summary,
@@ -169,7 +173,7 @@ class BoxLookupController(QObject):
         log = [f"{self._state.last_scanned_code}: {exc}", *self._state.log][:50]
         self._set_state(
             BoxLookupUiState(
-                status_message="Ошибка поиска коробки",
+                status_message=tr("lookup.errorStatus"),
                 error_message=str(exc),
                 last_scanned_code=self._state.last_scanned_code,
                 log=log,
@@ -192,6 +196,6 @@ class BoxLookupController(QObject):
     def _box_summary(box: BoxDto) -> str:
         """Формирует краткое описание найденной коробки."""
 
-        sscc = box.sscc or "SSCC не присвоен"
-        order = box.order_name or "без заказа"
+        sscc = box.sscc or tr("lookup.ssccMissing")
+        order = box.order_name or tr("lookup.noOrder")
         return f"#{box.box_id} | {order} | {sscc} | {box.filled}/{box.capacity}"

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
     apply_combo_popup_style,
     create_back_button,
@@ -37,7 +38,7 @@ class SoundSettingsPage(QWidget):
 
         super().__init__()
         self.setObjectName("settingsPage")
-        self._sound_enabled = QCheckBox("Звуки включены")
+        self._sound_enabled = QCheckBox(tr("settings.sound.enabled"))
         self._sound_enabled.setObjectName("settingsCheckBox")
         self._sound_enabled.setChecked(True)
         self._sound_volume = QSlider(Qt.Orientation.Horizontal)
@@ -56,30 +57,30 @@ class SoundSettingsPage(QWidget):
         ):
             combo.setObjectName("settingsCombo")
             apply_combo_popup_style(combo)
-        self._save_button = QPushButton("Сохранить")
+        self._save_button = QPushButton(tr("common.save"))
         self._save_button.setObjectName("settingsPrimaryButton")
         self._back_button = create_back_button()
         self._save_button.clicked.connect(self._emit_save)
         self._back_button.clicked.connect(self.back_requested.emit)
 
         header = create_page_header(
-            title="Звук",
-            subtitle="Файлы звуковых событий, громкость и быстрый предпросмотр.",
+            title=tr("settings.sound.title"),
+            subtitle=tr("settings.sound.subtitle"),
             icon_name=VectorIconName.TOKEN,
             icon_color="#f3c969",
         )
         card, card_layout = create_card(
-            title="События",
-            subtitle="Звуки берутся из ресурсов приложения и применяются после сохранения.",
+            title=tr("settings.sound.cardTitle"),
+            subtitle=tr("settings.sound.cardSubtitle"),
             icon_name=VectorIconName.LINK,
             icon_color="#66d2c7",
         )
         card_layout.addWidget(self._sound_enabled)
-        card_layout.addWidget(create_form_row("Громкость", self._sound_volume))
-        card_layout.addWidget(self._sound_row("Успех", self._sound_ok))
-        card_layout.addWidget(self._sound_row("Предупреждение", self._sound_warning))
-        card_layout.addWidget(self._sound_row("Ошибка", self._sound_error))
-        card_layout.addWidget(self._sound_row("Закрытие коробки", self._sound_victory))
+        card_layout.addWidget(create_form_row(tr("settings.sound.volume"), self._sound_volume))
+        card_layout.addWidget(self._sound_row(tr("settings.sound.success"), self._sound_ok))
+        card_layout.addWidget(self._sound_row(tr("settings.sound.warning"), self._sound_warning))
+        card_layout.addWidget(self._sound_row(tr("settings.sound.error"), self._sound_error))
+        card_layout.addWidget(self._sound_row(tr("settings.sound.closeBox"), self._sound_victory))
         actions = QHBoxLayout()
         actions.addWidget(self._save_button)
         actions.addWidget(self._back_button)
@@ -130,7 +131,7 @@ class SoundSettingsPage(QWidget):
     def _sound_row(self, label: str, combo: QComboBox) -> QFrame:
         """Создает строку выбора и прослушивания звука."""
 
-        preview_button = QPushButton("Прослушать")
+        preview_button = QPushButton(tr("settings.sound.preview"))
         preview_button.setObjectName("settingsSecondaryButton")
         preview_button.clicked.connect(lambda: self.preview_requested.emit(combo.currentText()))
         picker = QFrame()

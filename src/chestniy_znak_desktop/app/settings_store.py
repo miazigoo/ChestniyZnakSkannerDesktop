@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import QSettings
 
 from chestniy_znak_desktop.app.config import AppConfig
+from chestniy_znak_desktop.i18n import normalize_language
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +16,7 @@ class UserSettings:
 
     api_base_url: str
     device_id: str
+    language: str = "ru"
     theme_name: str = "light"
     scanner_port: str = ""
     scanner_baudrate: int = 9600
@@ -53,6 +55,7 @@ class SettingsStore:
         return UserSettings(
             api_base_url=self._value("network/api_base_url", defaults.api_base_url),
             device_id=self._value("device/device_id", defaults.device_id),
+            language=normalize_language(self._value("ui/language", "ru")),
             theme_name=self._value("ui/theme_name", "light"),
             scanner_port=self._value("scanner/port", ""),
             scanner_baudrate=self._int_value("scanner/baudrate", 9600),
@@ -70,6 +73,7 @@ class SettingsStore:
 
         self._settings.setValue("network/api_base_url", settings.api_base_url)
         self._settings.setValue("device/device_id", settings.device_id)
+        self._settings.setValue("ui/language", normalize_language(settings.language))
         self._settings.setValue("ui/theme_name", settings.theme_name)
         self._settings.setValue("scanner/port", settings.scanner_port)
         self._settings.setValue("scanner/baudrate", settings.scanner_baudrate)

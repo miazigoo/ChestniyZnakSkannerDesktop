@@ -6,11 +6,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QTableWidget,
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.packing_controller import PackingUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.packing_cards import (
     PackingScanCard,
@@ -35,6 +38,8 @@ class PackingScreen(QWidget):
     open_box_requested = Signal()
     close_box_requested = Signal()
     count_in_packing_changed = Signal(bool)
+    order_search_changed = Signal(str)
+    order_line_selected = Signal(str)
 
     def __init__(self) -> None:
         """Создает современную раскладку экрана упаковки."""
@@ -44,13 +49,18 @@ class PackingScreen(QWidget):
         self._is_busy = False
         self._scanner_ready = False
         self._has_box = False
+        self._has_order_selection = False
+        self._selected_order_scan_required = True
         self._summary_card = PackingSummaryCard()
         self._scan_card = PackingScanCard()
         self._progress_bar = self._summary_card.progress_bar
-        self._count_in_packing = QCheckBox("Учитывать коробку в упаковке")
-        self._refresh_button = QPushButton("Обновить")
-        self._open_box_button = QPushButton("Открыть коробку")
-        self._close_box_button = QPushButton("Закрыть коробку")
+        self._order_search = QLineEdit()
+        self._order_combo = QComboBox()
+        self._order_line_ids: list[str] = []
+        self._count_in_packing = QCheckBox(tr("packing.countInPacking"))
+        self._refresh_button = QPushButton(tr("packing.refresh"))
+        self._open_box_button = QPushButton(tr("packing.openBox"))
+        self._close_box_button = QPushButton(tr("packing.closeBox"))
         self._items_table = self._create_items_table()
 
         self._configure_actions()
@@ -63,6 +73,8 @@ class PackingScreen(QWidget):
         self._count_in_packing.blockSignals(True)
         self._count_in_packing.setChecked(state.count_in_packing)
         self._count_in_packing.blockSignals(False)
+        self._apply_order_options(state)
+        self._selected_order_scan_required = state.selected_order_scan_required
         self._scan_card.set_messages(
             status=state.status_message,
             result=state.result_message,
@@ -103,8 +115,14 @@ class PackingScreen(QWidget):
         self._refresh_button.setObjectName("packingSecondaryButton")
         self._open_box_button.setObjectName("packingPrimaryButton")
         self._close_box_button.setObjectName("packingDangerButton")
+        self._order_search.setObjectName("settingsInput")
+        self._order_search.setPlaceholderText(tr("packing.searchPlaceholder"))
+        self._order_combo.setObjectName("settingsInput")
+        self._order_combo.setMinimumWidth(280)
         self._count_in_packing.setObjectName("packingCheckBox")
         self._count_in_packing.setChecked(True)
+        self._order_search.textChanged.connect(self.order_search_changed.emit)
+        self._order_combo.currentIndexChanged.connect(self._emit_order_line_selected)
         self._count_in_packing.toggled.connect(self.count_in_packing_changed.emit)
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._open_box_button.clicked.connect(self.open_box_requested.emit)
@@ -139,12 +157,9 @@ class PackingScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("packingHero")
         icon = VectorIcon(VectorIconName.BOX, "#66d2c7")
-        title = QLabel("Открыть коробку и сканировать изделия")
+        title = QLabel(tr("packing.heroTitle"))
         title.setObjectName("packingHeroTitle")
-        subtitle = QLabel(
-            "Все коды принимаются только от COM/SPP-сканера. "
-            "Ручной ввод на рабочем экране отсутствует."
-        )
+        subtitle = QLabel(tr("packing.heroSubtitle"))
         subtitle.setObjectName("packingHeroSubtitle")
         subtitle.setWordWrap(True)
 
@@ -165,9 +180,9 @@ class PackingScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("packingActionsPanel")
-        title = QLabel("Действия")
+        title = QLabel(tr("packing.actions"))
         title.setObjectName("packingCardTitle")
-        hint = QLabel("Операции блокируются, если сканер не готов")
+        hint = QLabel(tr("packing.actionsHint"))
         hint.setObjectName("packingMutedText")
         hint.setWordWrap(True)
 
@@ -182,9 +197,46 @@ class PackingScreen(QWidget):
         layout.setSpacing(12)
         layout.addWidget(title)
         layout.addWidget(hint)
+        layout.addWidget(QLabel(tr("packing.orderAndProduct")))
+        layout.addWidget(self._order_search)
+        layout.addWidget(self._order_combo)
         layout.addLayout(buttons)
         layout.addWidget(self._count_in_packing)
         return panel
+
+    def _apply_order_options(self, state: PackingUiState) -> None:
+        """Обновляет список выбора заказа и номенклатуры."""
+
+        self._has_order_selection = bool(state.selected_order_line_id)
+        self._order_search.blockSignals(True)
+        if self._order_search.text() != state.order_search:
+            self._order_search.setText(state.order_search)
+        self._order_search.blockSignals(False)
+
+        self._order_combo.blockSignals(True)
+        self._order_combo.clear()
+        self._order_line_ids = [option.order_line_id for option in state.order_options]
+        if state.orders_loading:
+            self._order_combo.addItem(tr("packing.ordersLoading"))
+        elif not state.order_options:
+            self._order_combo.addItem(tr("packing.ordersEmpty"))
+        else:
+            for option in state.order_options:
+                self._order_combo.addItem(option.label)
+            selected_index = (
+                self._order_line_ids.index(state.selected_order_line_id)
+                if state.selected_order_line_id in self._order_line_ids
+                else 0
+            )
+            self._order_combo.setCurrentIndex(selected_index)
+        self._order_combo.blockSignals(False)
+
+    def _emit_order_line_selected(self, index: int) -> None:
+        """Публикует выбранный идентификатор строки заказа."""
+
+        if index < 0 or index >= len(self._order_line_ids):
+            return
+        self.order_line_selected.emit(self._order_line_ids[index])
 
     def _create_table_panel(self) -> QFrame:
         """Создает панель списка отсканированных изделий."""
@@ -192,9 +244,9 @@ class PackingScreen(QWidget):
         panel = QFrame()
         panel.setObjectName("packingTablePanel")
         header = QHBoxLayout()
-        title = QLabel("Изделия в коробке")
+        title = QLabel(tr("packing.tableTitle"))
         title.setObjectName("packingCardTitle")
-        hint = QLabel("Последние добавленные коды отображаются в списке")
+        hint = QLabel(tr("packing.tableHint"))
         hint.setObjectName("packingMutedText")
         header_text = QVBoxLayout()
         header_text.addWidget(title)
@@ -214,7 +266,7 @@ class PackingScreen(QWidget):
 
         table = QTableWidget(0, 4)
         table.setObjectName("packingItemsTable")
-        table.setHorizontalHeaderLabels(["#", "GTIN", "Serial", "Код"])
+        table.setHorizontalHeaderLabels(["#", "GTIN", "Serial", tr("packing.column.code")])
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -252,7 +304,12 @@ class PackingScreen(QWidget):
 
         self._is_busy = is_busy
         is_ready = not is_busy and self._scanner_ready
+        can_open_selected_order = self._has_order_selection and self._selected_order_scan_required
         self._refresh_button.setEnabled(not is_busy)
-        self._open_box_button.setEnabled(is_ready)
+        self._open_box_button.setEnabled(is_ready and (self._has_box or can_open_selected_order))
         self._close_box_button.setEnabled(is_ready and self._has_box)
+        self._order_search.setEnabled(not is_busy and not self._has_box)
+        self._order_combo.setEnabled(
+            not is_busy and not self._has_box and self._has_order_selection
+        )
         self._count_in_packing.setEnabled(not is_busy)

@@ -11,8 +11,8 @@ from chestniy_znak_desktop.api.models.packing import (
     BoxDetailDto,
     BoxDto,
     BoxListDto,
-    CloseBoxResultDto,
 )
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -33,13 +33,6 @@ class BoxesBackend(Protocol):
         """Возвращает детальную карточку коробки."""
 
 
-class PrinterBackend(Protocol):
-    """Контракт сервиса повторной печати этикеток."""
-
-    def print_box_label(self, box_id: int, device_id: str) -> CloseBoxResultDto:
-        """Печатает этикетку коробки."""
-
-
 class SoundPlayer(Protocol):
     """Контракт сервиса звуковой обратной связи."""
 
@@ -57,7 +50,6 @@ class BoxRowUi:
     filled: str
     status: str
     operator: str
-    print_status: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +74,6 @@ class BoxDetailUi:
     status: str
     count_in_packing: str
     operator: str
-    print_status: str
     items: list[BoxDetailItemUi] = field(default_factory=list)
 
 
@@ -102,9 +93,9 @@ class BoxesUiState:
     detail: BoxDetailUi | None = None
     is_detail_busy: bool = False
     is_action_busy: bool = False
-    status_message: str = "Загрузите список коробок"
+    status_message: str = field(default_factory=lambda: tr("boxes.initialStatus"))
     error_message: str = ""
-    detail_status_message: str = "Выберите коробку для просмотра состава"
+    detail_status_message: str = field(default_factory=lambda: tr("boxes.detailSelect"))
     detail_error_message: str = ""
 
     @property
@@ -132,9 +123,7 @@ class BoxesController(QObject):
     def __init__(
         self,
         boxes_service: BoxesBackend,
-        printer_service: PrinterBackend,
         task_runner: TaskRunner,
-        device_id: str,
         page_limit: int = 50,
         sound_service: SoundPlayer | None = None,
         parent: QObject | None = None,
@@ -143,9 +132,7 @@ class BoxesController(QObject):
 
         super().__init__(parent)
         self._boxes_service = boxes_service
-        self._printer_service = printer_service
         self._task_runner = task_runner
-        self._device_id = device_id
         self._sound_service = sound_service
         self._state = BoxesUiState(limit=page_limit)
 
@@ -220,7 +207,7 @@ class BoxesController(QObject):
                 detail=self._state.detail,
                 is_detail_busy=True,
                 status_message=self._state.status_message,
-                detail_status_message=f"Загружаем коробку #{box_id}...",
+                detail_status_message=tr("boxes.loadingBox", box_id=box_id),
             )
         )
         self._task_runner.submit(
@@ -229,9 +216,10 @@ class BoxesController(QObject):
             self._on_detail_error,
         )
 
-    def clear_detail(self, message: str = "Выберите коробку для просмотра состава") -> None:
+    def clear_detail(self, message: str = "") -> None:
         """Сбрасывает выбранную коробку и правую панель состава."""
 
+        message = message or tr("boxes.detailSelect")
         self._set_state(
             replace(
                 self._state,
@@ -251,28 +239,8 @@ class BoxesController(QObject):
                 status_filter=self._state.status_filter,
                 query=self._state.query,
                 limit=self._state.limit,
-                status_message="Список будет загружен при входе в экран",
+                status_message=tr("boxes.loadOnEntry"),
             )
-        )
-
-    def print_selected_label(self, box_id: int) -> None:
-        """Запускает повторную печать этикетки выбранной коробки."""
-
-        if self._state.is_action_busy:
-            return
-        self._set_state(
-            replace(
-                self._state,
-                selected_box_id=box_id,
-                is_action_busy=True,
-                detail_status_message=f"Печатаем этикетку коробки #{box_id}...",
-                detail_error_message="",
-            )
-        )
-        self._task_runner.submit(
-            lambda: self._printer_service.print_box_label(box_id, self._device_id),
-            self._on_label_printed,
-            self._on_print_error,
         )
 
     def _load_page(self, offset: int) -> None:
@@ -286,7 +254,7 @@ class BoxesController(QObject):
                 self._state,
                 is_busy=True,
                 offset=offset,
-                status_message="Загружаем коробки...",
+                status_message=tr("boxes.loading"),
                 error_message="",
             )
         )
@@ -323,12 +291,12 @@ class BoxesController(QObject):
                 rows=rows,
                 selected_box_id=selected_box_id if selected_exists else None,
                 detail=self._state.detail if selected_exists else None,
-                status_message="Коробки загружены",
+                status_message=tr("boxes.loaded"),
                 error_message="",
                 detail_status_message=(
                     self._state.detail_status_message
                     if selected_exists
-                    else "Выберите коробку для просмотра состава"
+                    else tr("boxes.detailSelect")
                 ),
                 detail_error_message=self._state.detail_error_message if selected_exists else "",
             )
@@ -343,7 +311,7 @@ class BoxesController(QObject):
                 is_busy=False,
                 selected_box_id=self._state.selected_box_id,
                 detail=self._state.detail,
-                status_message="Ошибка загрузки коробок",
+                status_message=tr("boxes.loadError"),
                 error_message=str(exc),
             )
         )
@@ -359,7 +327,7 @@ class BoxesController(QObject):
                 is_detail_busy=False,
                 selected_box_id=result.box_id,
                 detail=self._box_detail_to_ui(result),
-                detail_status_message=f"Коробка #{result.box_id} загружена",
+                detail_status_message=tr("boxes.boxLoaded", box_id=result.box_id),
                 detail_error_message="",
             )
         )
@@ -372,42 +340,7 @@ class BoxesController(QObject):
                 self._state,
                 is_detail_busy=False,
                 detail=None,
-                detail_status_message="Ошибка загрузки коробки",
-                detail_error_message=str(exc),
-            )
-        )
-
-    def _on_label_printed(self, result: object) -> None:
-        """Обрабатывает результат повторной печати этикетки."""
-
-        if not isinstance(result, CloseBoxResultDto):
-            raise TypeError("Ожидался результат CloseBoxResultDto")
-        self._play(SoundEvent.OK if result.ok and result.print_ok else SoundEvent.ERROR)
-        error_message = result.error or result.print_error or ""
-        detail = self._update_detail_print_status(result)
-        self._set_state(
-            replace(
-                self._state,
-                is_action_busy=False,
-                detail=detail,
-                detail_status_message=(
-                    "Этикетка отправлена на печать"
-                    if result.ok and result.print_ok
-                    else "Печать не выполнена"
-                ),
-                detail_error_message=error_message,
-            )
-        )
-
-    def _on_print_error(self, exc: Exception) -> None:
-        """Обрабатывает ошибку повторной печати этикетки."""
-
-        self._play(SoundEvent.ERROR)
-        self._set_state(
-            replace(
-                self._state,
-                is_action_busy=False,
-                detail_status_message="Ошибка печати",
+                detail_status_message=tr("boxes.boxLoadError"),
                 detail_error_message=str(exc),
             )
         )
@@ -424,16 +357,6 @@ class BoxesController(QObject):
         if self._sound_service is not None:
             self._sound_service.play(event)
 
-    def _update_detail_print_status(self, result: CloseBoxResultDto) -> BoxDetailUi | None:
-        """Обновляет статус печати в уже загруженной детальной карточке."""
-
-        if self._state.detail is None:
-            return None
-        return replace(
-            self._state.detail,
-            print_status=self._print_status(result.box),
-        )
-
     @staticmethod
     def _box_to_row(box: BoxDto) -> BoxRowUi:
         """Преобразует DTO коробки в строку таблицы."""
@@ -443,9 +366,8 @@ class BoxesController(QObject):
             order_name=box.order_name or "-",
             sscc=box.sscc or "-",
             filled=f"{box.filled} / {box.capacity}",
-            status="Закрыта" if box.is_closed else "Открыта",
+            status=tr("boxes.status.closed") if box.is_closed else tr("boxes.status.open"),
             operator=box.active_user_name or box.created_by_name or "-",
-            print_status=BoxesController._print_status(box),
         )
 
     @staticmethod
@@ -458,10 +380,9 @@ class BoxesController(QObject):
             sscc=box.sscc or "-",
             filled=box.filled,
             capacity=box.capacity,
-            status="Закрыта" if box.is_closed else "Открыта",
-            count_in_packing="Да" if box.count_in_packing else "Нет",
+            status=tr("boxes.status.closed") if box.is_closed else tr("boxes.status.open"),
+            count_in_packing=tr("boxes.yes") if box.count_in_packing else tr("boxes.no"),
             operator=box.active_user_name or box.created_by_name or "-",
-            print_status=BoxesController._print_status(box),
             items=[
                 BoxDetailItemUi(
                     id=item.id,
@@ -472,13 +393,3 @@ class BoxesController(QObject):
                 for item in box.items
             ],
         )
-
-    @staticmethod
-    def _print_status(box: BoxDto) -> str:
-        """Возвращает человекочитаемый статус печати."""
-
-        if box.print_ok:
-            return "Напечатано"
-        if box.print_error:
-            return box.print_error
-        return "-"

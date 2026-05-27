@@ -7,7 +7,6 @@ from typing import Any
 from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
-from chestniy_znak_desktop.api.services.printer_service import PrinterService
 
 
 class FakeApiClient:
@@ -17,11 +16,14 @@ class FakeApiClient:
         """Создает хранилище последнего вызова."""
 
         self.last_call: tuple[str, str, dict[str, Any]] | None = None
+        self.calls: list[tuple[str, str, dict[str, Any]]] = []
+        self.close_response: dict[str, Any] | None = None
 
     def get(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Возвращает payload для GET-сценария."""
 
         self.last_call = ("GET", url, {"params": params})
+        self.calls.append(self.last_call)
         if url.endswith("catalog/stats"):
             return {"codes_count": 10, "scans_count": 3}
         if url.endswith("packing/boxes/1"):
@@ -29,21 +31,6 @@ class FakeApiClient:
                 "ok": True,
                 "reason_code": "box_loaded",
                 "box": _box_detail_payload(),
-            }
-        if url.endswith("printer/printers"):
-            return {
-                "ok": True,
-                "device_id": "pc-1",
-                "selected_printer_id": None,
-                "printers": [
-                    {
-                        "id": 1,
-                        "name": "Zebra",
-                        "ip_address": "172.16.8.120",
-                        "section": "A",
-                        "is_active": True,
-                    }
-                ],
             }
         return {"items": [], "total": 0, "limit": 50, "offset": 0, "has_more": False}
 
@@ -56,6 +43,7 @@ class FakeApiClient:
         """Возвращает payload для POST-сценария."""
 
         self.last_call = ("POST", url, {"json": json, "params": params})
+        self.calls.append(self.last_call)
         if url.endswith("verify") and not url.endswith("verify/exists"):
             return {
                 "status": "OK",
@@ -109,14 +97,8 @@ class FakeApiClient:
                 "boxes": [],
                 "box": _box_payload(),
             }
-        if url.endswith("printer/boxes/1/print"):
-            return {
-                "ok": True,
-                "reason_code": "printed",
-                "box": _box_payload(),
-                "print_ok": True,
-                "print_error": "",
-            }
+        if url.endswith("boxes/1/close") and self.close_response is not None:
+            return self.close_response
         if url.endswith("box-edit/1/open"):
             return {"ok": True, "reason_code": "edit_opened", "box": _box_payload()}
         if url.endswith("box-edit/1/close"):
@@ -135,32 +117,20 @@ class FakeApiClient:
                 "box": _box_payload(),
                 "removed": 2,
             }
-        if url.endswith("printer-selection"):
-            return {
-                "ok": True,
-                "device_id": "pc-1",
-                "selected_printer_id": 1,
-                "selected_printer": {
-                    "id": 1,
-                    "name": "Zebra",
-                    "ip_address": "172.16.8.120",
-                    "section": "",
-                    "is_active": True,
-                },
-                "printers": [],
-            }
         return {"ok": True, "reason_code": "ok", "box": _box_payload()}
 
     def patch(self, url: str, json: dict[str, Any]) -> dict[str, Any]:
         """Возвращает payload для PATCH-сценария."""
 
         self.last_call = ("PATCH", url, {"json": json})
+        self.calls.append(self.last_call)
         return {"ok": True, "reason_code": "updated", "box": _box_payload()}
 
     def delete(self, url: str) -> dict[str, Any]:
         """Возвращает payload для DELETE-сценария."""
 
         self.last_call = ("DELETE", url, {})
+        self.calls.append(self.last_call)
         return {
             "ok": True,
             "reason_code": "empty_box_deleted",
@@ -305,36 +275,23 @@ def test_packing_service_get_box() -> None:
     assert result.items[0].serial == "SERIAL"
 
 
-def test_printer_service_set_selection() -> None:
-    """Проверяет сохранение выбранного принтера."""
+def test_packing_service_close_box_only_closes_remote_box() -> None:
+    """Проверяет, что рабочее место только закрывает коробку на сервере."""
 
     client = FakeApiClient()
-    result = PrinterService(client).set_selection(device_id="pc-1", printer_id=1)
-    assert result.selected_printer_id == 1
+    client.close_response = {
+        "ok": True,
+        "reason_code": "box_closed",
+        "box": _box_payload(),
+    }
 
+    result = PackingService(client).close_box(box_id=1, device_id="pc-1")
 
-def test_printer_service_get_selection() -> None:
-    """Проверяет получение доступных принтеров."""
-
-    client = FakeApiClient()
-    result = PrinterService(client).get_selection(device_id="pc-1")
-    assert result.printers[0].name == "Zebra"
-    assert client.last_call == (
-        "GET",
-        "chestniy-znak/packing/printer/printers",
-        {"params": {"device_id": "pc-1"}},
-    )
-
-
-def test_printer_service_print_box_label() -> None:
-    """Проверяет повторную печать этикетки коробки."""
-
-    client = FakeApiClient()
-    result = PrinterService(client).print_box_label(box_id=1, device_id="pc-1")
-    assert result.print_ok is True
+    assert result.ok is True
+    assert result.reason_code == "box_closed"
     assert client.last_call == (
         "POST",
-        "chestniy-znak/packing/printer/boxes/1/print",
+        "chestniy-znak/packing/boxes/1/close",
         {"json": None, "params": {"device_id": "pc-1"}},
     )
 

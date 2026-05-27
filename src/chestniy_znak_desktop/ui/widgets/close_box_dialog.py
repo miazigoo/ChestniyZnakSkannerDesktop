@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent
+from chestniy_znak_desktop.i18n import tr
 
 
 class CloseBoxDialog(QDialog):
@@ -52,7 +53,7 @@ class CloseBoxDialog(QDialog):
         details.setObjectName("closeBoxDialogDetails")
         details.setWordWrap(True)
 
-        ok_button = QPushButton("OK")
+        ok_button = QPushButton(tr("common.ok"))
         ok_button.setObjectName("closeBoxDialogButton")
         ok_button.clicked.connect(self.accept)
 
@@ -83,17 +84,13 @@ class CloseBoxDialog(QDialog):
         """Формирует детали закрытой коробки."""
 
         lines = [
-            f"Коробка: #{event.box_id}",
-            f"Заполнение: {event.filled} / {event.capacity}",
+            tr("closeBox.detailsBox", box_id=event.box_id),
+            tr("closeBox.detailsFill", filled=event.filled, capacity=event.capacity),
         ]
         if event.sscc:
             lines.append(f"SSCC: {event.sscc}")
-        if event.print_ok is False:
-            lines.append("Печать: ошибка")
-        elif event.print_ok is True:
-            lines.append("Печать: выполнена")
         if event.error_message:
-            lines.append(f"Ошибка: {event.error_message}")
+            lines.append(tr("closeBox.error", error=event.error_message))
         return "\n".join(lines)
 
 
@@ -105,7 +102,7 @@ class CloseBoxConfirmDialog(QDialog):
 
         super().__init__(parent)
         self.setObjectName("closeBoxConfirmDialog")
-        self.setWindowTitle("Закрыть неполную коробку?")
+        self.setWindowTitle(tr("closeBox.confirmTitle"))
         self.setModal(True)
         self.setMinimumSize(720, 390)
 
@@ -119,26 +116,23 @@ class CloseBoxConfirmDialog(QDialog):
         )
         image.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        title = QLabel("Закрыть неполную коробку?")
+        title = QLabel(tr("closeBox.confirmTitle"))
         title.setObjectName("closeBoxDialogTitle")
         title.setWordWrap(True)
 
-        message = QLabel(
-            "Коробка заполнена не полностью. После закрытия будет проверен принтер, "
-            "этикетка уйдет на печать, а приложение откроет следующую коробку."
-        )
+        message = QLabel(tr("closeBox.confirmMessage"))
         message.setObjectName("closeBoxDialogMessage")
         message.setWordWrap(True)
 
-        details = QLabel(f"Заполнение: {filled} / {capacity}")
+        details = QLabel(tr("closeBox.detailsFill", filled=filled, capacity=capacity))
         details.setObjectName("closeBoxDialogDetails")
         details.setWordWrap(True)
 
-        cancel_button = QPushButton("Отмена")
+        cancel_button = QPushButton(tr("common.cancel"))
         cancel_button.setObjectName("closeBoxDialogSecondaryButton")
         cancel_button.clicked.connect(self.reject)
 
-        close_button = QPushButton("Закрыть коробку")
+        close_button = QPushButton(tr("packing.closeBox"))
         close_button.setObjectName("closeBoxDialogButton")
         close_button.clicked.connect(self.accept)
 
@@ -178,16 +172,16 @@ class CloseBoxProgressDialog(QDialog):
 
         super().__init__(parent)
         self.setObjectName("closeBoxProgressDialog")
-        self.setWindowTitle("Закрываем коробку")
+        self.setWindowTitle(tr("closeBox.progressTitle"))
         self.setModal(True)
         self.setMinimumSize(520, 230)
 
-        title = QLabel("Закрываем коробку")
+        title = QLabel(tr("closeBox.progressTitle"))
         title.setObjectName("closeBoxDialogTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setWordWrap(True)
 
-        message = QLabel("Проверяем принтер и отправляем этикетку на печать...")
+        message = QLabel(tr("closeBox.progressMessage"))
         message.setObjectName("closeBoxDialogMessage")
         message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message.setWordWrap(True)

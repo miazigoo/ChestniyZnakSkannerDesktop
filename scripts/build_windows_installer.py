@@ -70,7 +70,7 @@ def render_svg_to_bmp(svg_path: Path, bmp_path: Path, width: int, height: int) -
     finally:
         painter.end()
 
-    if not image.scaled(QSize(width, height)).save(str(bmp_path), "BMP"):
+    if not image.scaled(QSize(width, height)).save(str(bmp_path), b"BMP"):
         raise RuntimeError(f"Не удалось сохранить BMP установщика: {bmp_path}")
 
 

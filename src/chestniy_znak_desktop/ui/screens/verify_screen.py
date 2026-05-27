@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.verify_controller import VerifyUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -29,17 +30,17 @@ class VerifyScreen(QWidget):
 
         super().__init__()
         self.setObjectName("verifyScreen")
-        self._title = QLabel("Проверка DataMatrix")
-        self._status = QLabel("Ожидание скана кода")
-        self._scanner_status = QLabel("Сканер: проверяем состояние")
-        self._duplicate_check = QCheckBox("Учитывать дубликаты")
-        self._result = QLabel("Ожидаем DataMatrix от сканера")
+        self._title = QLabel(tr("verify.title"))
+        self._status = QLabel(tr("verify.waitScan"))
+        self._scanner_status = QLabel(tr("verify.scannerChecking"))
+        self._duplicate_check = QCheckBox(tr("verify.duplicate"))
+        self._result = QLabel(tr("verify.resultWait"))
         self._error = QLabel("")
-        self._last_code = QLabel("Код: -")
-        self._technical_status = QLabel("Статус: -")
-        self._exists = QLabel("Наличие: -")
-        self._order = QLabel("Заказ: -")
-        self._device = QLabel("Устройство: -")
+        self._last_code = QLabel(tr("verify.code", code="-"))
+        self._technical_status = QLabel(tr("verify.technicalStatus", status="-"))
+        self._exists = QLabel(tr("verify.exists", exists="-"))
+        self._order = QLabel(tr("verify.order", order="-"))
+        self._device = QLabel(tr("verify.device", device="-"))
         self._warnings = QLabel("")
         self._log = QTextEdit()
         self._log.setReadOnly(True)
@@ -52,20 +53,22 @@ class VerifyScreen(QWidget):
 
         has_error = bool(state.error_message)
         self._status.setText(state.status_message)
-        self._result.setText(state.result_message or "Ожидаем DataMatrix от сканера")
+        self._result.setText(state.result_message or tr("verify.resultWait"))
         self._result.setProperty("tone", self._result_tone(state, has_error))
         self._result.style().unpolish(self._result)
         self._result.style().polish(self._result)
         self._error.setText(state.error_message)
         self._error.setVisible(has_error)
-        self._last_code.setText(f"Код: {self._preview(state.last_visible_code)}")
-        self._technical_status.setText(f"Статус: {state.technical_status or '-'}")
-        self._exists.setText(f"Наличие: {self._exists_text(state.exists)}")
+        self._last_code.setText(tr("verify.code", code=self._preview(state.last_visible_code)))
+        self._technical_status.setText(
+            tr("verify.technicalStatus", status=state.technical_status or "-")
+        )
+        self._exists.setText(tr("verify.exists", exists=self._exists_text(state.exists)))
         self._sync_duplicate_check(state.check_duplicates)
-        self._order.setText(f"Заказ: {state.order_name or '-'}")
-        self._device.setText(f"Устройство: {state.device_name or '-'}")
+        self._order.setText(tr("verify.order", order=state.order_name or "-"))
+        self._device.setText(tr("verify.device", device=state.device_name or "-"))
         warnings = "; ".join(state.warnings)
-        self._warnings.setText(f"Предупреждения: {warnings}" if warnings else "")
+        self._warnings.setText(tr("verify.warnings", warnings=warnings) if warnings else "")
         self._warnings.setVisible(bool(warnings))
         self._log.setPlainText("\n".join(state.log))
 
@@ -73,10 +76,12 @@ class VerifyScreen(QWidget):
         """Обновляет подсказку о доступности сканера для проверки."""
 
         if snapshot.scanner.is_running:
-            self._scanner_status.setText(f"Сканер готов: {snapshot.scanner.port or '-'}")
+            self._scanner_status.setText(
+                tr("verify.scannerReady", port=snapshot.scanner.port or "-")
+            )
             self._scanner_status.setProperty("tone", "active")
         else:
-            self._scanner_status.setText("Сканер не запущен. Проверка кода заблокирована.")
+            self._scanner_status.setText(tr("verify.scannerBlocked"))
             self._scanner_status.setProperty("tone", "error")
         self._scanner_status.style().unpolish(self._scanner_status)
         self._scanner_status.style().polish(self._scanner_status)
@@ -143,10 +148,7 @@ class VerifyScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("verifyHero")
         icon = VectorIcon(VectorIconName.SHIELD, "#66d2c7")
-        subtitle = QLabel(
-            "Сканируйте DataMatrix изделия. Приложение проверит наличие кода "
-            "в backend и покажет заказ, устройство и предупреждения."
-        )
+        subtitle = QLabel(tr("verify.heroSubtitle"))
         subtitle.setObjectName("verifyHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -165,12 +167,12 @@ class VerifyScreen(QWidget):
 
         card = QFrame()
         card.setObjectName("verifyCard")
-        title = QLabel("Источник данных")
+        title = QLabel(tr("verify.source"))
         title.setObjectName("verifyCardTitle")
-        note = QLabel("Ручной ввод отключен, принимаем только сканер")
+        note = QLabel(tr("verify.sourceNote"))
         note.setObjectName("verifyMutedText")
         note.setWordWrap(True)
-        duplicate_note = QLabel("Включите, если повторный скан должен считаться дублем.")
+        duplicate_note = QLabel(tr("verify.duplicateNote"))
         duplicate_note.setObjectName("verifyMutedText")
         duplicate_note.setWordWrap(True)
 
@@ -194,7 +196,7 @@ class VerifyScreen(QWidget):
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.TOKEN, "#f3c969"))
         header_text = QVBoxLayout()
-        title = QLabel("Результат проверки")
+        title = QLabel(tr("verify.resultTitle"))
         title.setObjectName("verifyCardTitle")
         header_text.addWidget(title)
         header_text.addWidget(self._status)
@@ -215,7 +217,7 @@ class VerifyScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("verifyMetaPanel")
-        title = QLabel("Детали кода")
+        title = QLabel(tr("verify.details"))
         title.setObjectName("verifyCardTitle")
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
@@ -239,9 +241,9 @@ class VerifyScreen(QWidget):
         panel = QFrame()
         panel.setObjectName("verifyLogPanel")
         header = QHBoxLayout()
-        title = QLabel("Журнал проверок")
+        title = QLabel(tr("verify.logTitle"))
         title.setObjectName("verifyCardTitle")
-        hint = QLabel("Последние результаты проверки DataMatrix")
+        hint = QLabel(tr("verify.logHint"))
         hint.setObjectName("verifyMutedText")
         text = QVBoxLayout()
         text.addWidget(title)
@@ -271,9 +273,9 @@ class VerifyScreen(QWidget):
         """Возвращает человекочитаемый статус наличия кода."""
 
         if exists is True:
-            return "код найден"
+            return tr("verify.found")
         if exists is False:
-            return "код не найден"
+            return tr("verify.notFound")
         return "-"
 
     def _sync_duplicate_check(self, checked: bool) -> None:

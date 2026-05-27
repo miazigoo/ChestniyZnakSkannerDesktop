@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.defect_controller import DefectUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -25,15 +26,15 @@ class DefectScreen(QWidget):
 
         super().__init__()
         self.setObjectName("defectScreen")
-        self._title = QLabel("Брак")
-        self._status = QLabel("Ожидание скана кода")
-        self._scanner_status = QLabel("Сканер: проверяем состояние")
-        self._result = QLabel("Ожидаем DataMatrix от сканера")
+        self._title = QLabel(tr("defect.title"))
+        self._status = QLabel(tr("defect.waitScan"))
+        self._scanner_status = QLabel(tr("verify.scannerChecking"))
+        self._result = QLabel(tr("defect.resultWait"))
         self._error = QLabel("")
-        self._last_code = QLabel("Код: -")
-        self._order = QLabel("Заказ: -")
-        self._device = QLabel("Устройство: -")
-        self._removed_box = QLabel("Удаление из коробки: -")
+        self._last_code = QLabel(tr("verify.code", code="-"))
+        self._order = QLabel(tr("verify.order", order="-"))
+        self._device = QLabel(tr("verify.device", device="-"))
+        self._removed_box = QLabel(tr("defect.removedFromBox", value="-"))
         self._warnings = QLabel("")
         self._log = QTextEdit()
         self._log.setReadOnly(True)
@@ -46,19 +47,19 @@ class DefectScreen(QWidget):
 
         has_error = bool(state.error_message)
         self._status.setText(state.status_message)
-        self._result.setText(state.result_message or "Ожидаем DataMatrix от сканера")
+        self._result.setText(state.result_message or tr("defect.resultWait"))
         self._result.setProperty("tone", "error" if has_error else "ok")
         self._result.style().unpolish(self._result)
         self._result.style().polish(self._result)
         self._error.setText(state.error_message)
         self._error.setVisible(has_error)
-        self._last_code.setText(f"Код: {self._preview(state.last_visible_code)}")
-        self._order.setText(f"Заказ: {state.order_name or '-'}")
-        self._device.setText(f"Устройство: {state.device_name or '-'}")
+        self._last_code.setText(tr("verify.code", code=self._preview(state.last_visible_code)))
+        self._order.setText(tr("verify.order", order=state.order_name or "-"))
+        self._device.setText(tr("verify.device", device=state.device_name or "-"))
         removed_box = state.removed_box_message or "-"
-        self._removed_box.setText(f"Удаление из коробки: {removed_box}")
+        self._removed_box.setText(tr("defect.removedFromBox", value=removed_box))
         warnings = "; ".join(state.warnings)
-        self._warnings.setText(f"Предупреждения: {warnings}" if warnings else "")
+        self._warnings.setText(tr("verify.warnings", warnings=warnings) if warnings else "")
         self._warnings.setVisible(bool(warnings))
         self._log.setPlainText("\n".join(state.log))
 
@@ -66,10 +67,12 @@ class DefectScreen(QWidget):
         """Обновляет подсказку о доступности сканера для брака."""
 
         if snapshot.scanner.is_running:
-            self._scanner_status.setText(f"Сканер готов: {snapshot.scanner.port or '-'}")
+            self._scanner_status.setText(
+                tr("verify.scannerReady", port=snapshot.scanner.port or "-")
+            )
             self._scanner_status.setProperty("tone", "active")
         else:
-            self._scanner_status.setText("Сканер не запущен. Отправка в брак заблокирована.")
+            self._scanner_status.setText(tr("defect.scannerBlocked"))
             self._scanner_status.setProperty("tone", "error")
         self._scanner_status.style().unpolish(self._scanner_status)
         self._scanner_status.style().polish(self._scanner_status)
@@ -132,10 +135,7 @@ class DefectScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("defectHero")
         icon = VectorIcon(VectorIconName.WARNING, "#f3c969")
-        subtitle = QLabel(
-            "Сканируйте изделие, которое нужно отправить в брак. "
-            "Код уйдет в backend, а при необходимости будет удален из коробки."
-        )
+        subtitle = QLabel(tr("defect.heroSubtitle"))
         subtitle.setObjectName("defectHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -154,9 +154,9 @@ class DefectScreen(QWidget):
 
         card = QFrame()
         card.setObjectName("defectCard")
-        title = QLabel("Источник данных")
+        title = QLabel(tr("defect.source"))
         title.setObjectName("defectCardTitle")
-        note = QLabel("Ручной ввод отключен, принимаем только сканер")
+        note = QLabel(tr("defect.sourceNote"))
         note.setObjectName("defectMutedText")
         note.setWordWrap(True)
 
@@ -178,7 +178,7 @@ class DefectScreen(QWidget):
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.SHIELD, "#66d2c7"))
         header_text = QVBoxLayout()
-        title = QLabel("Результат обработки")
+        title = QLabel(tr("defect.resultTitle"))
         title.setObjectName("defectCardTitle")
         header_text.addWidget(title)
         header_text.addWidget(self._status)
@@ -199,7 +199,7 @@ class DefectScreen(QWidget):
 
         panel = QFrame()
         panel.setObjectName("defectMetaPanel")
-        title = QLabel("Детали кода")
+        title = QLabel(tr("defect.details"))
         title.setObjectName("defectCardTitle")
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
@@ -222,9 +222,9 @@ class DefectScreen(QWidget):
         panel = QFrame()
         panel.setObjectName("defectLogPanel")
         header = QHBoxLayout()
-        title = QLabel("Журнал брака")
+        title = QLabel(tr("defect.logTitle"))
         title.setObjectName("defectCardTitle")
-        hint = QLabel("Последние результаты отправки кодов")
+        hint = QLabel(tr("defect.logHint"))
         hint.setObjectName("defectMutedText")
         text = QVBoxLayout()
         text.addWidget(title)

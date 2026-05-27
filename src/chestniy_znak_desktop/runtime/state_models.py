@@ -60,6 +60,13 @@ class SessionState:
 
     status: SessionStatus = SessionStatus.UNKNOWN
     user_name: str = ""
+    plant_id: str = ""
+    device_id: str = ""
+    supplier_id: str = ""
+    supplier_name: str = ""
+    plant_name: str = ""
+    client_device_id: str = ""
+    subscription_status: str = ""
 
     @property
     def is_authenticated(self) -> bool:

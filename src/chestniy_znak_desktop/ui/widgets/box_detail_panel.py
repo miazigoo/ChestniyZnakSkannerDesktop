@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.boxes_controller import BoxDetailUi
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -25,13 +26,13 @@ class BoxDetailPanel(QFrame):
 
         super().__init__(parent)
         self.setObjectName("boxesDetailPanel")
-        self._title = QLabel("Детали коробки")
+        self._title = QLabel(tr("boxes.detailTitle"))
         self._title.setObjectName("boxesPanelTitle")
-        self._status = QLabel("Выберите коробку для просмотра состава")
+        self._status = QLabel(tr("boxes.detailSelect"))
         self._status.setObjectName("boxesStatusText")
         self._error = QLabel("")
         self._error.setObjectName("boxesErrorText")
-        self._summary = QLabel("Коробка: -")
+        self._summary = QLabel(tr("boxes.detailSummary", value="-"))
         self._summary.setObjectName("boxesDetailTitle")
         self._progress_label = QLabel("0 / 0")
         self._progress_label.setObjectName("boxesProgressValue")
@@ -43,9 +44,8 @@ class BoxDetailPanel(QFrame):
         self._sscc_value = QLabel("-")
         self._status_value = QLabel("-")
         self._operator_value = QLabel("-")
-        self._print_value = QLabel("-")
         self._count_value = QLabel("-")
-        self._edit_status = QLabel("Редактирование не запущено")
+        self._edit_status = QLabel(tr("boxes.editIdle"))
         self._edit_status.setObjectName("boxesStatusText")
         self._edit_error = QLabel("")
         self._edit_error.setObjectName("boxesErrorText")
@@ -58,7 +58,7 @@ class BoxDetailPanel(QFrame):
         header.addLayout(header_text, 1)
 
         progress_row = QHBoxLayout()
-        progress_caption = QLabel("Заполнение")
+        progress_caption = QLabel(tr("packing.progress"))
         progress_caption.setObjectName("boxesMutedText")
         progress_row.addWidget(progress_caption)
         progress_row.addStretch(1)
@@ -67,12 +67,11 @@ class BoxDetailPanel(QFrame):
         meta_grid = QGridLayout()
         meta_grid.setHorizontalSpacing(16)
         meta_grid.setVerticalSpacing(8)
-        self._add_meta_row(meta_grid, 0, "Заказ", self._order_value)
+        self._add_meta_row(meta_grid, 0, tr("packing.column.order"), self._order_value)
         self._add_meta_row(meta_grid, 1, "SSCC", self._sscc_value)
-        self._add_meta_row(meta_grid, 2, "Статус", self._status_value)
-        self._add_meta_row(meta_grid, 3, "Оператор", self._operator_value)
-        self._add_meta_row(meta_grid, 4, "Печать", self._print_value)
-        self._add_meta_row(meta_grid, 5, "Учет", self._count_value)
+        self._add_meta_row(meta_grid, 2, tr("packing.column.status"), self._status_value)
+        self._add_meta_row(meta_grid, 3, tr("packing.column.operator"), self._operator_value)
+        self._add_meta_row(meta_grid, 4, tr("boxes.meta.accounting"), self._count_value)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -105,7 +104,7 @@ class BoxDetailPanel(QFrame):
     def set_empty(self) -> None:
         """Очищает панель, когда коробка не выбрана."""
 
-        self._summary.setText("Коробка: -")
+        self._summary.setText(tr("boxes.detailSummary", value="-"))
         self._progress_label.setText("0 / 0")
         self._progress_bar.setRange(0, 1)
         self._progress_bar.setValue(0)
@@ -113,7 +112,6 @@ class BoxDetailPanel(QFrame):
         self._sscc_value.setText("-")
         self._status_value.setText("-")
         self._operator_value.setText("-")
-        self._print_value.setText("-")
         self._count_value.setText("-")
 
     def set_detail(self, detail: BoxDetailUi) -> None:
@@ -121,7 +119,7 @@ class BoxDetailPanel(QFrame):
 
         progress_max = max(detail.capacity, 1)
         progress_value = min(max(detail.filled, 0), progress_max)
-        self._summary.setText(f"Коробка #{detail.box_id}")
+        self._summary.setText(tr("packing.summary.boxTitle", box_id=detail.box_id))
         self._progress_label.setText(f"{detail.filled} / {detail.capacity}")
         self._progress_bar.setRange(0, progress_max)
         self._progress_bar.setValue(progress_value)
@@ -129,7 +127,6 @@ class BoxDetailPanel(QFrame):
         self._sscc_value.setText(detail.sscc)
         self._status_value.setText(detail.status)
         self._operator_value.setText(detail.operator)
-        self._print_value.setText(detail.print_status)
         self._count_value.setText(detail.count_in_packing)
 
     @staticmethod

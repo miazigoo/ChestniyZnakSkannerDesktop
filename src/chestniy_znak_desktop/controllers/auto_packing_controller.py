@@ -10,6 +10,7 @@ from typing import Any, Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
+from chestniy_znak_desktop.api.models.orders import WorkOrderPageDto
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -23,9 +24,13 @@ from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.packing_controller import (
     CloseBoxUiEvent,
+    OrderBackend,
+    OrderLineOptionUi,
     PackingBoxUi,
     PackingItemUi,
+    PackingController,
 )
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -40,7 +45,15 @@ class AutoPackingBackend(Protocol):
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую открытую коробку."""
 
-    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+    def open_box(
+        self,
+        device_id: str,
+        count_in_packing: bool = True,
+        order_id: str | None = None,
+        order_line_id: str | None = None,
+        code_value: str | None = None,
+        sscc: str | None = None,
+    ) -> OpenBoxResultDto:
         """Открывает новую коробку."""
 
     def scan_batch_to_box(
@@ -127,11 +140,16 @@ class AutoPackingUiState:
     codes_per_item: int = 1
     pending_items: list[AutoPackingBoxItemUi] = field(default_factory=list)
     current_box: PackingBoxUi | None = None
-    status_message: str = "Открытая коробка не найдена"
+    status_message: str = field(default_factory=lambda: tr("packing.noOpenBox"))
     result_message: str = ""
     error_message: str = ""
     last_scanned_code: str = ""
     count_in_packing: bool = True
+    order_options: list[OrderLineOptionUi] = field(default_factory=list)
+    selected_order_line_id: str = ""
+    selected_order_scan_required: bool = True
+    order_search: str = ""
+    orders_loading: bool = False
 
     @property
     def pending_count(self) -> int:
@@ -161,6 +179,7 @@ class AutoPackingController(QObject):
         settings_store: SettingsStore,
         settings_defaults: AppConfig,
         device_id: str,
+        order_service: OrderBackend | None = None,
         scanner_id: str = "desktop-com",
         ws_verify_service: AutoPackingWsVerifier | None = None,
         sound_service: SoundPlayer | None = None,
@@ -172,6 +191,7 @@ class AutoPackingController(QObject):
         self._packing_service = packing_service
         self._verify_service = verify_service
         self._box_edit_service = box_edit_service
+        self._order_service = order_service
         self._task_runner = task_runner
         self._settings_store = settings_store
         self._settings_defaults = settings_defaults
@@ -203,11 +223,55 @@ class AutoPackingController(QObject):
     def refresh_current_box(self) -> None:
         """Загружает текущую открытую коробку пользователя."""
 
-        self._set_busy("Загружаем текущую коробку...")
+        self._set_busy(tr("packing.loadingCurrentBox"))
         self._task_runner.submit(
             self._packing_service.current_box,
             self._on_current_box_loaded,
             self._on_error,
+        )
+
+    def refresh_orders(self, search: str | None = None) -> None:
+        """Загружает доступные заказы и строки номенклатуры."""
+
+        if self._order_service is None:
+            return
+        order_service = self._order_service
+        normalized_search = self._state.order_search if search is None else search.strip()
+        self._set_state(
+            replace(
+                self._state,
+                order_search=normalized_search,
+                orders_loading=True,
+                error_message="",
+            )
+        )
+        self._task_runner.submit(
+            lambda: order_service.list_orders(
+                search=normalized_search,
+                page=1,
+                per_page=50,
+            ),
+            self._on_orders_loaded,
+            self._on_orders_error,
+        )
+
+    def select_order_line(self, order_line_id: str) -> None:
+        """Выбирает строку заказа для следующей коробки."""
+
+        if self._state.current_box is not None:
+            return
+        selected = self._find_order_option(order_line_id)
+        if selected is None:
+            return
+        self._set_state(
+            replace(
+                self._state,
+                selected_order_line_id=selected.order_line_id,
+                selected_order_scan_required=selected.scan_required,
+                status_message=PackingController._selected_order_status(selected),
+                result_message=PackingController._selected_order_result(selected),
+                error_message="",
+            )
         )
 
     def open_box(self) -> None:
@@ -215,12 +279,37 @@ class AutoPackingController(QObject):
 
         if self._state.is_busy:
             return
-        self._set_busy("Открываем коробку...")
+        selected = self._selected_order_option()
+        if selected is None and self._order_service is not None:
+            self._play(SoundEvent.WARNING)
+            self._set_state(
+                replace(
+                    self._state,
+                    status_message=tr("packing.selectOrder"),
+                    error_message=tr("packing.openRequiresOrder"),
+                )
+            )
+            return
+        if selected is not None and not selected.scan_required:
+            self._play(SoundEvent.WARNING)
+            self._set_state(
+                replace(
+                    self._state,
+                    selected_order_scan_required=False,
+                    status_message=tr("packing.scanDisabled"),
+                    result_message=PackingController._selected_order_result(selected),
+                    error_message=tr("packing.openNotNeeded"),
+                )
+            )
+            return
+        self._set_busy(tr("packing.openingBox"))
         count_in_packing = self._state.count_in_packing
         self._task_runner.submit(
             lambda: self._packing_service.open_box(
                 device_id=self._device_id,
                 count_in_packing=count_in_packing,
+                order_id=selected.order_id if selected else None,
+                order_line_id=selected.order_line_id if selected else None,
             ),
             self._on_box_opened,
             self._on_error,
@@ -232,7 +321,7 @@ class AutoPackingController(QObject):
         if self._state.is_busy or self._state.current_box is None:
             return
         box_id = self._state.current_box.box_id
-        self._set_busy("Закрываем коробку и ждем печать этикетки...")
+        self._set_busy(tr("packing.closingBox"))
         self._task_runner.submit(
             lambda: self._packing_service.close_box(
                 box_id=box_id,
@@ -254,8 +343,8 @@ class AutoPackingController(QObject):
             replace(
                 self._state,
                 codes_per_item=value,
-                status_message="Вместимость автоскана-бокса обновлена",
-                result_message=f"Ожидаем {value} код(ов) на изделие",
+                status_message=tr("autoPacking.capacityUpdated"),
+                result_message=tr("autoPacking.waitCodesCount", count=value),
                 error_message="",
             )
         )
@@ -273,7 +362,7 @@ class AutoPackingController(QObject):
             return
         if self._state.current_box is not None:
             box_id = self._state.current_box.box_id
-            self._set_busy("Обновляем учет коробки в упаковке...")
+            self._set_busy(tr("packing.updatingCountMode"))
             self._task_runner.submit(
                 lambda: self._packing_service.set_count_in_packing(box_id, enabled),
                 self._on_count_in_packing_changed,
@@ -284,11 +373,9 @@ class AutoPackingController(QObject):
             replace(
                 self._state,
                 count_in_packing=enabled,
-                status_message="Учет следующей коробки обновлен",
+                status_message=tr("autoPacking.nextCountUpdated"),
                 result_message=(
-                    "Коробка будет учитываться в упаковке"
-                    if enabled
-                    else "Коробка будет без учета упаковки"
+                    tr("autoPacking.nextCounted") if enabled else tr("autoPacking.nextNotCounted")
                 ),
                 error_message="",
             )
@@ -303,8 +390,8 @@ class AutoPackingController(QObject):
             replace(
                 self._state,
                 pending_items=[],
-                status_message="Автоскана-бокс очищен",
-                result_message="Можно сканировать изделие заново",
+                status_message=tr("autoPacking.localCleared"),
+                result_message=tr("autoPacking.rescanAllowed"),
                 error_message="",
             )
         )
@@ -320,7 +407,7 @@ class AutoPackingController(QObject):
             replace(
                 self._state,
                 pending_items=items,
-                status_message="Код удален из автоскана-бокса",
+                status_message=tr("autoPacking.removedFromLocal"),
                 result_message=removed.serial,
                 error_message="",
             )
@@ -340,7 +427,7 @@ class AutoPackingController(QObject):
         editor = self._box_edit_service
         box_id = self._state.current_box.box_id
         item_id = self._state.current_box.items[row].id
-        self._set_busy(f"Удаляем код #{item_id} из коробки #{box_id}...")
+        self._set_busy(tr("boxes.edit.removingCode", item_id=item_id, box_id=box_id))
         self._task_runner.submit(
             lambda: editor.remove_item(box_id, item_id),
             self._on_box_edit_result,
@@ -354,7 +441,7 @@ class AutoPackingController(QObject):
             return
         editor = self._box_edit_service
         box_id = self._state.current_box.box_id
-        self._set_busy(f"Очищаем коробку #{box_id}...")
+        self._set_busy(tr("boxes.edit.clearing", box_id=box_id))
         self._task_runner.submit(
             lambda: editor.clear_box(box_id),
             self._on_box_edit_result,
@@ -368,7 +455,7 @@ class AutoPackingController(QObject):
             return
         editor = self._box_edit_service
         box_id = self._state.current_box.box_id
-        self._set_busy(f"Удаляем пустую коробку #{box_id}...")
+        self._set_busy(tr("boxes.edit.deletingEmpty", box_id=box_id))
         self._task_runner.submit(
             lambda: editor.delete_empty_box(box_id),
             self._on_box_delete_result,
@@ -401,8 +488,8 @@ class AutoPackingController(QObject):
             self._set_state(
                 replace(
                     self._state,
-                    status_message="Код уже есть в текущей коробке",
-                    result_message="Повторный скан пропущен",
+                    status_message=tr("autoPacking.codeAlreadyInBox"),
+                    result_message=tr("autoPacking.duplicateSkipped"),
                     error_message="",
                     last_scanned_code=normalized,
                 )
@@ -412,8 +499,8 @@ class AutoPackingController(QObject):
             self._set_state(
                 replace(
                     self._state,
-                    status_message="Код уже есть в текущей коробке",
-                    result_message="Повторный скан пропущен",
+                    status_message=tr("autoPacking.codeAlreadyInBox"),
+                    result_message=tr("autoPacking.duplicateSkipped"),
                     error_message="",
                     last_scanned_code=normalized,
                 )
@@ -423,8 +510,8 @@ class AutoPackingController(QObject):
             self._set_state(
                 replace(
                     self._state,
-                    result_message="Повторный скан уже есть в автоскана-боксе или очереди",
-                    error_message="Дубль локального бокса не добавлен",
+                    result_message=tr("autoPacking.duplicateInLocalOrQueue"),
+                    error_message=tr("autoPacking.localDuplicateNotAdded"),
                     last_scanned_code=normalized,
                 )
             )
@@ -436,8 +523,8 @@ class AutoPackingController(QObject):
             self._set_state(
                 replace(
                     self._state,
-                    status_message="Сначала откройте коробку",
-                    error_message="Открытая коробка не найдена",
+                    status_message=tr("packing.openBoxFirst"),
+                    error_message=tr("packing.noOpenBox"),
                     last_scanned_code=normalized,
                 )
             )
@@ -446,8 +533,8 @@ class AutoPackingController(QObject):
             self._set_state(
                 replace(
                     self._state,
-                    status_message="Автоскана-бокс уже заполнен",
-                    error_message="Дождитесь отправки пачки или очистите бокс",
+                    status_message=tr("autoPacking.localFull"),
+                    error_message=tr("autoPacking.waitBatchOrClear"),
                     last_scanned_code=normalized,
                 )
             )
@@ -475,9 +562,9 @@ class AutoPackingController(QObject):
         self._set_state(
             replace(
                 self._state,
-                status_message="Скан отброшен",
+                status_message=tr("autoPacking.scanRejected"),
                 result_message="",
-                error_message="Пришел обрезанный DataMatrix без начала 01+GTIN+21",
+                error_message=tr("autoPacking.truncatedScan"),
                 last_scanned_code=code,
             )
         )
@@ -485,7 +572,7 @@ class AutoPackingController(QObject):
     def _verify_code_http(self, code: str) -> None:
         """Проверяет код через HTTP, если WS недоступен или не ответил."""
 
-        self._set_busy("Проверяем код через HTTP...", code)
+        self._set_busy(tr("autoPacking.checkingHttp"), code)
         self._task_runner.submit(
             lambda: self._verify_service.verify_exists(
                 code=code,
@@ -504,16 +591,16 @@ class AutoPackingController(QObject):
             code_id=0,
             raw_code=raw_code,
             gtin="",
-            serial="Ожидает проверки",
+            serial=tr("autoPacking.pendingSerial"),
             visible_code=raw_code,
-            order_key="Проверка при отправке",
+            order_key=tr("autoPacking.pendingOrder"),
         )
         pending_items = [*self._state.pending_items, item]
         next_state = replace(
             self._state,
             is_busy=False,
             pending_items=pending_items,
-            status_message="Код добавлен в автоскана-бокс",
+            status_message=tr("autoPacking.addedToLocal"),
             result_message=f"{len(pending_items)} / {self._state.codes_per_item}",
             error_message="",
             last_scanned_code=raw_code,
@@ -550,8 +637,8 @@ class AutoPackingController(QObject):
                     replace(
                         self._state,
                         is_busy=False,
-                        status_message="Код уже есть в текущей коробке",
-                        result_message="Повторный скан пропущен",
+                        status_message=tr("autoPacking.codeAlreadyInBox"),
+                        result_message=tr("autoPacking.duplicateSkipped"),
                         error_message="",
                         last_scanned_code=raw_code,
                     )
@@ -562,7 +649,7 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Код не прошел проверку",
+                    status_message=tr("autoPacking.verifyFailed"),
                     error_message=verify.message,
                     last_scanned_code=raw_code,
                 )
@@ -575,8 +662,8 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Код уже есть в текущей коробке",
-                    result_message="Повторный скан пропущен",
+                    status_message=tr("autoPacking.codeAlreadyInBox"),
+                    result_message=tr("autoPacking.duplicateSkipped"),
                     error_message="",
                     last_scanned_code=raw_code,
                 )
@@ -585,13 +672,13 @@ class AutoPackingController(QObject):
             return
 
         order_key = (verify.code.order_dnp_name or verify.order_name or "").strip()
-        if not order_key or order_key == "Не привязан":
+        if not order_key or order_key in {"Не привязан", tr("autoPacking.unbound")}:
             self._set_state(
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Код не добавлен в автоскана-бокс",
-                    error_message="Код не привязан к заказу",
+                    status_message=tr("autoPacking.notAddedToLocal"),
+                    error_message=tr("autoPacking.notLinkedToOrder"),
                     last_scanned_code=raw_code,
                 )
             )
@@ -603,8 +690,8 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Повтор в автоскана-боксе",
-                    error_message="Этот код уже есть в локальном боксе",
+                    status_message=tr("autoPacking.localDuplicate"),
+                    error_message=tr("autoPacking.alreadyInLocal"),
                     last_scanned_code=raw_code,
                 )
             )
@@ -617,8 +704,8 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Код другого заказа",
-                    error_message="В автоскана-боксе могут быть коды только одного заказа",
+                    status_message=tr("autoPacking.wrongOrder"),
+                    error_message=tr("autoPacking.oneOrderOnly"),
                     last_scanned_code=raw_code,
                 )
             )
@@ -638,7 +725,7 @@ class AutoPackingController(QObject):
             self._state,
             is_busy=False,
             pending_items=pending_items,
-            status_message="Код добавлен в автоскана-бокс",
+            status_message=tr("autoPacking.addedToLocal"),
             result_message=f"{len(pending_items)} / {self._state.codes_per_item}",
             error_message="",
             last_scanned_code=raw_code,
@@ -656,7 +743,7 @@ class AutoPackingController(QObject):
             return
         box_id = self._state.current_box.box_id
         codes = [item.raw_code for item in self._state.pending_items]
-        self._set_busy("Автоскана-бокс заполнен. Добавляем пачку в коробку...")
+        self._set_busy(tr("autoPacking.addingBatch"))
         self._task_runner.submit(
             lambda: self._packing_service.scan_batch_to_box(
                 box_id=box_id,
@@ -681,9 +768,9 @@ class AutoPackingController(QObject):
                     is_busy=False,
                     pending_items=pending_items,
                     current_box=self._merge_box_summary(batch.box),
-                    status_message="Пачка не добавлена",
+                    status_message=tr("autoPacking.batchNotAdded"),
                     result_message=(
-                        f"В автоскана-боксе осталось: {len(pending_items)}"
+                        tr("autoPacking.pendingLeft", count=len(pending_items))
                         if len(pending_items) != len(self._state.pending_items)
                         else self._state.result_message
                     ),
@@ -698,8 +785,8 @@ class AutoPackingController(QObject):
                 is_busy=False,
                 pending_items=[],
                 current_box=self._merge_box_summary(batch.box),
-                status_message="Пачка добавлена в коробку",
-                result_message=f"Добавлено кодов: {batch.added}",
+                status_message=tr("autoPacking.batchAdded"),
+                result_message=tr("autoPacking.addedCount", count=batch.added),
                 error_message="",
             )
         )
@@ -716,7 +803,7 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Коробка не изменена",
+                    status_message=tr("autoPacking.boxNotChanged"),
                     error_message=message,
                 )
             )
@@ -744,7 +831,7 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Коробка не удалена",
+                    status_message=tr("autoPacking.boxNotDeleted"),
                     error_message=message,
                 )
             )
@@ -754,7 +841,7 @@ class AutoPackingController(QObject):
                 self._state,
                 is_busy=False,
                 current_box=None,
-                status_message="Пустая коробка удалена",
+                status_message=tr("autoPacking.emptyDeleted"),
                 result_message=message,
                 error_message="",
             )
@@ -771,7 +858,7 @@ class AutoPackingController(QObject):
                 replace(
                     self._state,
                     is_busy=False,
-                    status_message="Учет коробки не изменен",
+                    status_message=tr("packing.countModeNotChanged"),
                     error_message=message,
                 )
             )
@@ -783,7 +870,7 @@ class AutoPackingController(QObject):
                 is_busy=False,
                 current_box=self._box_with_count_in_packing(count_in_packing),
                 count_in_packing=count_in_packing,
-                status_message="Учет коробки обновлен",
+                status_message=tr("packing.countModeUpdated"),
                 result_message=self._count_in_packing_message(count_in_packing),
                 error_message="",
             )
@@ -794,14 +881,16 @@ class AutoPackingController(QObject):
 
         closed = self._expect(result, CloseBoxResultDto)
         self._play(SoundEvent.VICTORY if closed.ok else SoundEvent.ERROR)
-        message = closed.error or closed.print_error or closed.reason_code
+        message = closed.error or closed.reason_code
         event = self._close_event(closed)
         self._set_state(
             replace(
                 self._state,
                 is_busy=False,
                 current_box=None if closed.ok else self._box_to_ui(closed.box),
-                status_message="Коробка закрыта" if closed.ok else "Коробка не закрыта",
+                status_message=(
+                    tr("closeBox.closedTitle") if closed.ok else tr("closeBox.notClosedTitle")
+                ),
                 result_message=message,
                 error_message="" if closed.ok else message,
             )
@@ -825,8 +914,8 @@ class AutoPackingController(QObject):
                 filled=current_box.filled,
                 capacity=current_box.capacity,
                 is_full=current_box.filled >= current_box.capacity,
-                title="Коробка не закрыта",
-                message="Не удалось закрыть коробку",
+                title=tr("closeBox.notClosedTitle"),
+                message=tr("closeBox.notClosedMessage"),
                 error_message=str(exc),
             )
         )
@@ -841,7 +930,7 @@ class AutoPackingController(QObject):
                     self._state,
                     is_busy=False,
                     current_box=None,
-                    status_message="Открытая коробка не найдена",
+                    status_message=tr("packing.noOpenBox"),
                 )
             )
             return
@@ -852,7 +941,7 @@ class AutoPackingController(QObject):
                 self._state,
                 is_busy=False,
                 current_box=self._box_to_ui(detail),
-                status_message="Коробка загружена",
+                status_message=tr("packing.boxLoaded"),
                 error_message="",
                 count_in_packing=detail.count_in_packing,
             )
@@ -870,14 +959,78 @@ class AutoPackingController(QObject):
                 is_busy=False,
                 current_box=self._box_to_ui(opened.box),
                 status_message=(
-                    "Коробка открыта" if opened.created else "Активная коробка уже была открыта"
+                    tr("packing.boxOpened") if opened.created else tr("packing.boxAlreadyOpened")
                 ),
-                result_message=f"Коробка #{opened.box.box_id}",
+                result_message=tr("packing.summary.boxTitle", box_id=opened.box.box_id),
                 error_message="",
                 count_in_packing=opened.box.count_in_packing,
             )
         )
         self._process_next_queued_scan()
+
+    def _on_orders_loaded(self, result: object) -> None:
+        """Обрабатывает загрузку заказов для выбора номенклатуры."""
+
+        page = self._expect(result, WorkOrderPageDto)
+        options = PackingController._order_options(page)
+        selected_id = self._state.selected_order_line_id
+        if selected_id and not any(option.order_line_id == selected_id for option in options):
+            selected_id = ""
+        if not selected_id and options:
+            selected_id = options[0].order_line_id
+        selected = PackingController._find_option_in(options, selected_id)
+        status_message = (
+            PackingController._selected_order_status(selected)
+            if selected
+            else self._state.status_message
+        )
+        result_message = (
+            PackingController._selected_order_result(selected)
+            if selected
+            else self._state.result_message
+        )
+        if not options:
+            status_message = tr("packing.noAvailableOrders")
+            result_message = ""
+        self._set_state(
+            replace(
+                self._state,
+                order_options=options,
+                selected_order_line_id=selected_id,
+                selected_order_scan_required=selected.scan_required if selected else True,
+                orders_loading=False,
+                status_message=status_message,
+                result_message=result_message,
+            )
+        )
+
+    def _on_orders_error(self, exc: Exception) -> None:
+        """Показывает ошибку загрузки заказов без сброса текущей коробки."""
+
+        self._set_state(
+            replace(
+                self._state,
+                orders_loading=False,
+                error_message=tr("packing.ordersLoadFailed", error=exc),
+            )
+        )
+
+    def _selected_order_option(self) -> OrderLineOptionUi | None:
+        """Возвращает выбранную строку заказа."""
+
+        return self._find_order_option(self._state.selected_order_line_id)
+
+    def _find_order_option(self, order_line_id: str) -> OrderLineOptionUi | None:
+        """Ищет строку заказа в текущем списке выбора."""
+
+        return next(
+            (
+                option
+                for option in self._state.order_options
+                if option.order_line_id == order_line_id
+            ),
+            None,
+        )
 
     def _on_error(self, exc: Exception) -> None:
         """Обрабатывает ошибку backend-сценария."""
@@ -887,7 +1040,7 @@ class AutoPackingController(QObject):
             replace(
                 self._state,
                 is_busy=False,
-                status_message="Ошибка операции",
+                status_message=tr("packing.operationError"),
                 error_message=str(exc),
             )
         )
@@ -917,8 +1070,8 @@ class AutoPackingController(QObject):
         """Возвращает понятный оператору текст режима учета коробки."""
 
         if enabled:
-            return "Коробка учитывается в упаковке"
-        return "Коробка не учитывается в упаковке"
+            return tr("packing.modeCounted")
+        return tr("packing.modeNotCounted")
 
     def _set_state(self, state: AutoPackingUiState) -> None:
         """Сохраняет и публикует состояние автосканера."""
@@ -948,7 +1101,7 @@ class AutoPackingController(QObject):
         self._set_state(
             replace(
                 self._state,
-                result_message=f"Сканов в очереди: {len(self._scan_queue)}",
+                result_message=tr("autoPacking.queued", count=len(self._scan_queue)),
                 last_scanned_code=normalized,
             )
         )
@@ -1144,8 +1297,6 @@ class AutoPackingController(QObject):
             capacity=box.capacity,
             count_in_packing=box.count_in_packing,
             is_closed=box.is_closed,
-            print_ok=box.print_ok,
-            print_error=box.print_error,
         )
 
     @staticmethod
@@ -1179,16 +1330,12 @@ class AutoPackingController(QObject):
 
         box = result.box
         is_full = box.filled >= box.capacity
-        print_error = result.print_error or ""
-        if result.ok and result.print_ok is False and print_error:
-            title = "Коробка закрыта, печать с ошибкой"
-            message = print_error
-        elif result.ok:
+        if result.ok:
             title = "Коробка закрыта"
             message = f"Коробка #{box.box_id} закрыта"
         else:
             title = "Коробка не закрыта"
-            message = result.error or print_error or "Не удалось закрыть коробку"
+            message = result.error or "Не удалось закрыть коробку"
         return CloseBoxUiEvent(
             ok=result.ok,
             box_id=box.box_id,
@@ -1199,8 +1346,6 @@ class AutoPackingController(QObject):
             title=title,
             message=message,
             error_message="" if result.ok else message,
-            print_ok=result.print_ok,
-            print_error=print_error,
         )
 
     @staticmethod
@@ -1227,8 +1372,6 @@ class AutoPackingController(QObject):
             capacity=box.capacity,
             count_in_packing=box.count_in_packing,
             is_closed=box.is_closed,
-            print_ok=box.print_ok,
-            print_error=box.print_error,
             items=items,
         )
 

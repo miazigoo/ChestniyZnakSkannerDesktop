@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.screens.settings_pages.common import (
     apply_combo_popup_style,
     create_back_button,
@@ -41,16 +42,16 @@ class ScannerSettingsPage(QWidget):
         apply_combo_popup_style(self._scanner_baudrate)
         self._scanner_baudrate.addItems(["9600", "19200", "38400", "57600", "115200"])
         self._scanner_baudrate.currentTextChanged.connect(self._emit_baudrate)
-        self._scanner_status = QLabel("Сканер не запущен")
+        self._scanner_status = QLabel(tr("settings.scanner.notRunning"))
         self._scanner_status.setObjectName("settingsStatusText")
         self._scanner_error = QLabel("")
         self._scanner_error.setObjectName("settingsErrorText")
         self._scanner_error.setVisible(False)
-        self._refresh_ports_button = QPushButton("Обновить порты")
+        self._refresh_ports_button = QPushButton(tr("settings.scanner.refreshPorts"))
         self._refresh_ports_button.setObjectName("settingsSecondaryButton")
-        self._start_scanner_button = QPushButton("Запустить сканер")
+        self._start_scanner_button = QPushButton(tr("settings.scanner.start"))
         self._start_scanner_button.setObjectName("settingsPrimaryButton")
-        self._stop_scanner_button = QPushButton("Остановить сканер")
+        self._stop_scanner_button = QPushButton(tr("settings.scanner.stop"))
         self._stop_scanner_button.setObjectName("settingsDangerButton")
         self._back_button = create_back_button()
         self._refresh_ports_button.clicked.connect(self.ports_refresh_requested.emit)
@@ -65,19 +66,21 @@ class ScannerSettingsPage(QWidget):
         actions.addStretch(1)
 
         header = create_page_header(
-            title="Сканер",
-            subtitle="COM/SPP-порт, скорость и управление чтением сканера.",
+            title=tr("settings.scanner.title"),
+            subtitle=tr("settings.scanner.subtitle"),
             icon_name=VectorIconName.SCANNER,
             icon_color="#8fb8ff",
         )
         card, card_layout = create_card(
-            title="COM/SPP подключение",
-            subtitle="Для локальной разработки поддерживаются Linux-порты вроде /dev/rfcomm0.",
+            title=tr("settings.scanner.cardTitle"),
+            subtitle=tr("settings.scanner.cardSubtitle"),
             icon_name=VectorIconName.LINK,
             icon_color="#66d2c7",
         )
-        card_layout.addWidget(create_form_row("Порт сканера", self._scanner_port))
-        card_layout.addWidget(create_form_row("Скорость порта", self._scanner_baudrate))
+        card_layout.addWidget(create_form_row(tr("settings.scanner.port"), self._scanner_port))
+        card_layout.addWidget(
+            create_form_row(tr("settings.scanner.baudrate"), self._scanner_baudrate)
+        )
         card_layout.addLayout(actions)
         card_layout.addWidget(self._scanner_status)
         card_layout.addWidget(self._scanner_error)

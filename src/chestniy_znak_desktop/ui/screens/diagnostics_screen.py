@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsUiState
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -30,8 +31,8 @@ class DiagnosticsScreen(QWidget):
 
         super().__init__()
         self.setObjectName("diagnosticsScreen")
-        self._title = QLabel("Диагностика")
-        self._status = QLabel("Диагностика готова")
+        self._title = QLabel(tr("diagnostics.title"))
+        self._status = QLabel(tr("diagnostics.ready"))
         self._error = QLabel("")
         self._backend_value = QLabel("-")
         self._websocket_value = QLabel("-")
@@ -40,9 +41,9 @@ class DiagnosticsScreen(QWidget):
         self._connection_value = QLabel("-")
         self._session_value = QLabel("-")
         self._scanner_value = QLabel("-")
-        self._log_path = QLabel("Лог: -")
-        self._refresh_button = QPushButton("Обновить логи")
-        self._clear_button = QPushButton("Очистить логи")
+        self._log_path = QLabel(tr("diagnostics.log", path="-"))
+        self._refresh_button = QPushButton(tr("diagnostics.refreshLogs"))
+        self._clear_button = QPushButton(tr("diagnostics.clearLogs"))
         self._log_view = QTextEdit()
         self._log_view.setReadOnly(True)
 
@@ -59,7 +60,7 @@ class DiagnosticsScreen(QWidget):
         self._websocket_value.setText(state.websocket_url)
         self._device_value.setText(state.device_id)
         self._data_dir_value.setText(state.data_dir)
-        self._log_path.setText(f"Лог: {state.log_file}")
+        self._log_path.setText(tr("diagnostics.log", path=state.log_file))
         self._log_view.setPlainText(state.log_text)
 
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
@@ -133,7 +134,7 @@ class DiagnosticsScreen(QWidget):
         hero = QFrame()
         hero.setObjectName("diagnosticsHero")
         icon = VectorIcon(VectorIconName.DIAGNOSTICS, "#66d2c7")
-        subtitle = QLabel("Состояние backend, WebSocket, сессии, сканера и последние строки логов.")
+        subtitle = QLabel(tr("diagnostics.heroSubtitle"))
         subtitle.setObjectName("diagnosticsHeroSubtitle")
         subtitle.setWordWrap(True)
         text = QVBoxLayout()
@@ -160,8 +161,8 @@ class DiagnosticsScreen(QWidget):
         header = self._create_panel_header(
             icon_name=VectorIconName.SETTINGS,
             icon_color="#8fb8ff",
-            title="Конфигурация",
-            subtitle="Параметры, с которыми запущено приложение",
+            title=tr("diagnostics.config"),
+            subtitle=tr("diagnostics.configSubtitle"),
         )
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
@@ -187,14 +188,14 @@ class DiagnosticsScreen(QWidget):
             icon_name=VectorIconName.LINK,
             icon_color="#66d2c7",
             title="Runtime",
-            subtitle="Текущее состояние соединения, сессии и сканера",
+            subtitle=tr("diagnostics.runtimeSubtitle"),
         )
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(12)
-        self._add_row(grid, 0, "Связь", self._connection_value)
-        self._add_row(grid, 1, "Сессия", self._session_value)
-        self._add_row(grid, 2, "Сканер", self._scanner_value)
+        self._add_row(grid, 0, tr("diagnostics.connection"), self._connection_value)
+        self._add_row(grid, 1, tr("diagnostics.session"), self._session_value)
+        self._add_row(grid, 2, tr("diagnostics.scanner"), self._scanner_value)
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -211,7 +212,7 @@ class DiagnosticsScreen(QWidget):
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.TOKEN, "#f3c969"))
         header_text = QVBoxLayout()
-        title = QLabel("Логи")
+        title = QLabel(tr("diagnostics.logs"))
         title.setObjectName("diagnosticsPanelTitle")
         header_text.addWidget(title)
         header_text.addWidget(self._log_path)

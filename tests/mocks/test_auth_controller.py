@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from chestniy_znak_desktop.api.errors import UnauthorizedError
+from chestniy_znak_desktop.api.errors import (
+    PlantSubscriptionExpiredError,
+    UnauthorizedError,
+)
 from chestniy_znak_desktop.api.models.auth import AccountDto, AuthCheckDto
 from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.controllers.auth_controller import AuthController
@@ -91,6 +94,33 @@ def test_auth_controller_logs_in_with_json_token() -> None:
     assert runtime.snapshot.session.user_name == "Test"
 
 
+def test_auth_controller_stores_saas_context_after_login() -> None:
+    """Проверяет сохранение завода и устройства из app-токена."""
+
+    controller, runtime, service = _controller_pair()
+    service.login_result = AccountDto(
+        id="user-1",
+        username="operator",
+        plant_id="plant-123456",
+        device_id="device-456",
+        supplier_id="supplier-123",
+        supplier_name="Поставщик",
+        plant_name="Завод",
+        client_device_id="desktop-1",
+        subscription_status="active",
+    )
+
+    controller.login_with_raw_token("abc")
+
+    assert runtime.snapshot.session.plant_id == "plant-123456"
+    assert runtime.snapshot.session.device_id == "device-456"
+    assert runtime.snapshot.session.supplier_id == "supplier-123"
+    assert runtime.snapshot.session.supplier_name == "Поставщик"
+    assert runtime.snapshot.session.plant_name == "Завод"
+    assert runtime.snapshot.session.client_device_id == "desktop-1"
+    assert runtime.snapshot.session.subscription_status == "active"
+
+
 def test_auth_controller_reports_bad_token() -> None:
     """Проверяет ошибку для пустого токена."""
 
@@ -123,6 +153,17 @@ def test_auth_controller_restore_session_failure_marks_unauthenticated() -> None
 
     assert runtime.snapshot.session.status == SessionStatus.UNAUTHENTICATED
     assert controller.state.error_message == ""
+
+
+def test_auth_controller_shows_subscription_error_on_restore() -> None:
+    """Проверяет, что истекшая подписка завода видна оператору."""
+
+    controller, runtime, service = _controller_pair()
+    service.restore_error = PlantSubscriptionExpiredError("Подписка завода закончилась")
+    controller.restore_session()
+
+    assert runtime.snapshot.session.status == SessionStatus.UNAUTHENTICATED
+    assert controller.state.error_message == "Подписка завода закончилась"
 
 
 def test_auth_controller_logout_clears_session() -> None:

@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from PySide6.QtCore import QObject, Signal
 
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.scanner.base import ScannerConfig, ScannerPort
 from chestniy_znak_desktop.scanner.scanner_worker import ScannerWorker
@@ -50,7 +51,7 @@ class ScannerUiState:
     selected_port: str = ""
     baudrate: int = 9600
     is_running: bool = False
-    status_message: str = "Сканер не запущен"
+    status_message: str = field(default_factory=lambda: tr("settings.scanner.notRunning"))
     error_message: str = ""
 
 
@@ -151,7 +152,7 @@ class ScannerController(QObject):
             if self._hid_keyboard_worker is not None:
                 self.start_hid_keyboard()
                 return
-            self._on_scanner_error("Выберите COM/SPP-порт сканера")
+            self._on_scanner_error(tr("settings.scanner.choosePort"))
             return
         self._set_state(
             ScannerUiState(
@@ -159,7 +160,7 @@ class ScannerController(QObject):
                 selected_port=self._state.selected_port,
                 baudrate=self._state.baudrate,
                 is_running=False,
-                status_message="Запускаем сканер...",
+                status_message=tr("settings.scanner.starting"),
             )
         )
         self._scanner_worker.start_serial(
@@ -177,7 +178,7 @@ class ScannerController(QObject):
             return
         if self._hid_running:
             self._publish_running_state(
-                status_message="HID-сканер активен. COM/SPP-порт не выбран.",
+                status_message=tr("settings.scanner.hidActiveNoPort"),
             )
             return
         self._set_state(
@@ -185,7 +186,7 @@ class ScannerController(QObject):
                 ports=self._state.ports,
                 selected_port="",
                 baudrate=self._state.baudrate,
-                status_message="Сканер не выбран. Настройте COM/SPP-порт.",
+                status_message=tr("settings.scanner.notSelected"),
             )
         )
 
@@ -213,19 +214,21 @@ class ScannerController(QObject):
         """Обрабатывает успешный старт worker."""
 
         self._serial_running = True
-        self._publish_running_state(status_message=f"Сканер запущен: {self._state.selected_port}")
+        self._publish_running_state(
+            status_message=tr("settings.scanner.started", port=self._state.selected_port)
+        )
 
     def _on_hid_keyboard_started(self) -> None:
         """Обрабатывает старт HID keyboard wedge источника."""
 
         self._hid_running = True
-        self._publish_running_state(status_message="HID-сканер активен")
+        self._publish_running_state(status_message=tr("settings.scanner.hidActive"))
 
     def _on_hid_keyboard_stopped(self) -> None:
         """Обрабатывает остановку HID keyboard wedge источника."""
 
         self._hid_running = False
-        self._publish_running_state(status_message="HID-сканер остановлен")
+        self._publish_running_state(status_message=tr("settings.scanner.hidStopped"))
 
     def _publish_running_state(self, status_message: str) -> None:
         """Публикует агрегированное состояние COM/SPP и HID источников."""
@@ -256,7 +259,11 @@ class ScannerController(QObject):
         """Обрабатывает остановку worker."""
 
         self._serial_running = False
-        message = "HID-сканер активен" if self._hid_running else "Сканер остановлен"
+        message = (
+            tr("settings.scanner.hidActive")
+            if self._hid_running
+            else tr("settings.scanner.stopped")
+        )
         self._publish_running_state(status_message=message)
 
     def _on_scanner_error(self, message: str) -> None:
@@ -274,9 +281,9 @@ class ScannerController(QObject):
                 baudrate=self._state.baudrate,
                 is_running=self._hid_running,
                 status_message=(
-                    "HID-сканер активен. COM/SPP не запущен."
+                    tr("settings.scanner.hidActiveComStopped")
                     if self._hid_running
-                    else "Ошибка сканера"
+                    else tr("settings.scanner.errorStatus")
                 ),
                 error_message=message,
             )

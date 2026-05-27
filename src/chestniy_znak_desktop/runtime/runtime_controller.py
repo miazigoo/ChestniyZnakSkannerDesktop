@@ -2,16 +2,32 @@
 
 from __future__ import annotations
 
+from typing import Any, Protocol
+
 from PySide6.QtCore import QObject, Signal
 
 from chestniy_znak_desktop.runtime.app_state import AppState
-from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.state_models import (
     ConnectionState,
     RuntimeSnapshot,
     ScannerState,
     ScannerStatus,
 )
+
+
+class ConnectionMonitorProtocol(Protocol):
+    """Минимальный контракт monitor-а связи для RuntimeController."""
+
+    state_changed: Any
+
+    def start(self) -> None:
+        """Запускает monitor."""
+
+    def stop(self) -> None:
+        """Останавливает monitor."""
+
+    def retry_now(self) -> None:
+        """Запускает внеплановую попытку подключения."""
 
 
 class RuntimeController(QObject):
@@ -23,7 +39,7 @@ class RuntimeController(QObject):
     def __init__(
         self,
         app_state: AppState,
-        connection_monitor: ConnectionMonitor,
+        connection_monitor: ConnectionMonitorProtocol,
         parent: QObject | None = None,
     ) -> None:
         """Создает контроллер и подписывает его на runtime-сервисы."""
@@ -64,10 +80,30 @@ class RuntimeController(QObject):
         self._app_state.connection = state
         self._emit_snapshot()
 
-    def set_authenticated_user(self, user_name: str) -> None:
+    def set_authenticated_user(
+        self,
+        user_name: str,
+        *,
+        plant_id: str = "",
+        device_id: str = "",
+        supplier_id: str = "",
+        supplier_name: str = "",
+        plant_name: str = "",
+        client_device_id: str = "",
+        subscription_status: str = "",
+    ) -> None:
         """Помечает сессию как авторизованную."""
 
-        self._app_state.set_authenticated_user(user_name)
+        self._app_state.set_authenticated_user(
+            user_name,
+            plant_id=plant_id,
+            device_id=device_id,
+            supplier_id=supplier_id,
+            supplier_name=supplier_name,
+            plant_name=plant_name,
+            client_device_id=client_device_id,
+            subscription_status=subscription_status,
+        )
         self._emit_snapshot()
 
     def clear_session(self) -> None:

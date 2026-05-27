@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from chestniy_znak_desktop.api.client import ApiClient
 from chestniy_znak_desktop.api.models.stats import CatalogStatsDto
 from chestniy_znak_desktop.api.models.verify import (
     DefectResponseDto,
     VerifyExistsResponseDto,
     VerifyResponseDto,
 )
+from chestniy_znak_desktop.api.services.api_client_protocol import ApiClientProtocol
 
 
 class ChestniyZnakService:
     """Выполняет проверку DataMatrix, брак и статистику каталога."""
 
-    def __init__(self, api_client: ApiClient) -> None:
+    def __init__(self, api_client: ApiClientProtocol) -> None:
         """Сохраняет API-клиент сервиса."""
 
         self._api_client = api_client

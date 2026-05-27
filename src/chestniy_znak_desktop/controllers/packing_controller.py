@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
+from chestniy_znak_desktop.api.models.orders import WorkOrderPageDto
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -16,6 +17,7 @@ from chestniy_znak_desktop.api.models.packing import (
     OpenBoxResultDto,
     ScanToBoxResultDto,
 )
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -28,7 +30,15 @@ class PackingBackend(Protocol):
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую открытую коробку."""
 
-    def open_box(self, device_id: str, count_in_packing: bool = True) -> OpenBoxResultDto:
+    def open_box(
+        self,
+        device_id: str,
+        count_in_packing: bool = True,
+        order_id: str | None = None,
+        order_line_id: str | None = None,
+        code_value: str | None = None,
+        sscc: str | None = None,
+    ) -> OpenBoxResultDto:
         """Открывает новую коробку."""
 
     def scan_to_box(self, box_id: int, code: str, scanner_id: str) -> ScanToBoxResultDto:
@@ -39,6 +49,19 @@ class PackingBackend(Protocol):
 
     def set_count_in_packing(self, box_id: int, count_in_packing: bool) -> BoxActionResultDto:
         """Переключает учет коробки в упаковке."""
+
+
+class OrderBackend(Protocol):
+    """Контракт сервиса рабочих заказов."""
+
+    def list_orders(
+        self,
+        status: str | None = None,
+        search: str = "",
+        page: int = 1,
+        per_page: int = 20,
+    ) -> WorkOrderPageDto:
+        """Возвращает заказы с доступными строками номенклатуры."""
 
 
 class SoundPlayer(Protocol):
@@ -70,9 +93,20 @@ class PackingBoxUi:
     capacity: int
     count_in_packing: bool
     is_closed: bool
-    print_ok: bool
-    print_error: str
     items: list[PackingItemUi] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class OrderLineOptionUi:
+    """UI-модель выбранной строки заказа/номенклатуры."""
+
+    order_id: str
+    order_line_id: str
+    order_number: str
+    sku: str
+    product_name: str
+    label: str
+    scan_required: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,11 +115,16 @@ class PackingUiState:
 
     is_busy: bool = False
     current_box: PackingBoxUi | None = None
-    status_message: str = "Открытая коробка не найдена"
+    status_message: str = field(default_factory=lambda: tr("packing.noOpenBox"))
     result_message: str = ""
     error_message: str = ""
     last_scanned_code: str = ""
     count_in_packing: bool = True
+    order_options: list[OrderLineOptionUi] = field(default_factory=list)
+    selected_order_line_id: str = ""
+    selected_order_scan_required: bool = True
+    order_search: str = ""
+    orders_loading: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,8 +140,6 @@ class CloseBoxUiEvent:
     title: str
     message: str
     error_message: str = ""
-    print_ok: bool | None = None
-    print_error: str = ""
 
 
 class PackingController(QObject):
@@ -116,6 +153,7 @@ class PackingController(QObject):
         packing_service: PackingBackend,
         task_runner: TaskRunner,
         device_id: str,
+        order_service: OrderBackend | None = None,
         scanner_id: str = "desktop-com",
         sound_service: SoundPlayer | None = None,
         parent: QObject | None = None,
@@ -124,6 +162,7 @@ class PackingController(QObject):
 
         super().__init__(parent)
         self._packing_service = packing_service
+        self._order_service = order_service
         self._task_runner = task_runner
         self._device_id = device_id
         self._scanner_id = scanner_id
@@ -146,17 +185,86 @@ class PackingController(QObject):
             self._on_error,
         )
 
+    def refresh_orders(self, search: str | None = None) -> None:
+        """Загружает доступные заказы и строки номенклатуры."""
+
+        if self._order_service is None:
+            return
+        order_service = self._order_service
+        normalized_search = self._state.order_search if search is None else search.strip()
+        self._set_state(
+            replace(
+                self._state,
+                order_search=normalized_search,
+                orders_loading=True,
+                error_message="",
+            )
+        )
+        self._task_runner.submit(
+            lambda: order_service.list_orders(
+                search=normalized_search,
+                page=1,
+                per_page=50,
+            ),
+            self._on_orders_loaded,
+            self._on_orders_error,
+        )
+
+    def select_order_line(self, order_line_id: str) -> None:
+        """Выбирает строку заказа для следующей коробки."""
+
+        if self._state.current_box is not None:
+            return
+        selected = self._find_order_option(order_line_id)
+        if selected is None:
+            return
+        self._set_state(
+            replace(
+                self._state,
+                selected_order_line_id=selected.order_line_id,
+                selected_order_scan_required=selected.scan_required,
+                status_message=self._selected_order_status(selected),
+                result_message=self._selected_order_result(selected),
+                error_message="",
+            )
+        )
+
     def open_box(self) -> None:
         """Открывает новую коробку для сканирования."""
 
         if self._state.is_busy:
             return
-        self._set_busy("Открываем коробку...")
+        selected = self._selected_order_option()
+        if selected is None and self._order_service is not None:
+            self._play(SoundEvent.WARNING)
+            self._set_state(
+                replace(
+                    self._state,
+                    status_message=tr("packing.selectOrder"),
+                    error_message=tr("packing.openRequiresOrder"),
+                )
+            )
+            return
+        if selected is not None and not selected.scan_required:
+            self._play(SoundEvent.WARNING)
+            self._set_state(
+                replace(
+                    self._state,
+                    selected_order_scan_required=False,
+                    status_message=tr("packing.scanDisabled"),
+                    result_message=self._selected_order_result(selected),
+                    error_message=tr("packing.openNotNeeded"),
+                )
+            )
+            return
+        self._set_busy(tr("packing.openingBox"))
         count_in_packing = self._state.count_in_packing
         self._task_runner.submit(
             lambda: self._packing_service.open_box(
                 device_id=self._device_id,
                 count_in_packing=count_in_packing,
+                order_id=selected.order_id if selected else None,
+                order_line_id=selected.order_line_id if selected else None,
             ),
             self._on_box_opened,
             self._on_error,
@@ -168,7 +276,7 @@ class PackingController(QObject):
         if self._state.is_busy or self._state.current_box is None:
             return
         box_id = self._state.current_box.box_id
-        self._set_busy("Закрываем коробку и ждем печать этикетки...")
+        self._set_busy(tr("packing.closingBox"))
         self._task_runner.submit(
             lambda: self._packing_service.close_box(
                 box_id=box_id,
@@ -185,23 +293,14 @@ class PackingController(QObject):
             return
         if self._state.current_box is not None:
             box_id = self._state.current_box.box_id
-            self._set_busy("Обновляем учет коробки в упаковке...")
+            self._set_busy(tr("packing.updatingCountMode"))
             self._task_runner.submit(
                 lambda: self._packing_service.set_count_in_packing(box_id, enabled),
                 self._on_count_in_packing_changed,
                 self._on_error,
             )
             return
-        self._state = PackingUiState(
-            is_busy=self._state.is_busy,
-            current_box=self._state.current_box,
-            status_message=self._state.status_message,
-            result_message=self._state.result_message,
-            error_message=self._state.error_message,
-            last_scanned_code=self._state.last_scanned_code,
-            count_in_packing=enabled,
-        )
-        self.state_changed.emit(self._state)
+        self._set_state(replace(self._state, count_in_packing=enabled))
 
     def on_code_scanned(self, code: str) -> None:
         """Отправляет скан в текущую коробку."""
@@ -211,18 +310,19 @@ class PackingController(QObject):
         if self._state.current_box is None:
             self._play(SoundEvent.WARNING)
             self._set_state(
-                PackingUiState(
+                replace(
+                    self._state,
                     current_box=None,
-                    status_message="Сначала откройте коробку",
-                    result_message="Код не отправлен",
-                    error_message="Открытая коробка не найдена",
+                    status_message=tr("packing.openBoxFirst"),
+                    result_message=tr("packing.codeNotSent"),
+                    error_message=tr("packing.noOpenBox"),
                     last_scanned_code=code,
                     count_in_packing=self._state.count_in_packing,
                 )
             )
             return
         box_id = self._state.current_box.box_id
-        self._set_busy("Отправляем код в коробку...", last_scanned_code=code)
+        self._set_busy(tr("packing.sendingCode"), last_scanned_code=code)
         self._task_runner.submit(
             lambda: self._packing_service.scan_to_box(
                 box_id=box_id,
@@ -237,13 +337,22 @@ class PackingController(QObject):
         """Обрабатывает результат загрузки текущей коробки."""
 
         if result is None:
-            self._set_state(PackingUiState(status_message="Открытая коробка не найдена"))
+            self._set_state(
+                replace(
+                    self._state,
+                    is_busy=False,
+                    current_box=None,
+                    status_message=tr("packing.noOpenBox"),
+                )
+            )
             return
         detail = self._expect(result, BoxDetailDto)
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=self._box_detail_to_ui(detail),
-                status_message="Коробка загружена",
+                status_message=tr("packing.boxLoaded"),
                 count_in_packing=detail.count_in_packing,
             )
         )
@@ -254,12 +363,14 @@ class PackingController(QObject):
         opened = self._expect(result, OpenBoxResultDto)
         self._play(SoundEvent.OK if opened.ok else SoundEvent.WARNING)
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=self._box_to_ui(opened.box),
                 status_message=(
-                    "Коробка открыта" if opened.created else "Активная коробка уже была открыта"
+                    tr("packing.boxOpened") if opened.created else tr("packing.boxAlreadyOpened")
                 ),
-                result_message=f"Коробка #{opened.box.box_id}",
+                result_message=tr("packing.summary.boxTitle", box_id=opened.box.box_id),
                 count_in_packing=opened.box.count_in_packing,
             )
         )
@@ -271,9 +382,13 @@ class PackingController(QObject):
         self._play(self._sound_for_scan(scan_result))
         message = scan_result.error or scan_result.reason_code
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=self._box_to_ui(scan_result.box),
-                status_message="Код добавлен" if scan_result.ok else "Код не добавлен",
+                status_message=(
+                    tr("packing.codeAdded") if scan_result.ok else tr("packing.codeNotAdded")
+                ),
                 result_message=message,
                 error_message="" if scan_result.ok else message,
                 last_scanned_code=self._state.last_scanned_code,
@@ -288,9 +403,11 @@ class PackingController(QObject):
         message = edit_result.error or edit_result.reason_code
         if not edit_result.ok:
             self._set_state(
-                PackingUiState(
+                replace(
+                    self._state,
+                    is_busy=False,
                     current_box=self._state.current_box,
-                    status_message="Учет коробки не изменен",
+                    status_message=tr("packing.countModeNotChanged"),
                     result_message=self._state.result_message,
                     error_message=message,
                     last_scanned_code=self._state.last_scanned_code,
@@ -300,9 +417,11 @@ class PackingController(QObject):
             return
         count_in_packing = edit_result.box.count_in_packing
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=self._box_with_count_in_packing(count_in_packing),
-                status_message="Учет коробки обновлен",
+                status_message=tr("packing.countModeUpdated"),
                 result_message=self._count_in_packing_message(count_in_packing),
                 last_scanned_code=self._state.last_scanned_code,
                 count_in_packing=count_in_packing,
@@ -314,12 +433,16 @@ class PackingController(QObject):
 
         closed = self._expect(result, CloseBoxResultDto)
         self._play(SoundEvent.VICTORY if closed.ok else SoundEvent.ERROR)
-        message = closed.error or closed.print_error or closed.reason_code
+        message = closed.error or closed.reason_code
         event = self._close_event(closed)
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=None if closed.ok else self._box_to_ui(closed.box),
-                status_message="Коробка закрыта" if closed.ok else "Коробка не закрыта",
+                status_message=(
+                    tr("closeBox.closedTitle") if closed.ok else tr("closeBox.notClosedTitle")
+                ),
                 result_message=message,
                 error_message="" if closed.ok else message,
                 count_in_packing=self._state.count_in_packing,
@@ -342,8 +465,8 @@ class PackingController(QObject):
                 filled=current_box.filled,
                 capacity=current_box.capacity,
                 is_full=current_box.filled >= current_box.capacity,
-                title="Коробка не закрыта",
-                message="Не удалось закрыть коробку",
+                title=tr("closeBox.notClosedTitle"),
+                message=tr("closeBox.notClosedMessage"),
                 error_message=str(exc),
             )
         )
@@ -353,9 +476,11 @@ class PackingController(QObject):
 
         self._play(SoundEvent.ERROR)
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
+                is_busy=False,
                 current_box=self._state.current_box,
-                status_message="Ошибка операции",
+                status_message=tr("packing.operationError"),
                 error_message=str(exc),
                 last_scanned_code=self._state.last_scanned_code,
                 count_in_packing=self._state.count_in_packing,
@@ -366,7 +491,8 @@ class PackingController(QObject):
         """Переводит экран в состояние ожидания backend."""
 
         self._set_state(
-            PackingUiState(
+            replace(
+                self._state,
                 is_busy=True,
                 current_box=self._state.current_box,
                 status_message=message,
@@ -375,6 +501,126 @@ class PackingController(QObject):
                 count_in_packing=self._state.count_in_packing,
             )
         )
+
+    def _on_orders_loaded(self, result: object) -> None:
+        """Обрабатывает загрузку заказов для выбора номенклатуры."""
+
+        page = self._expect(result, WorkOrderPageDto)
+        options = self._order_options(page)
+        selected_id = self._state.selected_order_line_id
+        if selected_id and not any(option.order_line_id == selected_id for option in options):
+            selected_id = ""
+        if not selected_id and options:
+            selected_id = options[0].order_line_id
+        selected = self._find_option_in(options, selected_id)
+        status_message = (
+            self._selected_order_status(selected) if selected else self._state.status_message
+        )
+        result_message = (
+            self._selected_order_result(selected) if selected else self._state.result_message
+        )
+        if not options:
+            status_message = tr("packing.noAvailableOrders")
+            result_message = ""
+        self._set_state(
+            replace(
+                self._state,
+                order_options=options,
+                selected_order_line_id=selected_id,
+                selected_order_scan_required=selected.scan_required if selected else True,
+                orders_loading=False,
+                status_message=status_message,
+                result_message=result_message,
+            )
+        )
+
+    def _on_orders_error(self, exc: Exception) -> None:
+        """Показывает ошибку загрузки заказов без сброса текущей коробки."""
+
+        self._set_state(
+            replace(
+                self._state,
+                orders_loading=False,
+                error_message=tr("packing.ordersLoadFailed", error=exc),
+            )
+        )
+
+    def _selected_order_option(self) -> OrderLineOptionUi | None:
+        """Возвращает выбранную строку заказа."""
+
+        return self._find_order_option(self._state.selected_order_line_id)
+
+    def _find_order_option(self, order_line_id: str) -> OrderLineOptionUi | None:
+        """Ищет строку заказа в текущем списке выбора."""
+
+        return next(
+            (
+                option
+                for option in self._state.order_options
+                if option.order_line_id == order_line_id
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _order_options(page: WorkOrderPageDto) -> list[OrderLineOptionUi]:
+        """Преобразует заказы backend в варианты выбора строки заказа."""
+
+        options: list[OrderLineOptionUi] = []
+        for order in page.data:
+            for line in order.lines:
+                if line.status != "active":
+                    continue
+                product = line.product
+                sku = product.sku if product else line.product_id
+                product_name = product.name if product else tr("packing.product")
+                label = f"{order.order_number} · {sku} · {product_name}"
+                if not order.scan_required:
+                    label = f"{label} · {tr('packing.noScanSuffix')}"
+                options.append(
+                    OrderLineOptionUi(
+                        order_id=order.id,
+                        order_line_id=line.id,
+                        order_number=order.order_number,
+                        sku=sku,
+                        product_name=product_name,
+                        scan_required=order.scan_required,
+                        label=label,
+                    )
+                )
+        return options
+
+    @staticmethod
+    def _find_option_in(
+        options: list[OrderLineOptionUi],
+        order_line_id: str,
+    ) -> OrderLineOptionUi | None:
+        """Ищет выбранную строку в переданном списке."""
+
+        return next(
+            (option for option in options if option.order_line_id == order_line_id),
+            None,
+        )
+
+    @staticmethod
+    def _selected_order_status(selected: OrderLineOptionUi | None) -> str:
+        """Возвращает статус выбранного заказа для оператора."""
+
+        if selected is None:
+            return tr("packing.selectOrder")
+        if selected.scan_required:
+            return tr("packing.selectedOrder", order=selected.order_number)
+        return tr("packing.scanDisabled")
+
+    @staticmethod
+    def _selected_order_result(selected: OrderLineOptionUi | None) -> str:
+        """Возвращает пояснение по выбранному заказу."""
+
+        if selected is None:
+            return ""
+        if selected.scan_required:
+            return selected.product_name or selected.sku
+        return tr("packing.noScanOrderResult", order=selected.order_number)
 
     def _set_state(self, state: PackingUiState) -> None:
         """Сохраняет и публикует состояние упаковки."""
@@ -394,16 +640,12 @@ class PackingController(QObject):
 
         box = result.box
         is_full = box.filled >= box.capacity
-        print_error = result.print_error or ""
-        if result.ok and result.print_ok is False and print_error:
-            title = "Коробка закрыта, печать с ошибкой"
-            message = print_error
-        elif result.ok:
-            title = "Коробка закрыта"
-            message = f"Коробка #{box.box_id} закрыта"
+        if result.ok:
+            title = tr("closeBox.closedTitle")
+            message = tr("closeBox.closedMessage", box_id=box.box_id)
         else:
-            title = "Коробка не закрыта"
-            message = result.error or print_error or "Не удалось закрыть коробку"
+            title = tr("closeBox.notClosedTitle")
+            message = result.error or tr("closeBox.notClosedMessage")
         return CloseBoxUiEvent(
             ok=result.ok,
             box_id=box.box_id,
@@ -414,8 +656,6 @@ class PackingController(QObject):
             title=title,
             message=message,
             error_message="" if result.ok else message,
-            print_ok=result.print_ok,
-            print_error=print_error,
         )
 
     @staticmethod
@@ -431,8 +671,6 @@ class PackingController(QObject):
             capacity=box.capacity,
             count_in_packing=box.count_in_packing,
             is_closed=box.is_closed,
-            print_ok=box.print_ok,
-            print_error=box.print_error,
             items=[PackingController._item_to_ui(item) for item in detail.items],
         )
 
@@ -448,8 +686,6 @@ class PackingController(QObject):
             capacity=box.capacity,
             count_in_packing=box.count_in_packing,
             is_closed=box.is_closed,
-            print_ok=box.print_ok,
-            print_error=box.print_error,
             items=[],
         )
 
@@ -466,8 +702,6 @@ class PackingController(QObject):
             capacity=self._state.current_box.capacity,
             count_in_packing=count_in_packing,
             is_closed=self._state.current_box.is_closed,
-            print_ok=self._state.current_box.print_ok,
-            print_error=self._state.current_box.print_error,
             items=self._state.current_box.items,
         )
 
@@ -476,8 +710,8 @@ class PackingController(QObject):
         """Возвращает понятный оператору текст режима учета коробки."""
 
         if enabled:
-            return "Коробка учитывается в упаковке"
-        return "Коробка не учитывается в упаковке"
+            return tr("packing.modeCounted")
+        return tr("packing.modeNotCounted")
 
     @staticmethod
     def _item_to_ui(item: BoxItemDto) -> PackingItemUi:
@@ -496,7 +730,13 @@ class PackingController(QObject):
 
         if result.ok:
             return SoundEvent.OK
-        if result.reason_code in {"wrong_order", "duplicate_in_box", "code_in_other_box"}:
+        if result.reason_code in {
+            "wrong_order",
+            "mark_code_wrong_order",
+            "duplicate_in_box",
+            "code_in_other_box",
+            "mark_code_already_packed",
+        }:
             return SoundEvent.WARNING
         return SoundEvent.ERROR
 

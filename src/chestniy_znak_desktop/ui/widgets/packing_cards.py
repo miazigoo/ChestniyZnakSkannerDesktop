@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -24,11 +25,11 @@ class PackingSummaryCard(QFrame):
 
         super().__init__(parent)
         self.setObjectName("packingCard")
-        self._box_title = QLabel("Коробка не открыта")
+        self._box_title = QLabel(tr("packing.summary.emptyTitle"))
         self._box_title.setObjectName("packingCardTitle")
-        self._box_subtitle = QLabel("Откройте коробку и сканируйте изделия")
+        self._box_subtitle = QLabel(tr("packing.summary.emptySubtitle"))
         self._box_subtitle.setObjectName("packingMutedText")
-        self._status_badge = QLabel("Ожидание")
+        self._status_badge = QLabel(tr("packing.summary.idle"))
         self._status_badge.setObjectName("packingBadge")
         self._progress_label = QLabel("0 / 0")
         self._progress_label.setObjectName("packingProgressValue")
@@ -50,7 +51,7 @@ class PackingSummaryCard(QFrame):
         header.addWidget(self._status_badge)
 
         progress_row = QHBoxLayout()
-        progress_caption = QLabel("Заполнение")
+        progress_caption = QLabel(tr("packing.progress"))
         progress_caption.setObjectName("packingMutedText")
         progress_row.addWidget(progress_caption)
         progress_row.addStretch(1)
@@ -59,9 +60,9 @@ class PackingSummaryCard(QFrame):
         meta_grid = QGridLayout()
         meta_grid.setHorizontalSpacing(18)
         meta_grid.setVerticalSpacing(6)
-        self._add_meta_row(meta_grid, 0, "Заказ", self._order_value)
+        self._add_meta_row(meta_grid, 0, tr("packing.column.order"), self._order_value)
         self._add_meta_row(meta_grid, 1, "SSCC", self._sscc_value)
-        self._add_meta_row(meta_grid, 2, "Режим", self._mode_value)
+        self._add_meta_row(meta_grid, 2, tr("packing.mode"), self._mode_value)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -80,9 +81,9 @@ class PackingSummaryCard(QFrame):
     def set_empty(self) -> None:
         """Переводит карточку в состояние без открытой коробки."""
 
-        self._box_title.setText("Коробка не открыта")
-        self._box_subtitle.setText("Сканирование изделий пока заблокировано")
-        self._status_badge.setText("Ожидание")
+        self._box_title.setText(tr("packing.summary.emptyTitle"))
+        self._box_subtitle.setText(tr("packing.summary.emptySubtitle"))
+        self._status_badge.setText(tr("packing.summary.idle"))
         self._status_badge.setProperty("tone", "idle")
         self._status_badge.style().unpolish(self._status_badge)
         self._status_badge.style().polish(self._status_badge)
@@ -108,9 +109,11 @@ class PackingSummaryCard(QFrame):
 
         progress_max = max(capacity, 1)
         progress_value = min(max(filled, 0), progress_max)
-        self._box_title.setText(f"Коробка #{box_id}")
-        self._box_subtitle.setText("Готова принимать DataMatrix от сканера")
-        self._status_badge.setText("Закрыта" if is_closed else "Открыта")
+        self._box_title.setText(tr("packing.summary.boxTitle", box_id=box_id))
+        self._box_subtitle.setText(tr("packing.summary.ready"))
+        self._status_badge.setText(
+            tr("packing.summary.closed") if is_closed else tr("packing.summary.open")
+        )
         self._status_badge.setProperty("tone", "closed" if is_closed else "active")
         self._status_badge.style().unpolish(self._status_badge)
         self._status_badge.style().polish(self._status_badge)
@@ -119,7 +122,7 @@ class PackingSummaryCard(QFrame):
         self._progress_bar.setValue(progress_value)
         self._order_value.setText(order_name or "-")
         self._sscc_value.setText(sscc or "-")
-        mode = "Учитывается в упаковке" if count_in_packing else "Без учета упаковки"
+        mode = tr("packing.modeCounted") if count_in_packing else tr("packing.modeNotCounted")
         self._mode_value.setText(mode)
 
     @staticmethod
@@ -147,23 +150,23 @@ class PackingScanCard(QFrame):
 
         super().__init__(parent)
         self.setObjectName("packingScanCard")
-        self._scanner_label = QLabel("Сканер: проверяем состояние")
+        self._scanner_label = QLabel(tr("packing.scannerChecking"))
         self._scanner_label.setObjectName("packingScannerStatus")
-        self._status_label = QLabel("Открытая коробка не найдена")
+        self._status_label = QLabel(tr("packing.noOpenBox"))
         self._status_label.setObjectName("packingScanTitle")
         self._result_label = QLabel("")
         self._result_label.setObjectName("packingResult")
         self._error_label = QLabel("")
         self._error_label.setObjectName("packingError")
-        self._last_code_label = QLabel("Последний скан: -")
+        self._last_code_label = QLabel(tr("packing.lastScan", code="-"))
         self._last_code_label.setObjectName("packingMutedText")
 
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.SCANNER, "#8fb8ff"))
         header_text = QVBoxLayout()
-        title = QLabel("Сканирование изделий")
+        title = QLabel(tr("packing.scanTitle"))
         title.setObjectName("packingCardTitle")
-        subtitle = QLabel("Ручной ввод отключен, принимаем только данные сканера")
+        subtitle = QLabel(tr("packing.scanSubtitle"))
         subtitle.setObjectName("packingMutedText")
         header_text.addWidget(title)
         header_text.addWidget(subtitle)
@@ -184,10 +187,10 @@ class PackingScanCard(QFrame):
         """Обновляет отображение готовности сканера."""
 
         if scanner_ready:
-            self._scanner_label.setText(f"Сканер готов: {port or '-'}")
+            self._scanner_label.setText(tr("packing.scannerReady", port=port or "-"))
             self._scanner_label.setProperty("tone", "active")
         else:
-            self._scanner_label.setText("Сканер не запущен. Упаковка заблокирована.")
+            self._scanner_label.setText(tr("packing.scannerBlocked"))
             self._scanner_label.setProperty("tone", "error")
         self._scanner_label.style().unpolish(self._scanner_label)
         self._scanner_label.style().polish(self._scanner_label)
@@ -203,10 +206,10 @@ class PackingScanCard(QFrame):
         """Обновляет текстовые статусы последней операции."""
 
         self._status_label.setText(status)
-        self._result_label.setText(result or "Ожидаем скан изделия")
+        self._result_label.setText(result or tr("packing.waitScan"))
         self._error_label.setText(error)
         self._error_label.setVisible(bool(error))
-        self._last_code_label.setText(f"Последний скан: {self._preview(last_code)}")
+        self._last_code_label.setText(tr("packing.lastScan", code=self._preview(last_code)))
 
     @staticmethod
     def _preview(code: str) -> str:

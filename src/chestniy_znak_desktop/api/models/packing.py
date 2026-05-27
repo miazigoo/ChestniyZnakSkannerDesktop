@@ -10,6 +10,8 @@ class BoxDto(BaseModel):
 
     box_id: int
     order_id: int | None = None
+    order_uuid: str | None = None
+    order_line_uuid: str | None = None
     order_name: str | None = None
     sscc: str | None = None
     capacity: int
@@ -20,8 +22,6 @@ class BoxDto(BaseModel):
     is_edit_mode: bool
     active_user_name: str = ""
     created_by_name: str = ""
-    print_ok: bool = False
-    print_error: str = ""
 
 
 class BoxItemDto(BaseModel):
@@ -88,14 +88,12 @@ class ScanBatchToBoxResultDto(BaseModel):
 
 
 class CloseBoxResultDto(BaseModel):
-    """Результат закрытия коробки и печати этикетки."""
+    """Результат закрытия коробки."""
 
     ok: bool
     reason_code: str
     error: str | None = None
     box: BoxDto
-    print_ok: bool | None = None
-    print_error: str | None = None
 
 
 class BoxActionResultDto(BaseModel):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 GS = "\x1d"
@@ -9,6 +10,8 @@ ESC_GS_SEQ = "\x1b`\x1bb\x1bi"
 AI21_MAX_SERIAL_LEN = 20
 KNOWN_AI_FIXED_VALUE_LEN = {"91": 4, "93": 4}
 KNOWN_AI_VARIABLE_TO_END = {"92"}
+GROUP_SEPARATOR_TOKEN_RE = re.compile(r"(?i)(?:\\u001d|\\x1d|\\035|<GS>|\[GS\]|\{GS\})")
+BRACKETED_AI_RE = re.compile(r"\((01|21|91|92|93)\)")
 
 
 class MarkingCodeParseError(ValueError):
@@ -46,25 +49,24 @@ def visible(code: str) -> str:
 def compact_bracketed_ai(code: str) -> str:
     """Приводит AI в скобках к компактному GS1-виду."""
 
-    return (
-        code.replace("(01)", "01")
-        .replace("(21)", "21")
-        .replace("(91)", f"{GS}91")
-        .replace("(92)", f"{GS}92")
-        .replace("(93)", f"{GS}93")
-    )
+    def repl(match: re.Match[str]) -> str:
+        ai = match.group(1)
+        if ai in {"91", "92", "93"}:
+            return f"{GS}{ai}"
+        return ai
+
+    return BRACKETED_AI_RE.sub(repl, code)
 
 
 def normalize_scanner_input(code: str) -> tuple[str, bool, bool]:
     """Нормализует строку сканера и возвращает признаки GS-разделителя."""
 
-    normalized = str(code or "").replace("<GS>", GS).replace("[GS]", GS)
-    normalized = normalized.replace("\\x1d", GS).replace("\\u001d", GS)
+    normalized = GROUP_SEPARATOR_TOKEN_RE.sub(GS, str(code or ""))
     normalized = compact_bracketed_ai(normalized)
     native_gs = GS in normalized
     escaped_gs = ESC_GS_SEQ in normalized
     normalized = normalized.replace(ESC_GS_SEQ, GS)
-    return normalized.rstrip("\r\n\t ").lstrip(GS), native_gs, escaped_gs
+    return normalized.strip("\r\n\t ").lstrip(GS), native_gs, escaped_gs
 
 
 def parse_ai_tail_with_gs(rest: str) -> tuple[dict[str, str], list[str]]:
