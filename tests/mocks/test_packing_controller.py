@@ -19,6 +19,7 @@ from chestniy_znak_desktop.api.models.packing import (
     OpenBoxResultDto,
     ScanToBoxResultDto,
 )
+from chestniy_znak_desktop.api.models.printers import ClientPrinterDto, PackageLabelPrintResultDto
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent, PackingController
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
@@ -144,6 +145,33 @@ class FakeOrderService:
         return self.page
 
 
+class FakeLabelPrinter:
+    """Fake сервис печати SSCC для проверки закрытия коробки."""
+
+    def __init__(self, print_ok: bool = True) -> None:
+        """Создает fake с заданным результатом печати."""
+
+        self.print_ok = print_ok
+        self.calls: list[tuple[int, str]] = []
+
+    def print_box_label(self, box_id: int, device_id: str) -> PackageLabelPrintResultDto:
+        """Возвращает fake результат печати."""
+
+        self.calls.append((box_id, device_id))
+        return PackageLabelPrintResultDto(
+            ok=self.print_ok,
+            reason_code="label_printed" if self.print_ok else "label_print_failed",
+            print_status="",
+            print_ok=self.print_ok,
+            print_error="" if self.print_ok else "Нет связи с принтером",
+            printer=ClientPrinterDto(
+                id=1,
+                name="Zebra",
+                ip_address="192.168.1.10",
+            ),
+        )
+
+
 def _box(
     *,
     filled: int = 0,
@@ -200,6 +228,7 @@ def _work_order(*, scan_required: bool = True) -> WorkOrderPageDto:
 
 def _controller_pair(
     order_service: FakeOrderService | None = None,
+    label_printer: FakeLabelPrinter | None = None,
 ) -> tuple[PackingController, FakePackingService, FakeSoundService]:
     """Создает controller с fake-зависимостями."""
 
@@ -212,6 +241,7 @@ def _controller_pair(
         order_service=order_service,
         scanner_id="desktop-com",
         sound_service=sounds,
+        label_printer=label_printer,
     )
     return controller, service, sounds
 
@@ -311,6 +341,41 @@ def test_packing_controller_close_box_clears_current_box() -> None:
     assert sounds.events[-1] == SoundEvent.VICTORY
     assert events[-1].ok is True
     assert events[-1].is_full is True
+
+
+def test_packing_controller_prints_label_after_successful_close() -> None:
+    """Проверяет печать SSCC после успешного закрытия коробки."""
+
+    label_printer = FakeLabelPrinter(print_ok=True)
+    controller, _service, sounds = _controller_pair(label_printer=label_printer)
+    events: list[CloseBoxUiEvent] = []
+    controller.close_completed.connect(events.append)
+
+    controller.open_box()
+    controller.close_current_box()
+
+    assert label_printer.calls == [(1, "pc-1")]
+    assert events[-1].print_ok is True
+    assert events[-1].print_printer_name == "Zebra"
+    assert sounds.events[-1] == SoundEvent.VICTORY
+
+
+def test_packing_controller_warns_when_label_print_failed_after_close() -> None:
+    """Проверяет явный статус, если коробка закрылась, но SSCC не напечатался."""
+
+    label_printer = FakeLabelPrinter(print_ok=False)
+    controller, _service, sounds = _controller_pair(label_printer=label_printer)
+    events: list[CloseBoxUiEvent] = []
+    controller.close_completed.connect(events.append)
+
+    controller.open_box()
+    controller.close_current_box()
+
+    assert controller.state.current_box is None
+    assert events[-1].ok is True
+    assert events[-1].print_ok is False
+    assert events[-1].print_error == "Нет связи с принтером"
+    assert sounds.events[-1] == SoundEvent.WARNING
 
 
 def test_packing_controller_close_failed_keeps_current_box() -> None:

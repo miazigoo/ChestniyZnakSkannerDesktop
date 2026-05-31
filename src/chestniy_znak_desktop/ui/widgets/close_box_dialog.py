@@ -89,6 +89,20 @@ class CloseBoxDialog(QDialog):
         ]
         if event.sscc:
             lines.append(f"SSCC: {event.sscc}")
+        if event.print_ok is True:
+            lines.append(
+                tr(
+                    "closeBox.printed",
+                    printer=event.print_printer_name or tr("common.notAvailable"),
+                )
+            )
+        elif event.print_ok is False:
+            lines.append(
+                tr(
+                    "closeBox.printFailed",
+                    error=event.print_error or tr("common.notAvailable"),
+                )
+            )
         if event.error_message:
             lines.append(tr("closeBox.error", error=event.error_message))
         return "\n".join(lines)

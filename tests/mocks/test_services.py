@@ -7,6 +7,8 @@ from typing import Any
 from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
+from chestniy_znak_desktop.api.services.printer_service import PrinterService
+from chestniy_znak_desktop.api.models.printers import PrintJobDto
 
 
 class FakeApiClient:
@@ -18,6 +20,7 @@ class FakeApiClient:
         self.last_call: tuple[str, str, dict[str, Any]] | None = None
         self.calls: list[tuple[str, str, dict[str, Any]]] = []
         self.close_response: dict[str, Any] | None = None
+        self.printer_selected = False
 
     def get(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Возвращает payload для GET-сценария."""
@@ -26,6 +29,14 @@ class FakeApiClient:
         self.calls.append(self.last_call)
         if url.endswith("catalog/stats"):
             return {"codes_count": 10, "scans_count": 3}
+        if url.endswith("printer/printers"):
+            return {
+                "ok": True,
+                "device_id": (params or {}).get("device_id", ""),
+                "selected_printer_id": 11 if self.printer_selected else None,
+                "selected_printer": _printer_payload() if self.printer_selected else None,
+                "printers": [_printer_payload()],
+            }
         if url.endswith("packing/boxes/1"):
             return {
                 "ok": True,
@@ -99,6 +110,46 @@ class FakeApiClient:
             }
         if url.endswith("boxes/1/close") and self.close_response is not None:
             return self.close_response
+        if url.endswith("printer/printer-selection"):
+            self.printer_selected = True
+            return {
+                "ok": True,
+                "device_id": (json or {}).get("device_id", ""),
+                "selected_printer_id": (json or {}).get("printer_id", 11),
+                "selected_printer": _printer_payload(),
+                "printers": [_printer_payload()],
+            }
+        if url.endswith("boxes/1/print-label"):
+            return {
+                "ok": True,
+                "reason_code": "label_print_job_ready",
+                "print_status": "job_ready",
+                "print_ok": False,
+                "print_error_code": "",
+                "print_error": "",
+                "printer": _printer_payload(),
+                "print_job": {
+                    "format": "zpl",
+                    "driver": "zpl",
+                    "encoding": "utf-8",
+                    "transport": "raw_tcp",
+                    "payload": "^XA^XZ",
+                    "printer": _printer_payload(),
+                },
+                "box": _box_payload(),
+            }
+        if url.endswith("boxes/1/print-result"):
+            return {
+                "ok": True,
+                "reason_code": "label_printed",
+                "print_status": "",
+                "print_ok": bool((json or {}).get("print_ok")),
+                "print_error_code": "",
+                "print_error": str((json or {}).get("print_error") or ""),
+                "printer": _printer_payload(),
+                "print_job": None,
+                "box": _box_payload(),
+            }
         if url.endswith("box-edit/1/open"):
             return {"ok": True, "reason_code": "edit_opened", "box": _box_payload()}
         if url.endswith("box-edit/1/close"):
@@ -154,6 +205,35 @@ def _box_payload() -> dict[str, Any]:
         "is_closed": False,
         "is_edit_mode": False,
     }
+
+
+def _printer_payload() -> dict[str, Any]:
+    """Возвращает payload принтера для DTO."""
+
+    return {
+        "id": 11,
+        "name": "Zebra",
+        "ip_address": "192.168.1.10",
+        "port": 9100,
+        "section": "Line A",
+        "driver": "zpl",
+        "is_active": True,
+    }
+
+
+class FakePrintTransport:
+    """Fake транспорт печати для проверки PrinterService."""
+
+    def __init__(self) -> None:
+        """Создает список отправленных заданий."""
+
+        self.jobs: list[PrintJobDto] = []
+
+    def send(self, job: PrintJobDto) -> tuple[bool, str]:
+        """Запоминает задание и возвращает успех."""
+
+        self.jobs.append(job)
+        return True, ""
 
 
 def _box_detail_payload() -> dict[str, Any]:
@@ -294,6 +374,27 @@ def test_packing_service_close_box_only_closes_remote_box() -> None:
         "chestniy-znak/packing/boxes/1/close",
         {"json": None, "params": {"device_id": "pc-1"}},
     )
+
+
+def test_printer_service_autoselects_single_printer_and_reports_print_result() -> None:
+    """Проверяет полный цикл печати SSCC через локальный транспорт."""
+
+    client = FakeApiClient()
+    transport = FakePrintTransport()
+
+    result = PrinterService(client, print_transport=transport).print_box_label(
+        box_id=1,
+        device_id="pc-1",
+    )
+
+    assert result.print_ok is True
+    assert transport.jobs[0].payload == "^XA^XZ"
+    assert [call[1] for call in client.calls] == [
+        "chestniy-znak/packing/printer/printers",
+        "chestniy-znak/packing/printer/printer-selection",
+        "chestniy-znak/packing/boxes/1/print-label",
+        "chestniy-znak/packing/boxes/1/print-result",
+    ]
 
 
 def test_box_edit_service_open_edit() -> None:

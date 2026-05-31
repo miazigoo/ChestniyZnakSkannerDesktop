@@ -22,6 +22,7 @@ from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent, PackingController
+from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
@@ -60,6 +61,7 @@ class AppWindow(QMainWindow):
         box_edit_controller: BoxEditController,
         defect_controller: DefectController,
         verify_controller: VerifyController,
+        printer_controller: PrinterController,
         diagnostics_controller: DiagnosticsController,
         scanner_controller: ScannerController,
         settings_controller: SettingsController,
@@ -77,6 +79,7 @@ class AppWindow(QMainWindow):
         self._box_edit_controller = box_edit_controller
         self._defect_controller = defect_controller
         self._verify_controller = verify_controller
+        self._printer_controller = printer_controller
         self._diagnostics_controller = diagnostics_controller
         self._scanner_controller = scanner_controller
         self._settings_controller = settings_controller
@@ -109,6 +112,12 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._printer_controller.state_changed.connect(
+            self._main_screen.packing_screen.apply_printer_state
+        )
+        self._printer_controller.state_changed.connect(
+            self._main_screen.auto_packing_screen.apply_printer_state
+        )
         self._packing_controller.close_completed.connect(self._handle_box_close_completed)
         self._auto_packing_controller.state_changed.connect(
             self._main_screen.auto_packing_screen.apply_state
@@ -189,6 +198,12 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.order_line_selected.connect(
             self._packing_controller.select_order_line
         )
+        self._main_screen.packing_screen.printer_refresh_requested.connect(
+            self._printer_controller.refresh_selection
+        )
+        self._main_screen.packing_screen.printer_selected.connect(
+            self._printer_controller.select_printer
+        )
         self._main_screen.auto_packing_screen.refresh_requested.connect(
             self._auto_packing_controller.refresh_current_box
         )
@@ -209,6 +224,12 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.auto_packing_screen.order_line_selected.connect(
             self._auto_packing_controller.select_order_line
+        )
+        self._main_screen.auto_packing_screen.printer_refresh_requested.connect(
+            self._printer_controller.refresh_selection
+        )
+        self._main_screen.auto_packing_screen.printer_selected.connect(
+            self._printer_controller.select_printer
         )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending
@@ -313,9 +334,11 @@ class AppWindow(QMainWindow):
 
         if screen_name == "packing":
             self._packing_controller.refresh_current_box()
+            self._printer_controller.refresh_selection()
             return
         if screen_name == "auto_packing":
             self._auto_packing_controller.refresh_current_box()
+            self._printer_controller.refresh_selection()
             return
         if screen_name == "boxes":
             selected_box_id = self._boxes_controller.state.selected_box_id
@@ -466,6 +489,7 @@ class AppWindow(QMainWindow):
         dialog.finished.connect(lambda _code, dialog=dialog: self._forget_close_dialog(dialog))
         dialog.open()
         if event.ok:
+            self._printer_controller.refresh_selection()
             self._packing_controller.open_box()
 
     def _handle_auto_box_close_completed(self, event: CloseBoxUiEvent) -> None:
@@ -477,6 +501,7 @@ class AppWindow(QMainWindow):
         dialog.finished.connect(lambda _code, dialog=dialog: self._forget_close_dialog(dialog))
         dialog.open()
         if event.ok:
+            self._printer_controller.refresh_selection()
             self._auto_packing_controller.open_box()
 
     def _handle_box_changed(self, box_id: int) -> None:

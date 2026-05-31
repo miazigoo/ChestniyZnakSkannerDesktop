@@ -17,6 +17,7 @@ from chestniy_znak_desktop.api.models.packing import (
     OpenBoxResultDto,
     ScanToBoxResultDto,
 )
+from chestniy_znak_desktop.api.models.printers import PackageLabelPrintResultDto
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
@@ -69,6 +70,13 @@ class SoundPlayer(Protocol):
 
     def play(self, event: SoundEvent) -> None:
         """Проигрывает звук для указанного события."""
+
+
+class PackageLabelPrinter(Protocol):
+    """Контракт сервиса локальной печати SSCC-этикетки коробки."""
+
+    def print_box_label(self, box_id: int, device_id: str) -> PackageLabelPrintResultDto:
+        """Печатает SSCC-этикетку закрытой коробки."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +148,17 @@ class CloseBoxUiEvent:
     title: str
     message: str
     error_message: str = ""
+    print_ok: bool | None = None
+    print_error: str = ""
+    print_printer_name: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class CloseBoxTaskResult:
+    """Результат закрытия коробки и последующей печати SSCC."""
+
+    close: CloseBoxResultDto
+    print_result: PackageLabelPrintResultDto | None = None
 
 
 class PackingController(QObject):
@@ -156,6 +175,7 @@ class PackingController(QObject):
         order_service: OrderBackend | None = None,
         scanner_id: str = "desktop-com",
         sound_service: SoundPlayer | None = None,
+        label_printer: PackageLabelPrinter | None = None,
         parent: QObject | None = None,
     ) -> None:
         """Создает контроллер упаковки."""
@@ -167,6 +187,7 @@ class PackingController(QObject):
         self._device_id = device_id
         self._scanner_id = scanner_id
         self._sound_service = sound_service
+        self._label_printer = label_printer
         self._state = PackingUiState()
 
     @property
@@ -278,13 +299,32 @@ class PackingController(QObject):
         box_id = self._state.current_box.box_id
         self._set_busy(tr("packing.closingBox"))
         self._task_runner.submit(
-            lambda: self._packing_service.close_box(
-                box_id=box_id,
-                device_id=self._device_id,
-            ),
+            lambda: self._close_and_print_box(box_id),
             self._on_box_closed,
             self._on_close_error,
         )
+
+    def _close_and_print_box(self, box_id: int) -> CloseBoxTaskResult:
+        """Закрывает коробку и печатает SSCC, если закрытие прошло успешно."""
+
+        closed = self._packing_service.close_box(
+            box_id=box_id,
+            device_id=self._device_id,
+        )
+        if not closed.ok or self._label_printer is None:
+            return CloseBoxTaskResult(close=closed)
+        try:
+            print_result = self._label_printer.print_box_label(box_id, self._device_id)
+        except Exception as exc:
+            print_result = PackageLabelPrintResultDto(
+                ok=False,
+                reason_code="label_print_failed",
+                print_status="failed",
+                print_ok=False,
+                print_error_code="printer_job_failed",
+                print_error=str(exc),
+            )
+        return CloseBoxTaskResult(close=closed, print_result=print_result)
 
     def set_count_in_packing(self, enabled: bool) -> None:
         """Обновляет флаг учета коробки в упаковке."""
@@ -431,10 +471,11 @@ class PackingController(QObject):
     def _on_box_closed(self, result: object) -> None:
         """Обрабатывает результат закрытия коробки."""
 
-        closed = self._expect(result, CloseBoxResultDto)
-        self._play(SoundEvent.VICTORY if closed.ok else SoundEvent.ERROR)
+        close_result = self._expect(result, CloseBoxTaskResult)
+        closed = close_result.close
+        self._play(self._sound_for_close(close_result))
         message = closed.error or closed.reason_code
-        event = self._close_event(closed)
+        event = self._close_event(closed, close_result.print_result)
         self._set_state(
             replace(
                 self._state,
@@ -635,11 +676,21 @@ class PackingController(QObject):
             self._sound_service.play(event)
 
     @staticmethod
-    def _close_event(result: CloseBoxResultDto) -> CloseBoxUiEvent:
+    def _close_event(
+        result: CloseBoxResultDto,
+        print_result: PackageLabelPrintResultDto | None = None,
+    ) -> CloseBoxUiEvent:
         """Преобразует backend-результат закрытия в UI-событие."""
 
         box = result.box
         is_full = box.filled >= box.capacity
+        print_ok = print_result.print_ok if print_result is not None else None
+        print_error = print_result.print_error if print_result is not None else ""
+        print_printer_name = (
+            print_result.printer.name
+            if print_result is not None and print_result.printer is not None
+            else ""
+        )
         if result.ok:
             title = tr("closeBox.closedTitle")
             message = tr("closeBox.closedMessage", box_id=box.box_id)
@@ -656,6 +707,9 @@ class PackingController(QObject):
             title=title,
             message=message,
             error_message="" if result.ok else message,
+            print_ok=print_ok,
+            print_error=print_error,
+            print_printer_name=print_printer_name,
         )
 
     @staticmethod
@@ -739,6 +793,16 @@ class PackingController(QObject):
         }:
             return SoundEvent.WARNING
         return SoundEvent.ERROR
+
+    @staticmethod
+    def _sound_for_close(result: CloseBoxTaskResult) -> SoundEvent:
+        """Выбирает звук по закрытию коробки и печати SSCC."""
+
+        if not result.close.ok:
+            return SoundEvent.ERROR
+        if result.print_result is not None and not result.print_result.print_ok:
+            return SoundEvent.WARNING
+        return SoundEvent.VICTORY
 
     @staticmethod
     def _expect(result: object, expected_type: type[TPackingResult]) -> TPackingResult:

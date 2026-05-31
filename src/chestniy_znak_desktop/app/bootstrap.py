@@ -11,6 +11,7 @@ from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.auth_service import AuthService
 from chestniy_znak_desktop.api.services.order_service import OrderService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
+from chestniy_znak_desktop.api.services.printer_service import PrinterService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.session_store import FileBearerTokenStore, FileCookieStore
 from chestniy_znak_desktop.app.config import AppConfig
@@ -23,6 +24,7 @@ from chestniy_znak_desktop.controllers.boxes_controller import BoxesController
 from chestniy_znak_desktop.controllers.defect_controller import DefectController
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsController
 from chestniy_znak_desktop.controllers.packing_controller import PackingController
+from chestniy_znak_desktop.controllers.printer_controller import PrinterController
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.i18n import set_current_language
@@ -91,6 +93,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         ),
     )
     packing_service = PackingService(api_client)
+    printer_service = PrinterService(api_client)
     order_service = OrderService(api_client)
     chz_service = ChestniyZnakService(api_client)
     box_edit_service = BoxEditService(api_client)
@@ -101,6 +104,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         device_id=settings.device_id,
         order_service=order_service,
         sound_service=sound_service,
+        label_printer=printer_service,
     )
     auto_packing_controller = AutoPackingController(
         packing_service=packing_service,
@@ -113,6 +117,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         order_service=order_service,
         ws_verify_service=auto_pack_ws_verifier,
         sound_service=sound_service,
+        label_printer=printer_service,
     )
     boxes_controller = BoxesController(
         boxes_service=packing_service,
@@ -138,6 +143,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         verify_service=chz_service,
         task_runner=api_task_runner,
         sound_service=sound_service,
+    )
+    printer_controller = PrinterController(
+        printer_service=printer_service,
+        task_runner=api_task_runner,
+        device_id=settings.device_id,
     )
     diagnostics_controller = DiagnosticsController(
         config=config,
@@ -170,6 +180,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         box_edit_controller=box_edit_controller,
         defect_controller=defect_controller,
         verify_controller=verify_controller,
+        printer_controller=printer_controller,
         diagnostics_controller=diagnostics_controller,
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
@@ -180,6 +191,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_orders())
+    auth_controller.authenticated.connect(lambda _user: printer_controller.refresh_selection())
     auth_controller.authenticated.connect(
         lambda _user: auto_packing_controller.refresh_current_box()
     )

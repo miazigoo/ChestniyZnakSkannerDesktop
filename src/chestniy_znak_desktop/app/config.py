@@ -10,7 +10,7 @@ from pathlib import Path
 class AppConfig:
     """Хранит базовые настройки запуска desktop-клиента."""
 
-    api_base_url: str = "http://srv-dnp.argos.loc/api/v2/"
+    api_base_url: str = "https://api.chestniy-z.ru/api/v1/"
     device_id: str = "DESKTOP-CHZ-01"
     app_name: str = "Честный знак Desktop"
     organization_name: str = "DevAndProd"

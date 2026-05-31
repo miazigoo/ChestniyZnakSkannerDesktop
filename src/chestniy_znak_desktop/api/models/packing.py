@@ -9,6 +9,7 @@ class BoxDto(BaseModel):
     """Краткая карточка коробки ЧЗ."""
 
     box_id: int
+    package_uuid: str | None = None
     order_id: int | None = None
     order_uuid: str | None = None
     order_line_uuid: str | None = None

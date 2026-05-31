@@ -54,6 +54,10 @@ from chestniy_znak_desktop.controllers.packing_controller import (  # noqa: E402
     PackingItemUi,
     PackingUiState,
 )
+from chestniy_znak_desktop.controllers.printer_controller import (  # noqa: E402
+    PrinterOptionUi,
+    PrinterUiState,
+)
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
 from chestniy_znak_desktop.controllers.verify_controller import VerifyUiState  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
@@ -509,6 +513,24 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
     assert screen._progress_bar.value() == 1  # noqa: SLF001
     assert screen._items_table.rowCount() == 1  # noqa: SLF001
     assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
+
+
+def test_packing_screen_shows_printer_selection() -> None:
+    """Проверяет выбор SSCC-принтера на экране упаковки."""
+
+    qapp()
+    screen = PackingScreen()
+    screen.apply_printer_state(
+        PrinterUiState(
+            options=[PrinterOptionUi(id=7, label="Zebra · 192.168.1.10:9100")],
+            selected_printer_id=7,
+            status_message="Выбран принтер: Zebra",
+        )
+    )
+
+    assert screen._printer_combo.count() == 1  # noqa: SLF001
+    assert screen._printer_combo.currentText().startswith("Zebra")  # noqa: SLF001
+    assert "Zebra" in screen._printer_status.text()  # noqa: SLF001
 
 
 def test_close_box_dialog_uses_android_assets() -> None:

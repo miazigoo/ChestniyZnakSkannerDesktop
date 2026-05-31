@@ -105,7 +105,7 @@ class PackingService:
         return ScanBatchToBoxResultDto.model_validate(payload)
 
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
-        """Закрывает коробку без локальной печати на рабочем месте."""
+        """Закрывает коробку на backend."""
 
         payload = self._api_client.post(
             f"chestniy-znak/packing/boxes/{box_id}/close",

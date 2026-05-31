@@ -53,6 +53,11 @@ class Counter:
 
         self.count += 1
 
+    def refresh_selection(self) -> None:
+        """Увеличивает счетчик обновления выбора принтера."""
+
+        self.count += 1
+
 
 class FakeBoxesController:
     """Fake контроллер коробок для проверки списка и деталей."""
@@ -193,6 +198,7 @@ def test_auto_packing_screen_refreshes_current_box() -> None:
     window = SimpleNamespace(
         _packing_controller=Counter(),
         _auto_packing_controller=auto_packing,
+        _printer_controller=Counter(),
         _boxes_controller=FakeBoxesController(),
         _diagnostics_controller=Counter(),
         _settings_controller=Counter(),
@@ -202,6 +208,7 @@ def test_auto_packing_screen_refreshes_current_box() -> None:
     AppWindow._refresh_screen_data(window, "auto_packing")  # type: ignore[arg-type]
 
     assert auto_packing.count == 1
+    assert window._printer_controller.count == 1
 
 
 def test_box_changed_refreshes_list_and_detail() -> None:
