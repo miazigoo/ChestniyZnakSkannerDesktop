@@ -107,6 +107,9 @@ class AppWindow(QMainWindow):
         self._runtime_controller.snapshot_changed.connect(self._main_screen.apply_runtime_snapshot)
         self._runtime_controller.blocking_changed.connect(self._set_work_area_blocking)
         self._auth_controller.state_changed.connect(self._login_screen.apply_state)
+        self._login_screen.manual_token_submitted.connect(
+            self._auth_controller.login_with_raw_token
+        )
         self._auth_controller.authenticated.connect(lambda _user: self.show_main_screen())
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)

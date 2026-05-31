@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPaintEvent, QPen
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState
 from chestniy_znak_desktop.i18n import tr
@@ -54,6 +63,8 @@ class LoginStatusRow(QFrame):
 class LoginScreen(QWidget):
     """Экран входа по токену авторизации."""
 
+    manual_token_submitted = Signal(str)
+
     def __init__(self) -> None:
         """Создает современный экран ожидания скана авторизационного токена."""
 
@@ -76,6 +87,12 @@ class LoginScreen(QWidget):
         self._error_label = QLabel("")
         self._error_label.setObjectName("loginError")
         self._error_label.setWordWrap(True)
+        self._manual_input = QLineEdit()
+        self._manual_input.setPlaceholderText(tr("login.manualPlaceholder"))
+        self._manual_input.setClearButtonEnabled(True)
+        self._manual_input.returnPressed.connect(self._submit_manual_token)
+        self._manual_button = QPushButton(tr("login.manualSubmit"))
+        self._manual_button.clicked.connect(self._submit_manual_token)
 
         self._connection_row = LoginStatusRow(
             VectorIconName.LINK,
@@ -165,6 +182,20 @@ class LoginScreen(QWidget):
         panel_layout.addSpacing(6)
         panel_layout.addWidget(self._status_label)
         panel_layout.addWidget(self._error_label)
+        panel_layout.addSpacing(4)
+        manual_label = QLabel(tr("login.manualToken"))
+        manual_label.setObjectName("loginStatusTitle")
+        manual_hint = QLabel(tr("login.manualHint"))
+        manual_hint.setObjectName("loginPanelHint")
+        manual_hint.setWordWrap(True)
+        manual_row = QHBoxLayout()
+        manual_row.setContentsMargins(0, 0, 0, 0)
+        manual_row.setSpacing(8)
+        manual_row.addWidget(self._manual_input, stretch=1)
+        manual_row.addWidget(self._manual_button)
+        panel_layout.addWidget(manual_label)
+        panel_layout.addLayout(manual_row)
+        panel_layout.addWidget(manual_hint)
         panel_layout.addSpacing(8)
         panel_layout.addWidget(self._scanner_row)
         panel_layout.addWidget(self._token_row)
@@ -176,6 +207,14 @@ class LoginScreen(QWidget):
         root.setSpacing(26)
         root.addLayout(hero, stretch=6)
         root.addWidget(panel, stretch=5)
+
+    def _submit_manual_token(self) -> None:
+        """Передает вручную введенный токен в контроллер авторизации."""
+
+        value = self._manual_input.text().strip()
+        if not value:
+            return
+        self.manual_token_submitted.emit(value)
 
     def _draw_scan_beams(self, painter: QPainter) -> None:
         """Рисует декоративные лучи сканирования."""

@@ -30,7 +30,7 @@ def _extract_json_token(value: str) -> str | None:
         return None
     if not isinstance(payload, dict):
         return None
-    token = payload.get("token")
+    token = payload.get("token") or payload.get("activation_code") or payload.get("app_token")
     return str(token).strip() if token else None
 
 

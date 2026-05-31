@@ -18,6 +18,22 @@ def test_settings_store_loads_defaults(tmp_path) -> None:  # type: ignore[no-unt
     assert settings.auto_pack_codes_per_item == 1
 
 
+def test_settings_store_generates_unique_default_device_id(
+    tmp_path,
+) -> None:  # type: ignore[no-untyped-def]
+    """Проверяет, что production-Desktop не использует общий legacy Device ID."""
+
+    settings_path = tmp_path / "settings.ini"
+    store = SettingsStore.from_file(str(settings_path))
+    settings = store.load(AppConfig())
+    assert settings.device_id.startswith("DESKTOP-")
+    assert settings.device_id != "DESKTOP-CHZ-01"
+    assert (
+        SettingsStore.from_file(str(settings_path)).load(AppConfig()).device_id
+        == settings.device_id
+    )
+
+
 def test_settings_store_saves_and_loads_values(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """Проверяет сохранение и повторную загрузку пользовательских настроек."""
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import uuid4
 
 from PySide6.QtCore import QSettings
 
@@ -52,9 +53,10 @@ class SettingsStore:
     def load(self, defaults: AppConfig) -> UserSettings:
         """Загружает настройки, подставляя значения конфигурации по умолчанию."""
 
+        device_id = self._device_id_value(defaults)
         return UserSettings(
             api_base_url=self._value("network/api_base_url", defaults.api_base_url),
-            device_id=self._value("device/device_id", defaults.device_id),
+            device_id=device_id,
             language=normalize_language(self._value("ui/language", "ru")),
             theme_name=self._value("ui/theme_name", "light"),
             scanner_port=self._value("scanner/port", ""),
@@ -94,6 +96,20 @@ class SettingsStore:
 
         value = self._settings.value(key, default)
         return str(value)
+
+    def _device_id_value(self, defaults: AppConfig) -> str:
+        """Возвращает постоянный уникальный ID установки Desktop."""
+
+        stored = self._settings.value("device/device_id", None)
+        stored_value = str(stored).strip() if stored is not None else ""
+        if stored_value and stored_value != "DESKTOP-CHZ-01":
+            return stored_value
+        if defaults.device_id != "DESKTOP-CHZ-01":
+            return defaults.device_id
+        generated = f"DESKTOP-{uuid4().hex[:12].upper()}"
+        self._settings.setValue("device/device_id", generated)
+        self._settings.sync()
+        return generated
 
     def _int_value(self, key: str, default: int) -> int:
         """Возвращает целочисленное значение настройки."""

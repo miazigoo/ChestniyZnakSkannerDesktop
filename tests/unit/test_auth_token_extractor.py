@@ -17,6 +17,12 @@ def test_extract_auth_token_from_json() -> None:
     assert extract_auth_token('{"token":"json-token"}') == "json-token"
 
 
+def test_extract_auth_token_from_activation_code_json() -> None:
+    """Проверяет QR payload из кабинета поставщика."""
+
+    assert extract_auth_token('{"activation_code":"activation-token"}') == "activation-token"
+
+
 def test_extract_auth_token_from_url_query() -> None:
     """Проверяет токен в query-параметре URL."""
 

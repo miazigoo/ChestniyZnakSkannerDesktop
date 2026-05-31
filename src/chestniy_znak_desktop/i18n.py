@@ -38,8 +38,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "login.product": "Честный знак",
         "login.subtitle": "Desktop-клиент оператора",
         "login.description": (
-            "Авторизация выполняется только сканером. Считайте QR-токен, чтобы открыть "
-            "рабочие сценарии упаковки, проверки и брака."
+            "Считайте QR-токен или введите app-токен вручную, чтобы открыть рабочие "
+            "сценарии упаковки, проверки и брака."
         ),
         "login.waitBadge": "Ожидание токена",
         "login.waitStatus": "Ожидание токена авторизации",
@@ -51,12 +51,21 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "login.session": "Сессия",
         "login.security": "Токен будет отправлен в backend и закреплен за заводом",
         "login.panelTitle": "Вход по app-токену",
-        "login.panelHint": "Поднесите QR авторизации к подключенному COM/SPP-сканеру.",
+        "login.panelHint": (
+            "Поднесите QR авторизации к сканеру или вставьте токен из кабинета поставщика."
+        ),
+        "login.manualToken": "Ручной вход",
+        "login.manualPlaceholder": "App-токен или QR payload",
+        "login.manualSubmit": "Войти",
+        "login.manualHint": (
+            "Для проверки можно вставить токен с экрана поставщика. "
+            "В работе быстрее сканировать QR."
+        ),
         "login.signingIn": "Выполняем вход",
         "login.needToken": "Требуется новый токен",
         "login.ready": "Готов к скану",
         "login.scannerReady": "Готов к чтению: {port}",
-        "login.scannerStopped": "Сканер не запущен. Вход невозможен без сканера.",
+        "login.scannerStopped": "Сканер не запущен. Можно войти вручную по app-токену.",
     },
     "en": {
         "common.save": "Save",
@@ -76,7 +85,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "login.product": "Chestniy Znak",
         "login.subtitle": "Operator desktop client",
         "login.description": (
-            "Authorization is scanner-only. Scan the QR token to open packaging, "
+            "Scan a QR token or enter an app token manually to open packaging, "
             "verification, and defect workflows."
         ),
         "login.waitBadge": "Waiting for token",
@@ -89,12 +98,21 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "login.session": "Session",
         "login.security": "The token will be sent to the backend and bound to the plant",
         "login.panelTitle": "App-token sign-in",
-        "login.panelHint": "Bring the authorization QR to the connected COM/SPP scanner.",
+        "login.panelHint": (
+            "Scan the authorization QR or paste the token from the supplier cabinet."
+        ),
+        "login.manualToken": "Manual sign-in",
+        "login.manualPlaceholder": "App token or QR payload",
+        "login.manualSubmit": "Sign in",
+        "login.manualHint": (
+            "For testing, paste the supplier token here. "
+            "In production, scanning the QR is faster."
+        ),
         "login.signingIn": "Signing in",
         "login.needToken": "New token required",
         "login.ready": "Ready to scan",
         "login.scannerReady": "Ready to scan: {port}",
-        "login.scannerStopped": "Scanner is not running. Sign-in is blocked without a scanner.",
+        "login.scannerStopped": "Scanner is not running. Manual app-token sign-in is available.",
     },
     "zh": {
         "common.save": "保存",
@@ -113,7 +131,7 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "settings.saved": "设置已保存。",
         "login.product": "Chestniy Znak",
         "login.subtitle": "操作员桌面客户端",
-        "login.description": "授权仅通过扫描器完成。扫描 QR 令牌后即可打开包装、校验和不良品流程。",
+        "login.description": "扫描 QR 令牌或手动输入 App 令牌后，即可打开包装、校验和不良品流程。",
         "login.waitBadge": "等待令牌",
         "login.waitStatus": "等待授权令牌",
         "login.connection": "连接",
@@ -124,12 +142,16 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
         "login.session": "会话",
         "login.security": "令牌会发送到后端并绑定到工厂",
         "login.panelTitle": "App 令牌登录",
-        "login.panelHint": "将授权 QR 码靠近已连接的 COM/SPP 扫描器。",
+        "login.panelHint": "扫描授权 QR，或粘贴供应商后台中的令牌。",
+        "login.manualToken": "手动登录",
+        "login.manualPlaceholder": "App 令牌或 QR 内容",
+        "login.manualSubmit": "登录",
+        "login.manualHint": "测试时可在此粘贴供应商令牌。实际工作中扫描 QR 更快。",
         "login.signingIn": "登录中",
         "login.needToken": "需要新令牌",
         "login.ready": "准备扫描",
         "login.scannerReady": "可扫描：{port}",
-        "login.scannerStopped": "扫描器未运行。没有扫描器无法登录。",
+        "login.scannerStopped": "扫描器未运行。可手动输入 App 令牌登录。",
     },
 }
 
