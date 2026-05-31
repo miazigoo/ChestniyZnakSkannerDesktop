@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field, replace
+from hashlib import sha256
 from typing import Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
@@ -18,11 +20,13 @@ from chestniy_znak_desktop.api.models.packing import (
     ScanToBoxResultDto,
 )
 from chestniy_znak_desktop.api.models.printers import PackageLabelPrintResultDto
+from chestniy_znak_desktop.domain.scanner_normalizer import visible
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 TPackingResult = TypeVar("TPackingResult")
+logger = logging.getLogger(__name__)
 
 
 class PackingBackend(Protocol):
@@ -345,6 +349,12 @@ class PackingController(QObject):
     def on_code_scanned(self, code: str) -> None:
         """Отправляет скан в текущую коробку."""
 
+        logger.info(
+            "Packing scan captured length=%s sha256=%s value=%s",
+            len(code),
+            sha256(code.encode("utf-8")).hexdigest()[:24],
+            visible(code),
+        )
         if self._state.is_busy:
             return
         if self._state.current_box is None:
@@ -419,6 +429,13 @@ class PackingController(QObject):
         """Обрабатывает результат добавления кода в коробку."""
 
         scan_result = self._expect(result, ScanToBoxResultDto)
+        logger.info(
+            "Packing scan result ok=%s reason=%s error=%s box_id=%s",
+            scan_result.ok,
+            scan_result.reason_code,
+            scan_result.error or "",
+            scan_result.box.box_id,
+        )
         self._play(self._sound_for_scan(scan_result))
         message = scan_result.error or scan_result.reason_code
         self._set_state(

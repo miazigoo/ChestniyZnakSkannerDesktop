@@ -160,6 +160,9 @@ class PackingScanCard(QFrame):
         self._error_label.setObjectName("packingError")
         self._last_code_label = QLabel(tr("packing.lastScan", code="-"))
         self._last_code_label.setObjectName("packingMutedText")
+        self._last_code_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._last_code_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._last_code_label.setWordWrap(True)
 
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.SCANNER, "#8fb8ff"))
@@ -209,15 +212,20 @@ class PackingScanCard(QFrame):
         self._result_label.setText(result or tr("packing.waitScan"))
         self._error_label.setText(error)
         self._error_label.setVisible(bool(error))
-        self._last_code_label.setText(tr("packing.lastScan", code=self._preview(last_code)))
+        visible_code = self._visible_code(last_code)
+        self._last_code_label.setText(tr("packing.lastScan", code=visible_code))
+        self._last_code_label.setToolTip(visible_code if last_code else "")
 
     @staticmethod
-    def _preview(code: str) -> str:
-        """Возвращает короткое отображение длинного кода маркировки."""
+    def _visible_code(code: str) -> str:
+        """Возвращает полный код сканера с видимыми управляющими символами."""
 
         if not code:
             return "-"
-        compact = code.strip().replace("\n", "")
-        if len(compact) <= 20:
-            return compact
-        return f"{compact[:10]}...{compact[-8:]}"
+        return (
+            code.strip()
+            .replace("\x1d", "<GS>")
+            .replace("\r", "<CR>")
+            .replace("\n", "<LF>")
+            .replace("\t", "<TAB>")
+        )
