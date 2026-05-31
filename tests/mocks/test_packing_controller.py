@@ -43,6 +43,42 @@ class ImmediateTaskRunner:
         on_success(result)
 
 
+class QueuedTaskRunner:
+    """TaskRunner, который выполняет задачи по явному вызову теста."""
+
+    def __init__(self) -> None:
+        """Создает пустую очередь задач."""
+
+        self._tasks: list[
+            tuple[
+                Callable[[], object],
+                Callable[[object], None],
+                Callable[[Exception], None],
+            ]
+        ] = []
+
+    def submit(
+        self,
+        task: Callable[[], object],
+        on_success: Callable[[object], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Сохраняет задачу для последующего запуска."""
+
+        self._tasks.append((task, on_success, on_error))
+
+    def run_next(self) -> None:
+        """Запускает следующую задачу в очереди."""
+
+        task, on_success, on_error = self._tasks.pop(0)
+        try:
+            result = task()
+        except Exception as exc:
+            on_error(exc)
+            return
+        on_success(result)
+
+
 class FakeSoundService:
     """Fake sound service для проверки выбранных звуков."""
 
@@ -325,6 +361,35 @@ def test_packing_controller_scan_to_box_updates_state() -> None:
     assert controller.state.current_box.filled == 1
     assert controller.state.status_message == "Код добавлен"
     assert sounds.events[-1] == SoundEvent.OK
+
+
+def test_packing_controller_queues_scan_while_busy() -> None:
+    """Проверяет, что скан во время фоновой операции не теряется."""
+
+    service = FakePackingService()
+    sounds = FakeSoundService()
+    runner = QueuedTaskRunner()
+    controller = PackingController(
+        packing_service=service,
+        task_runner=runner,
+        device_id="pc-1",
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+
+    controller.open_box()
+    controller.on_code_scanned("CODE")
+
+    assert service.last_scan is None
+    assert controller.state.status_message == "Скан принят в очередь"
+
+    runner.run_next()
+    assert service.last_scan is None
+    assert controller.state.status_message == "Отправляем код в коробку..."
+
+    runner.run_next()
+    assert getattr(service, "last_scan") == (1, "CODE", "desktop-com")
+    assert controller.state.status_message == "Код добавлен"
 
 
 def test_packing_controller_close_box_clears_current_box() -> None:

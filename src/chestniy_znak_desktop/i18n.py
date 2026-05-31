@@ -359,6 +359,10 @@ _MESSAGES["ru"].update(
         "packing.openBoxFirst": "Сначала откройте коробку",
         "packing.codeNotSent": "Код не отправлен",
         "packing.sendingCode": "Отправляем код в коробку...",
+        "packing.scanQueued": "Скан принят в очередь",
+        "packing.scanQueuedResult": (
+            "Дождемся окончания текущей операции и отправим код. В очереди: {count}"
+        ),
         "packing.boxLoaded": "Коробка загружена",
         "packing.boxOpened": "Коробка открыта",
         "packing.boxAlreadyOpened": "Активная коробка уже была открыта",
@@ -818,6 +822,10 @@ _MESSAGES["en"].update(
         "packing.openBoxFirst": "Open a box first",
         "packing.codeNotSent": "Code was not sent",
         "packing.sendingCode": "Sending code to the box...",
+        "packing.scanQueued": "Scan queued",
+        "packing.scanQueuedResult": (
+            "The app will send it after the current operation finishes. Queue: {count}"
+        ),
         "packing.boxLoaded": "Box loaded",
         "packing.boxOpened": "Box opened",
         "packing.boxAlreadyOpened": "An active box was already open",
@@ -1266,6 +1274,8 @@ _MESSAGES["zh"].update(
         "packing.openBoxFirst": "请先打开箱",
         "packing.codeNotSent": "代码未发送",
         "packing.sendingCode": "正在将代码发送到箱...",
+        "packing.scanQueued": "扫描已加入队列",
+        "packing.scanQueuedResult": "当前操作完成后应用会自动发送该代码。队列：{count}",
         "packing.boxLoaded": "箱已加载",
         "packing.boxOpened": "箱已打开",
         "packing.boxAlreadyOpened": "已有活动箱打开",

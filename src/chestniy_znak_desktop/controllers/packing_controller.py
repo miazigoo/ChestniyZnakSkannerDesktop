@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field, replace
 from hashlib import sha256
 from typing import Protocol, TypeVar
@@ -193,6 +194,7 @@ class PackingController(QObject):
         self._sound_service = sound_service
         self._label_printer = label_printer
         self._state = PackingUiState()
+        self._scan_queue: deque[str] = deque()
 
     @property
     def state(self) -> PackingUiState:
@@ -356,6 +358,16 @@ class PackingController(QObject):
             visible(code),
         )
         if self._state.is_busy:
+            self._scan_queue.append(code)
+            self._set_state(
+                replace(
+                    self._state,
+                    status_message=tr("packing.scanQueued"),
+                    result_message=tr("packing.scanQueuedResult", count=len(self._scan_queue)),
+                    error_message="",
+                    last_scanned_code=code,
+                )
+            )
             return
         if self._state.current_box is None:
             self._play(SoundEvent.WARNING)
@@ -395,6 +407,7 @@ class PackingController(QObject):
                     status_message=tr("packing.noOpenBox"),
                 )
             )
+            self._process_next_queued_scan()
             return
         detail = self._expect(result, BoxDetailDto)
         self._set_state(
@@ -406,6 +419,7 @@ class PackingController(QObject):
                 count_in_packing=detail.count_in_packing,
             )
         )
+        self._process_next_queued_scan()
 
     def _on_box_opened(self, result: object) -> None:
         """Обрабатывает результат открытия коробки."""
@@ -424,6 +438,7 @@ class PackingController(QObject):
                 count_in_packing=opened.box.count_in_packing,
             )
         )
+        self._process_next_queued_scan()
 
     def _on_scan_result(self, result: object) -> None:
         """Обрабатывает результат добавления кода в коробку."""
@@ -452,6 +467,7 @@ class PackingController(QObject):
                 count_in_packing=scan_result.box.count_in_packing,
             )
         )
+        self._process_next_queued_scan()
 
     def _on_count_in_packing_changed(self, result: object) -> None:
         """Обрабатывает результат переключения учета текущей коробки."""
@@ -471,6 +487,7 @@ class PackingController(QObject):
                     count_in_packing=self._state.count_in_packing,
                 )
             )
+            self._process_next_queued_scan()
             return
         count_in_packing = edit_result.box.count_in_packing
         self._set_state(
@@ -484,6 +501,7 @@ class PackingController(QObject):
                 count_in_packing=count_in_packing,
             )
         )
+        self._process_next_queued_scan()
 
     def _on_box_closed(self, result: object) -> None:
         """Обрабатывает результат закрытия коробки."""
@@ -507,6 +525,7 @@ class PackingController(QObject):
             )
         )
         self.close_completed.emit(event)
+        self._process_next_queued_scan()
 
     def _on_close_error(self, exc: Exception) -> None:
         """Обрабатывает ошибку закрытия коробки и публикует модалку."""
@@ -544,6 +563,7 @@ class PackingController(QObject):
                 count_in_packing=self._state.count_in_packing,
             )
         )
+        self._process_next_queued_scan()
 
     def _set_busy(self, message: str, last_scanned_code: str | None = None) -> None:
         """Переводит экран в состояние ожидания backend."""
@@ -685,6 +705,14 @@ class PackingController(QObject):
 
         self._state = state
         self.state_changed.emit(state)
+
+    def _process_next_queued_scan(self) -> None:
+        """Отправляет следующий скан, который пришел во время фоновой операции."""
+
+        if self._state.is_busy or not self._scan_queue:
+            return
+        next_code = self._scan_queue.popleft()
+        self.on_code_scanned(next_code)
 
     def _play(self, event: SoundEvent) -> None:
         """Проигрывает звук, если сервис звука подключен."""
