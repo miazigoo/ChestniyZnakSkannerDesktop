@@ -29,6 +29,7 @@ from chestniy_znak_desktop.controllers.auto_packing_controller import (
 from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.code_format import format_marking_code_for_display
 from chestniy_znak_desktop.ui.widgets.packing_cards import PackingSummaryCard
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -476,10 +477,12 @@ class AutoPackingScreen(QWidget):
                 item.order_key,
                 item.gtin,
                 item.serial,
-                item.visible_code,
+                format_marking_code_for_display(item.visible_code, empty=""),
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
+                if column == 4 and value:
+                    cell.setToolTip(value)
                 if column == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._pending_table.setItem(row, column, cell)
@@ -501,10 +504,12 @@ class AutoPackingScreen(QWidget):
                 str(row + 1),
                 item.gtin,
                 item.serial,
-                item.visible_code,
+                format_marking_code_for_display(item.visible_code, empty=""),
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
+                if column == 3 and value:
+                    cell.setToolTip(value)
                 if column == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._box_items_table.setItem(row, column, cell)

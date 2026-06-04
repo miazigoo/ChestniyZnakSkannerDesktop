@@ -193,16 +193,18 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
 
     qapp()
     screen = AutoPackingScreen()
+    code_with_gs = "010460123456789021A10000000291VDMY\x1d91RATR2\x1d92TAIL"
+    visible_code = "010460123456789021A10000000291VDMY<GS>91RATR2<GS>92TAIL"
     screen.apply_state(
         AutoPackingUiState(
             codes_per_item=2,
             pending_items=[
                 AutoPackingBoxItemUi(
                     code_id=1,
-                    raw_code="CODE1",
+                    raw_code=code_with_gs,
                     gtin="04646151697261",
                     serial="SERIAL1",
-                    visible_code="CODE1",
+                    visible_code=code_with_gs,
                     order_key="26-0001/0001",
                 )
             ],
@@ -219,7 +221,7 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
                         id=11,
                         gtin="04646151697261",
                         serial="SERIAL1",
-                        visible_code="CODE1",
+                        visible_code=code_with_gs,
                     )
                 ],
             ),
@@ -232,6 +234,8 @@ def test_auto_packing_screen_shows_local_box_state() -> None:
     assert screen._status_title.text() == "Бокс не заполнен: 1 / 2"  # noqa: SLF001
     assert screen._tables_tabs.tabText(0) == "Локальный бокс (1/2)"  # noqa: SLF001
     assert screen._tables_tabs.tabText(1) == "Текущая коробка (1)"  # noqa: SLF001
+    assert screen._pending_table.item(0, 4).text() == visible_code  # noqa: SLF001
+    assert screen._box_items_table.item(0, 3).text() == visible_code  # noqa: SLF001
 
 
 def test_boxes_screen_shows_rows_and_detail_panel() -> None:
@@ -267,7 +271,7 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
                         id=501,
                         gtin="04601234567890",
                         serial="SERIAL77",
-                        visible_code="04601234567890SERIAL77",
+                        visible_code="04601234567890SERIAL77\x1d91ABC",
                     )
                 ],
             ),
@@ -278,6 +282,9 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
 
     assert screen._table.rowCount() == 1  # noqa: SLF001
     assert screen._detail_items_table.rowCount() == 1  # noqa: SLF001
+    assert (  # noqa: SLF001
+        screen._detail_items_table.item(0, 3).text() == "04601234567890SERIAL77<GS>91ABC"
+    )
 
 
 def test_boxes_screen_loads_detail_on_single_click() -> None:
@@ -500,7 +507,7 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
                         id=1,
                         gtin="04601234567890",
                         serial="ABC123",
-                        visible_code="04601234567890ABC123",
+                        visible_code="04601234567890ABC123\x1d91ABC",
                     )
                 ],
             ),
@@ -512,6 +519,7 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
 
     assert screen._progress_bar.value() == 1  # noqa: SLF001
     assert screen._items_table.rowCount() == 1  # noqa: SLF001
+    assert screen._items_table.item(0, 3).text() == "04601234567890ABC123<GS>91ABC"  # noqa: SLF001
     assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
 
 

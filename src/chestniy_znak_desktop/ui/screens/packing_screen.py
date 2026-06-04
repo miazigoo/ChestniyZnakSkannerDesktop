@@ -25,6 +25,7 @@ from chestniy_znak_desktop.controllers.packing_controller import PackingUiState
 from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.code_format import format_marking_code_for_display
 from chestniy_znak_desktop.ui.widgets.packing_cards import (
     PackingScanCard,
     PackingSummaryCard,
@@ -352,10 +353,12 @@ class PackingScreen(QWidget):
                 str(row + 1),
                 item.gtin,
                 item.serial,
-                item.visible_code,
+                format_marking_code_for_display(item.visible_code, empty=""),
             ]
             for column, value in enumerate(values):
                 cell = QTableWidgetItem(value)
+                if column == 3 and value:
+                    cell.setToolTip(value)
                 if column == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._items_table.setItem(row, column, cell)

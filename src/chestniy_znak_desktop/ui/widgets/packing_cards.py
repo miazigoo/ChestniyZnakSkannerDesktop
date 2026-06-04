@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.i18n import tr
+from chestniy_znak_desktop.ui.code_format import format_marking_code_for_display
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -220,12 +221,4 @@ class PackingScanCard(QFrame):
     def _visible_code(code: str) -> str:
         """Возвращает полный код сканера с видимыми управляющими символами."""
 
-        if not code:
-            return "-"
-        return (
-            code.strip()
-            .replace("\x1d", "<GS>")
-            .replace("\r", "<CR>")
-            .replace("\n", "<LF>")
-            .replace("\t", "<TAB>")
-        )
+        return format_marking_code_for_display(code)

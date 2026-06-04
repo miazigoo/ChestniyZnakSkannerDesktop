@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from chestniy_znak_desktop.controllers.box_edit_controller import BoxEditUiState
 from chestniy_znak_desktop.controllers.boxes_controller import BoxesUiState
 from chestniy_znak_desktop.i18n import tr
+from chestniy_znak_desktop.ui.code_format import format_marking_code_for_display
 from chestniy_znak_desktop.ui.widgets.box_detail_panel import BoxDetailPanel
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
@@ -488,9 +489,16 @@ class BoxesScreen(QWidget):
         self._detail_panel.set_detail(detail)
         self._detail_items_table.setRowCount(len(detail.items))
         for row_index, item in enumerate(detail.items):
-            values = [str(item.id), item.gtin, item.serial, item.visible_code]
+            values = [
+                str(item.id),
+                item.gtin,
+                item.serial,
+                format_marking_code_for_display(item.visible_code, empty=""),
+            ]
             for column_index, value in enumerate(values):
                 cell = QTableWidgetItem(value)
+                if column_index == 3 and value:
+                    cell.setToolTip(value)
                 if column_index == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._detail_items_table.setItem(row_index, column_index, cell)
