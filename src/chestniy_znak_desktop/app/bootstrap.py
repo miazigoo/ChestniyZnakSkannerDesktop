@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
+from typing import TypeAlias
 
 from PySide6.QtWidgets import QApplication
 
@@ -33,12 +35,29 @@ from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.connection_monitor import ConnectionMonitor
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
 from chestniy_znak_desktop.runtime.task_runner import QtTaskRunner, UnauthorizedAwareTaskRunner
+from chestniy_znak_desktop.scanner.evdev_keyboard_scanner import (
+    EvdevKeyboardScanner,
+    MultiEvdevKeyboardScanner,
+    default_evdev_scanner_paths,
+)
 from chestniy_znak_desktop.scanner.hid_keyboard_scanner import HidKeyboardScanner
+from chestniy_znak_desktop.scanner.hid_process_worker import HidProcessScanner
+from chestniy_znak_desktop.scanner.windows_hid_scanner import WindowsHidScanner
+from chestniy_znak_desktop.scanner.windows_raw_input_scanner import WindowsRawInputScanner
 from chestniy_znak_desktop.services.auto_pack_ws_verifier import AutoPackWsVerifier
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.services.log_service import LogService
 from chestniy_znak_desktop.ui.app_window import AppWindow
 from chestniy_znak_desktop.ui.themes.theme_manager import ThemeManager
+
+HidScannerSource: TypeAlias = (
+    EvdevKeyboardScanner
+    | MultiEvdevKeyboardScanner
+    | HidKeyboardScanner
+    | HidProcessScanner
+    | WindowsHidScanner
+    | WindowsRawInputScanner
+)
 
 
 def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
@@ -153,7 +172,7 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         config=config,
         log_service=LogService(config.data_dir / "logs" / "desktop.log"),
     )
-    hid_keyboard_scanner = HidKeyboardScanner()
+    hid_keyboard_scanner = _create_hid_scanner()
     scanner_controller = ScannerController(
         runtime_controller=runtime_controller,
         hid_keyboard_worker=hid_keyboard_scanner,
@@ -185,7 +204,11 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         scanner_controller=scanner_controller,
         settings_controller=settings_controller,
     )
-    hid_keyboard_scanner.bind_root(window)
+    if isinstance(
+        hid_keyboard_scanner,
+        (HidKeyboardScanner, WindowsHidScanner, WindowsRawInputScanner),
+    ):
+        hid_keyboard_scanner.bind_root(window)
     window.destroyed.connect(lambda _obj: runtime_controller.stop())
     window.destroyed.connect(lambda _obj: api_client.close())
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
@@ -205,6 +228,17 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     diagnostics_controller.refresh_logs()
     auth_controller.restore_session()
     return window
+
+
+def _create_hid_scanner() -> HidScannerSource:
+    """Возвращает самый надежный HID-источник для текущей платформы."""
+
+    evdev_paths = default_evdev_scanner_paths()
+    if evdev_paths:
+        return MultiEvdevKeyboardScanner(device_paths=evdev_paths)
+    if sys.platform == "win32":
+        return WindowsRawInputScanner()
+    return HidKeyboardScanner()
 
 
 def _handle_unauthorized_api_error(

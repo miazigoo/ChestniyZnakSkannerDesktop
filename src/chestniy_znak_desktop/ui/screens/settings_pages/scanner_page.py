@@ -44,14 +44,20 @@ class ScannerSettingsPage(QWidget):
         self._scanner_baudrate.currentTextChanged.connect(self._emit_baudrate)
         self._scanner_status = QLabel(tr("settings.scanner.notRunning"))
         self._scanner_status.setObjectName("settingsStatusText")
+        self._scanner_sources = QLabel(self._format_sources(ScannerUiState()))
+        self._scanner_sources.setObjectName("settingsStatusText")
+        self._scanner_sources.setWordWrap(True)
+        self._hid_devices = QLabel(tr("settings.scanner.hidNotFound"))
+        self._hid_devices.setObjectName("settingsStatusText")
+        self._hid_devices.setWordWrap(True)
         self._scanner_error = QLabel("")
         self._scanner_error.setObjectName("settingsErrorText")
         self._scanner_error.setVisible(False)
         self._refresh_ports_button = QPushButton(tr("settings.scanner.refreshPorts"))
         self._refresh_ports_button.setObjectName("settingsSecondaryButton")
-        self._start_scanner_button = QPushButton(tr("settings.scanner.start"))
+        self._start_scanner_button = QPushButton(tr("settings.scanner.startCom"))
         self._start_scanner_button.setObjectName("settingsPrimaryButton")
-        self._stop_scanner_button = QPushButton(tr("settings.scanner.stop"))
+        self._stop_scanner_button = QPushButton(tr("settings.scanner.stopAll"))
         self._stop_scanner_button.setObjectName("settingsDangerButton")
         self._back_button = create_back_button()
         self._refresh_ports_button.clicked.connect(self.ports_refresh_requested.emit)
@@ -83,6 +89,8 @@ class ScannerSettingsPage(QWidget):
         )
         card_layout.addLayout(actions)
         card_layout.addWidget(self._scanner_status)
+        card_layout.addWidget(self._scanner_sources)
+        card_layout.addWidget(self._hid_devices)
         card_layout.addWidget(self._scanner_error)
         card_layout.addWidget(self._back_button)
 
@@ -113,9 +121,13 @@ class ScannerSettingsPage(QWidget):
             self._scanner_baudrate.setCurrentIndex(baudrate_index)
         self._scanner_baudrate.blockSignals(False)
         self._scanner_status.setText(state.status_message)
+        self._scanner_sources.setText(self._format_sources(state))
+        self._hid_devices.setText(self._format_hid_devices(state))
         self._scanner_error.setText(state.error_message)
         self._scanner_error.setVisible(bool(state.error_message))
-        self._start_scanner_button.setEnabled(not state.is_running)
+        self._start_scanner_button.setEnabled(
+            bool(state.selected_port) and state.selected_port not in state.active_serial_ports
+        )
         self._stop_scanner_button.setEnabled(state.is_running)
 
     def _emit_baudrate(self, value: str) -> None:
@@ -123,3 +135,24 @@ class ScannerSettingsPage(QWidget):
 
         if value:
             self.baudrate_changed.emit(int(value))
+
+    @staticmethod
+    def _format_sources(state: ScannerUiState) -> str:
+        """Возвращает читаемый список активных источников сканов."""
+
+        sources: list[str] = []
+        if state.serial_running:
+            sources.append("COM: " + ", ".join(state.active_serial_ports))
+        if state.hid_running:
+            sources.append(tr("settings.scanner.sourceHidActive"))
+        if not sources:
+            sources.append(tr("settings.scanner.sourceNone"))
+        return f"{tr('settings.scanner.sourcesPrefix')}: " + "; ".join(sources)
+
+    @staticmethod
+    def _format_hid_devices(state: ScannerUiState) -> str:
+        """Возвращает список HID-устройств, которые видит приложение."""
+
+        if not state.hid_devices:
+            return tr("settings.scanner.hidNotFound")
+        return tr("settings.scanner.hidDevices", devices="; ".join(state.hid_devices))

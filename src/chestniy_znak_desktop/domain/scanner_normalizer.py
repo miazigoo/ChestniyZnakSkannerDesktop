@@ -8,10 +8,14 @@ from dataclasses import dataclass
 GS = "\x1d"
 ESC_GS_SEQ = "\x1b`\x1bb\x1bi"
 AI21_MAX_SERIAL_LEN = 20
+AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE = 13
 KNOWN_AI_FIXED_VALUE_LEN = {"91": 4, "93": 4}
 KNOWN_AI_VARIABLE_TO_END = {"92"}
 GROUP_SEPARATOR_TOKEN_RE = re.compile(r"(?i)(?:\\u001d|\\x1d|\\035|<GS>|\[GS\]|\{GS\})")
 BRACKETED_AI_RE = re.compile(r"\((01|21|91|92|93)\)")
+GS1_CODE_START_RE = re.compile(r"01\d{14}21")
+GTIN21_START_RE = re.compile(r"\d{14}21")
+GTIN04_SUFFIX_21_START_RE = re.compile(r"\d{12}21")
 
 
 class MarkingCodeParseError(ValueError):
@@ -118,6 +122,26 @@ def parse_ai_tail_without_gs(rest: str) -> tuple[dict[str, str], list[str]]:
     return ai_parts, warnings
 
 
+def split_tail_without_gs(tail: str) -> tuple[str, dict[str, str], list[str], bool]:
+    """Разделяет serial и AI-хвост, когда scanner не прислал GS явно."""
+
+    max_serial_len = min(AI21_MAX_SERIAL_LEN, len(tail))
+    for serial_len in range(max_serial_len, AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE - 1, -1):
+        rest = tail[serial_len:]
+        if len(rest) < 2:
+            continue
+        if rest[:2] not in KNOWN_AI_FIXED_VALUE_LEN and rest[:2] not in KNOWN_AI_VARIABLE_TO_END:
+            continue
+        ai_parts, warnings = parse_ai_tail_without_gs(rest)
+        if ai_parts and not warnings:
+            return tail[:serial_len], ai_parts, [], True
+
+    serial = tail[:AI21_MAX_SERIAL_LEN]
+    rest = tail[AI21_MAX_SERIAL_LEN:]
+    ai_parts, warnings = parse_ai_tail_without_gs(rest)
+    return serial, ai_parts, warnings, False
+
+
 def build_raw_code(gtin: str, serial: str, ai_parts: dict[str, str]) -> str:
     """Собирает нормализованный полный код из GTIN, serial и AI-хвоста."""
 
@@ -138,6 +162,9 @@ def parse_marking_code(code: str) -> ParsedMarkingCode:
     warnings: list[str] = []
     if not normalized:
         raise MarkingCodeParseError("Пустой код")
+    normalized, prefix_warning = restore_missing_gs1_marking_prefix(normalized)
+    if prefix_warning:
+        warnings.append(prefix_warning)
     if not normalized.startswith("01"):
         raise MarkingCodeParseError("Код должен начинаться с AI 01")
     if len(normalized) < 18:
@@ -158,11 +185,12 @@ def parse_marking_code(code: str) -> ParsedMarkingCode:
         serial, rest = tail.split(GS, 1)
         ai_parts, tail_warnings = parse_ai_tail_with_gs(rest)
     elif len(tail) > AI21_MAX_SERIAL_LEN:
-        serial = tail[:AI21_MAX_SERIAL_LEN]
-        rest = tail[AI21_MAX_SERIAL_LEN:]
+        serial, ai_parts, tail_warnings, restored_by_ai = split_tail_without_gs(tail)
         gs_restored = True
-        warnings.append("GS не пришел явно; разделитель восстановлен после 20 символов serial")
-        ai_parts, tail_warnings = parse_ai_tail_without_gs(rest)
+        if restored_by_ai:
+            warnings.append("GS не пришел явно; разделитель восстановлен перед известным AI")
+        else:
+            warnings.append("GS не пришел явно; разделитель восстановлен после 20 символов serial")
     else:
         serial = tail
         ai_parts, tail_warnings = {}, ["GS отсутствует; AI-хвост после serial не обнаружен"]
@@ -182,3 +210,115 @@ def parse_marking_code(code: str) -> ParsedMarkingCode:
         gs_restored=gs_restored or escaped_gs,
         warnings=warnings,
     )
+
+
+def is_complete_gs1_marking_code(code: str) -> bool:
+    """Returns True when a scanner fragment is safe to treat as a complete code."""
+
+    normalized = code.strip()
+    if not has_gs1_marking_prefix(normalized):
+        return False
+    try:
+        parsed = parse_marking_code(normalized)
+    except MarkingCodeParseError:
+        return False
+    if not parsed.ai_parts:
+        return False
+    if any(key == "unknown_tail" or key.startswith("unknown_") for key in parsed.ai_parts):
+        return False
+    for ai, expected_len in KNOWN_AI_FIXED_VALUE_LEN.items():
+        value = parsed.ai_parts.get(ai)
+        if value is not None and len(value) != expected_len:
+            return False
+    return True
+
+
+def has_gs1_marking_prefix(code: str) -> bool:
+    """Returns True for regular 01+GTIN+21 or a recoverable missing prefix."""
+
+    normalized = code.strip()
+    return (
+        GS1_CODE_START_RE.match(normalized) is not None
+        or looks_like_missing_ai01_prefix(normalized)
+        or looks_like_missing_ai01_gtin04_prefix(normalized)
+    )
+
+
+def has_regular_gs1_marking_prefix(code: str) -> bool:
+    """Returns True only for explicit 01+GTIN+21 scanner payloads."""
+
+    return GS1_CODE_START_RE.match(code.strip()) is not None
+
+
+def looks_like_missing_ai01_prefix(code: str) -> bool:
+    """Returns True when a serial scan likely lost the leading AI 01 bytes."""
+
+    normalized = code.strip()
+    return GTIN21_START_RE.match(normalized) is not None
+
+
+def looks_like_missing_ai01_gtin04_prefix(code: str) -> bool:
+    """Returns True when Windows HID likely dropped leading AI 01 and GTIN 04."""
+
+    normalized = code.strip()
+    return GTIN04_SUFFIX_21_START_RE.match(normalized) is not None
+
+
+def restore_missing_gs1_marking_prefix(code: str) -> tuple[str, str]:
+    """Restores recoverable GS1 marking prefixes lost by keyboard-wedge scanners."""
+
+    normalized = code.strip()
+    if normalized.startswith("01"):
+        return normalized, ""
+    if looks_like_missing_ai01_prefix(normalized):
+        return f"01{normalized}", "AI 01 не пришел явно; префикс восстановлен перед GTIN"
+    if looks_like_missing_ai01_gtin04_prefix(normalized):
+        return (
+            f"0104{normalized}",
+            "AI 01 и начало GTIN 04 не пришли явно; префикс восстановлен перед GTIN",
+        )
+    return normalized, ""
+
+
+def split_completed_gs1_buffer_text(text: str) -> tuple[list[str], str]:
+    """Splits completed glued GS1 codes while keeping the active scan in the buffer."""
+
+    starts = [match.start() for match in GS1_CODE_START_RE.finditer(text)]
+    if len(starts) < 2:
+        return [], text
+    completed_codes: list[str] = []
+    current_start = starts[0]
+    for next_start in starts[1:]:
+        candidate = text[current_start:next_start].strip()
+        if not is_complete_gs1_marking_code(candidate):
+            break
+        completed_codes.append(candidate)
+        current_start = next_start
+    if not completed_codes:
+        return [], text
+    return completed_codes, text[current_start:]
+
+
+def split_scanner_payload_by_gs1_starts(code: str) -> list[str]:
+    """Splits a scanner payload only at starts preceded by a complete GS1 code."""
+
+    normalized = code.strip()
+    if not normalized:
+        return []
+    starts = [match.start() for match in GS1_CODE_START_RE.finditer(normalized)]
+    if not starts:
+        if not normalized[0].isdigit():
+            return [normalized]
+        return [normalized] if has_gs1_marking_prefix(normalized) else []
+    parts: list[str] = []
+    current_start = starts[0]
+    for next_start in starts[1:]:
+        candidate = normalized[current_start:next_start].strip()
+        if not is_complete_gs1_marking_code(candidate):
+            continue
+        parts.append(candidate)
+        current_start = next_start
+    tail = normalized[current_start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
