@@ -48,3 +48,31 @@ class WorkOrderPageDto(BaseModel):
 
     data: list[WorkOrderDto] = Field(default_factory=list)
     meta: dict[str, int] = Field(default_factory=dict)
+
+
+class LocalPoolCodeDto(BaseModel):
+    """Код маркировки из локального пула заказа."""
+
+    id: str
+    code: str
+    status: str
+    order_line_id: str | None = None
+
+
+class LocalCodePoolDto(BaseModel):
+    """Страница локального пула кодов выбранного заказа."""
+
+    order: WorkOrderDto
+    codes: list[LocalPoolCodeDto] = Field(default_factory=list)
+    total: int = 0
+    count: int = 0
+    limit: int = 5000
+    offset: int = 0
+    next_offset: int | None = None
+    has_more: bool = False
+
+
+class LocalCodePoolPageDto(BaseModel):
+    """Ответ SaaS API со страницей локального пула заказа."""
+
+    data: LocalCodePoolDto

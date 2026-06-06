@@ -6,6 +6,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 from chestniy_znak_desktop.api.models.orders import (
+    LocalCodePoolDto,
+    LocalCodePoolPageDto,
+    LocalPoolCodeDto,
     OrderLineDto,
     OrderProductDto,
     WorkOrderDto,
@@ -321,10 +324,12 @@ class FakeBoxEditService:
 class FakeOrderService:
     """Fake сервис рабочих заказов для проверки выбора номенклатуры."""
 
-    def __init__(self, page: WorkOrderPageDto) -> None:
+    def __init__(self, page: WorkOrderPageDto, pool_codes: list[str] | None = None) -> None:
         """Создает сервис с фиксированной страницей заказов."""
 
         self.page = page
+        self.pool_codes = pool_codes
+        self.pool_calls: list[tuple[str, int, int]] = []
 
     def list_orders(
         self,
@@ -336,6 +341,38 @@ class FakeOrderService:
         """Возвращает заданную страницу заказов."""
 
         return self.page
+
+    def download_local_pool(
+        self,
+        order_id: str,
+        limit: int = 5000,
+        offset: int = 0,
+    ) -> LocalCodePoolPageDto:
+        """Возвращает локальный пул кодов выбранного заказа."""
+
+        self.pool_calls.append((order_id, limit, offset))
+        codes = self.pool_codes or []
+        page_codes = codes[offset : offset + limit]
+        next_offset = offset + limit if offset + limit < len(codes) else None
+        return LocalCodePoolPageDto(
+            data=LocalCodePoolDto(
+                order=self.page.data[0],
+                codes=[
+                    LocalPoolCodeDto(
+                        id=f"code-{index}",
+                        code=code,
+                        status="issued",
+                    )
+                    for index, code in enumerate(page_codes, start=offset + 1)
+                ],
+                total=len(codes),
+                count=len(page_codes),
+                limit=limit,
+                offset=offset,
+                next_offset=next_offset,
+                has_more=next_offset is not None,
+            )
+        )
 
 
 def _box(
@@ -586,6 +623,43 @@ def test_auto_packing_blocks_box_for_no_scan_order(tmp_path: Path) -> None:
     assert service.open_calls == []
     assert controller.state.status_message == "Сканирование по заказу отключено"
     assert "web-кабинете поставщика" in controller.state.result_message
+    assert sounds.events == [SoundEvent.WARNING]
+
+
+def test_auto_packing_accepts_only_downloaded_local_pool_codes(tmp_path: Path) -> None:
+    """Проверяет, что Desktop сканирует только коды из скачанного пула заказа."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    order_service = FakeOrderService(_work_order(), pool_codes=["CODE1"])
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+
+    controller.refresh_orders()
+    controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned("CODE1")
+    controller.on_code_scanned("CODE2")
+
+    assert order_service.pool_calls == [("order-1", 5000, 0)]
+    assert [item.raw_code for item in controller.state.pending_items] == ["CODE1"]
+    assert service.batch_calls == []
+    assert verifier.calls == []
+    assert controller.state.status_message == "Код не относится к выбранному заказу"
+    assert "не будет добавлен" in controller.state.error_message
     assert sounds.events == [SoundEvent.WARNING]
 
 

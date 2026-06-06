@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -88,6 +90,7 @@ class ScanBatchToBoxResultDto(BaseModel):
     rejected_raw_code: str | None = None
     rejected_code_ids: list[int] = Field(default_factory=list)
     rejected_raw_codes: list[str] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class CloseBoxResultDto(BaseModel):

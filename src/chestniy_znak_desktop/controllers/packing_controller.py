@@ -10,7 +10,7 @@ from typing import Protocol, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.models.orders import WorkOrderPageDto
+from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto, WorkOrderPageDto
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -68,6 +68,14 @@ class OrderBackend(Protocol):
         per_page: int = 20,
     ) -> WorkOrderPageDto:
         """Возвращает заказы с доступными строками номенклатуры."""
+
+    def download_local_pool(
+        self,
+        order_id: str,
+        limit: int = 5000,
+        offset: int = 0,
+    ) -> LocalCodePoolPageDto:
+        """Возвращает страницу кодов заказа для локального сканирования."""
 
 
 class SoundPlayer(Protocol):

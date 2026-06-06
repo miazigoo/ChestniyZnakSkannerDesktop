@@ -479,6 +479,19 @@ _MESSAGES["ru"].update(
         "autoPacking.scanRejected": "Скан отброшен",
         "autoPacking.truncatedScan": "Пришел обрезанный DataMatrix без начала 01+GTIN+21",
         "autoPacking.checkingHttp": "Проверяем код через HTTP...",
+        "autoPacking.localPoolDownloading": "Скачиваем коды выбранного заказа...",
+        "autoPacking.localPoolLoaded": "Коды заказа загружены локально",
+        "autoPacking.localPoolLoadedCount": "В локальном пуле: {count}",
+        "autoPacking.localPoolFailed": "Не удалось скачать коды заказа",
+        "autoPacking.localPoolFailedWithError": (
+            "Проверьте соединение и повторите выбор заказа: {error}"
+        ),
+        "autoPacking.notInLocalPool": "Код не относится к выбранному заказу",
+        "autoPacking.notInLocalPoolHint": (
+            "Выберите правильный заказ или скачайте свежий пул кодов. Такой код не будет "
+            "добавлен в коробку."
+        ),
+        "autoPacking.codeInOtherBox": "Код уже находится в коробке {package_code}",
         "autoPacking.pendingSerial": "Ожидает проверки",
         "autoPacking.pendingOrder": "Проверка при отправке",
         "autoPacking.addedToLocal": "Код добавлен в автоскана-бокс",
@@ -1004,6 +1017,19 @@ _MESSAGES["en"].update(
         "autoPacking.scanRejected": "Scan rejected",
         "autoPacking.truncatedScan": "Truncated DataMatrix received without the 01+GTIN+21 prefix",
         "autoPacking.checkingHttp": "Checking code over HTTP...",
+        "autoPacking.localPoolDownloading": "Downloading codes for the selected order...",
+        "autoPacking.localPoolLoaded": "Order codes downloaded locally",
+        "autoPacking.localPoolLoadedCount": "Codes in local pool: {count}",
+        "autoPacking.localPoolFailed": "Could not download order codes",
+        "autoPacking.localPoolFailedWithError": (
+            "Check the connection and select the order again: {error}"
+        ),
+        "autoPacking.notInLocalPool": "Code does not belong to the selected order",
+        "autoPacking.notInLocalPoolHint": (
+            "Select the correct order or download a fresh code pool. This code will not "
+            "be added to the box."
+        ),
+        "autoPacking.codeInOtherBox": "Code is already in box {package_code}",
         "autoPacking.pendingSerial": "Awaiting verification",
         "autoPacking.pendingOrder": "Verified on submit",
         "autoPacking.addedToLocal": "Code added to the auto-scan box",
@@ -1496,6 +1522,14 @@ _MESSAGES["zh"].update(
         "autoPacking.scanRejected": "扫描已丢弃",
         "autoPacking.truncatedScan": "收到缺少 01+GTIN+21 开头的截断 DataMatrix",
         "autoPacking.checkingHttp": "正在通过 HTTP 校验代码...",
+        "autoPacking.localPoolDownloading": "正在下载所选订单的代码...",
+        "autoPacking.localPoolLoaded": "订单代码已下载到本地",
+        "autoPacking.localPoolLoadedCount": "本地码池数量：{count}",
+        "autoPacking.localPoolFailed": "无法下载订单代码",
+        "autoPacking.localPoolFailedWithError": "请检查连接并重新选择订单：{error}",
+        "autoPacking.notInLocalPool": "代码不属于所选订单",
+        "autoPacking.notInLocalPoolHint": "请选择正确订单或下载最新码池。该代码不会加入箱中。",
+        "autoPacking.codeInOtherBox": "代码已在箱 {package_code} 中",
         "autoPacking.pendingSerial": "等待校验",
         "autoPacking.pendingOrder": "提交时校验",
         "autoPacking.addedToLocal": "代码已添加到自动扫描箱",

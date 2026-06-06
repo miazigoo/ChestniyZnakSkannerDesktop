@@ -6,11 +6,11 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field, replace
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar, cast
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.models.orders import WorkOrderPageDto
+from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto, WorkOrderPageDto
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -32,6 +32,10 @@ from chestniy_znak_desktop.controllers.packing_controller import (
     PackingBoxUi,
     PackingItemUi,
     PackingController,
+)
+from chestniy_znak_desktop.domain.scanner_normalizer import (
+    MarkingCodeParseError,
+    parse_marking_code,
 )
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.task_runner import TaskRunner
@@ -211,6 +215,10 @@ class AutoPackingController(QObject):
         self._accepted_box_id: int | None = None
         self._box_code_ids: set[int] = set()
         self._box_visible_codes: set[str] = set()
+        self._local_pool_order_id = ""
+        self._local_pool_codes: set[str] = set()
+        self._local_pool_loaded = False
+        self._open_box_after_pool_order_id = ""
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
@@ -278,6 +286,7 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        self._download_local_pool_for(selected)
 
     def open_box(self) -> None:
         """Открывает коробку для приема заполненных автоскана-боксов."""
@@ -307,6 +316,9 @@ class AutoPackingController(QObject):
                 )
             )
             return
+        if selected is not None and not self._is_local_pool_ready_for(selected.order_id):
+            if self._download_local_pool_for(selected, open_after=True):
+                return
         self._set_busy(tr("packing.openingBox"))
         count_in_packing = self._state.count_in_packing
         self._task_runner.submit(
@@ -508,6 +520,11 @@ class AutoPackingController(QObject):
     def _handle_single_code_scanned(self, normalized: str) -> None:
         """Обрабатывает один уже выделенный код маркировки."""
 
+        selected = self._selected_order_option()
+        local_pool_code = self._code_from_selected_local_pool(normalized, selected)
+        if local_pool_code is None:
+            return
+        normalized = local_pool_code
         if self._box_contains_visible_code(normalized):
             self._set_state(
                 replace(
@@ -1028,6 +1045,8 @@ class AutoPackingController(QObject):
                 result_message=result_message,
             )
         )
+        if selected is not None and selected.scan_required and self._state.current_box is None:
+            self._download_local_pool_for(selected)
 
     def _on_orders_error(self, exc: Exception) -> None:
         """Показывает ошибку загрузки заказов без сброса текущей коробки."""
@@ -1039,6 +1058,132 @@ class AutoPackingController(QObject):
                 error_message=tr("packing.ordersLoadFailed", error=exc),
             )
         )
+
+    def _download_local_pool_for(
+        self,
+        selected: OrderLineOptionUi | None,
+        *,
+        open_after: bool = False,
+    ) -> bool:
+        """Скачивает локальный пул кодов выбранного заказа, если backend это поддерживает."""
+
+        if selected is None or not selected.scan_required:
+            return False
+        if self._is_local_pool_ready_for(selected.order_id):
+            return False
+        download_method = getattr(self._order_service, "download_local_pool", None)
+        if not callable(download_method):
+            return False
+        self._local_pool_order_id = selected.order_id
+        self._local_pool_codes.clear()
+        self._local_pool_loaded = False
+        if open_after:
+            self._open_box_after_pool_order_id = selected.order_id
+        self._set_busy(tr("autoPacking.localPoolDownloading"))
+        self._task_runner.submit(
+            lambda: self._download_local_pool_codes(selected.order_id, download_method),
+            lambda codes: self._on_local_pool_loaded(selected.order_id, cast(set[str], codes)),
+            self._on_local_pool_error,
+        )
+        return True
+
+    def _download_local_pool_codes(self, order_id: str, download_method: object) -> set[str]:
+        """Постранично скачивает и нормализует локальный пул кодов заказа."""
+
+        if not callable(download_method):
+            return set()
+        limit = 5000
+        offset = 0
+        codes: set[str] = set()
+        while True:
+            page = download_method(order_id, limit=limit, offset=offset)
+            pool_page = self._expect(page, LocalCodePoolPageDto)
+            pool = pool_page.data
+            codes.update(self._normalize_pool_code(code.code) for code in pool.codes)
+            if not pool.has_more or pool.next_offset is None:
+                break
+            next_offset = int(pool.next_offset)
+            if next_offset <= offset:
+                break
+            offset = next_offset
+        return codes
+
+    def _on_local_pool_loaded(self, order_id: str, codes: set[str]) -> None:
+        """Применяет загруженный локальный пул и продолжает открытие коробки при необходимости."""
+
+        self._local_pool_order_id = order_id
+        self._local_pool_codes = codes
+        self._local_pool_loaded = True
+        open_after = self._open_box_after_pool_order_id == order_id
+        self._open_box_after_pool_order_id = ""
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                status_message=tr("autoPacking.localPoolLoaded"),
+                result_message=tr("autoPacking.localPoolLoadedCount", count=len(codes)),
+                error_message="",
+            )
+        )
+        selected = self._selected_order_option()
+        if open_after and selected is not None and selected.order_id == order_id:
+            self.open_box()
+
+    def _on_local_pool_error(self, exc: Exception) -> None:
+        """Показывает ошибку загрузки локального пула заказа."""
+
+        self._local_pool_loaded = False
+        self._local_pool_codes.clear()
+        self._open_box_after_pool_order_id = ""
+        self._set_state(
+            replace(
+                self._state,
+                is_busy=False,
+                status_message=tr("autoPacking.localPoolFailed"),
+                error_message=tr("autoPacking.localPoolFailedWithError", error=exc),
+            )
+        )
+
+    def _is_local_pool_ready_for(self, order_id: str) -> bool:
+        """Проверяет, что кэш пула относится к нужному заказу."""
+
+        return self._local_pool_loaded and self._local_pool_order_id == order_id
+
+    def _code_from_selected_local_pool(
+        self,
+        code: str,
+        selected: OrderLineOptionUi | None,
+    ) -> str | None:
+        """Возвращает нормализованный код, если он есть в пуле выбранного заказа."""
+
+        if selected is None or not self._is_local_pool_ready_for(selected.order_id):
+            return code
+        normalized = self._normalize_pool_code(code)
+        if normalized in self._local_pool_codes:
+            return normalized
+        self._play(SoundEvent.WARNING)
+        self._set_state(
+            replace(
+                self._state,
+                status_message=tr("autoPacking.notInLocalPool"),
+                result_message="",
+                error_message=tr("autoPacking.notInLocalPoolHint"),
+                last_scanned_code=code,
+            )
+        )
+        return None
+
+    @staticmethod
+    def _normalize_pool_code(code: str) -> str:
+        """Нормализует код ЧЗ так же, как scanner input, сохраняя fallback для тестовых строк."""
+
+        raw_code = (code or "").strip()
+        if not raw_code:
+            return ""
+        try:
+            return parse_marking_code(raw_code).raw_code
+        except MarkingCodeParseError:
+            return raw_code
 
     def _selected_order_option(self) -> OrderLineOptionUi | None:
         """Возвращает выбранную строку заказа."""
@@ -1328,6 +1473,9 @@ class AutoPackingController(QObject):
     def _batch_error_message(message: str, batch: ScanBatchToBoxResultDto) -> str:
         """Формирует понятную ошибку пачки с проблемным кодом."""
 
+        package_code = str(batch.details.get("package_code") or "").strip()
+        if package_code and batch.reason_code == "code_in_other_box":
+            message = tr("autoPacking.codeInOtherBox", package_code=package_code)
         rejected = batch.rejected_raw_code or ""
         rejected_codes = sorted(AutoPackingController._rejected_raw_codes(batch))
         if rejected_codes:

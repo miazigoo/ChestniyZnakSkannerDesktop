@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from chestniy_znak_desktop.api.models.orders import WorkOrderPageDto
+from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto, WorkOrderPageDto
 from chestniy_znak_desktop.api.services.api_client_protocol import ApiClientProtocol
 
 
@@ -30,3 +30,17 @@ class OrderService:
             params["search"] = search.strip()
         payload = self._api_client.get("orders", params=params)
         return WorkOrderPageDto.model_validate(payload)
+
+    def download_local_pool(
+        self,
+        order_id: str,
+        limit: int = 5000,
+        offset: int = 0,
+    ) -> LocalCodePoolPageDto:
+        """Возвращает страницу кодов заказа для локального сканирования."""
+
+        payload = self._api_client.get(
+            f"orders/{order_id}/local-pool",
+            params={"limit": limit, "offset": offset},
+        )
+        return LocalCodePoolPageDto.model_validate(payload)
