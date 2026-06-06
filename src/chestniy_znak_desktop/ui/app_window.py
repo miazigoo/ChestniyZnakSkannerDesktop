@@ -116,10 +116,7 @@ class AppWindow(QMainWindow):
         self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._printer_controller.state_changed.connect(
-            self._main_screen.packing_screen.apply_printer_state
-        )
-        self._printer_controller.state_changed.connect(
-            self._main_screen.auto_packing_screen.apply_printer_state
+            self._main_screen.settings_screen.apply_printer_state
         )
         self._packing_controller.close_completed.connect(self._handle_box_close_completed)
         self._auto_packing_controller.state_changed.connect(
@@ -201,12 +198,6 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.order_line_selected.connect(
             self._packing_controller.select_order_line
         )
-        self._main_screen.packing_screen.printer_refresh_requested.connect(
-            self._printer_controller.refresh_selection
-        )
-        self._main_screen.packing_screen.printer_selected.connect(
-            self._printer_controller.select_printer
-        )
         self._main_screen.auto_packing_screen.refresh_requested.connect(
             self._auto_packing_controller.refresh_current_box
         )
@@ -227,12 +218,6 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.auto_packing_screen.order_line_selected.connect(
             self._auto_packing_controller.select_order_line
-        )
-        self._main_screen.auto_packing_screen.printer_refresh_requested.connect(
-            self._printer_controller.refresh_selection
-        )
-        self._main_screen.auto_packing_screen.printer_selected.connect(
-            self._printer_controller.select_printer
         )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending
@@ -268,6 +253,12 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.settings_screen.sound_preview_requested.connect(
             self._settings_controller.preview_sound_file
+        )
+        self._main_screen.settings_screen.printer_refresh_requested.connect(
+            self._printer_controller.refresh_selection
+        )
+        self._main_screen.settings_screen.printer_selected.connect(
+            self._printer_controller.select_printer
         )
         self._main_screen.settings_screen.scanner_ports_refresh_requested.connect(
             self._scanner_controller.refresh_ports
@@ -337,11 +328,9 @@ class AppWindow(QMainWindow):
 
         if screen_name == "packing":
             self._packing_controller.refresh_current_box()
-            self._printer_controller.refresh_selection()
             return
         if screen_name == "auto_packing":
             self._auto_packing_controller.refresh_current_box()
-            self._printer_controller.refresh_selection()
             return
         if screen_name == "boxes":
             selected_box_id = self._boxes_controller.state.selected_box_id

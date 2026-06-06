@@ -17,6 +17,7 @@ class SettingsHubPage(QWidget):
 
     app_requested = Signal()
     scanner_requested = Signal()
+    printer_requested = Signal()
     theme_requested = Signal()
     sound_requested = Signal()
 
@@ -35,8 +36,9 @@ class SettingsHubPage(QWidget):
         grid.setSpacing(16)
         grid.addWidget(self._button(tr("settings.hub.app"), self.app_requested.emit), 0, 0)
         grid.addWidget(self._button(tr("settings.hub.scanner"), self.scanner_requested.emit), 0, 1)
-        grid.addWidget(self._button(tr("settings.hub.theme"), self.theme_requested.emit), 1, 0)
-        grid.addWidget(self._button(tr("settings.hub.sound"), self.sound_requested.emit), 1, 1)
+        grid.addWidget(self._button(tr("settings.hub.printer"), self.printer_requested.emit), 1, 0)
+        grid.addWidget(self._button(tr("settings.hub.theme"), self.theme_requested.emit), 1, 1)
+        grid.addWidget(self._button(tr("settings.hub.sound"), self.sound_requested.emit), 2, 0)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 8)

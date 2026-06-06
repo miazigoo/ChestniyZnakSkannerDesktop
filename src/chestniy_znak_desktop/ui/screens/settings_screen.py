@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from chestniy_znak_desktop.app.config import AppConfig
+from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerUiState
 from chestniy_znak_desktop.controllers.settings_controller import (
     SettingsFormData,
@@ -15,6 +16,9 @@ from chestniy_znak_desktop.controllers.settings_controller import (
 )
 from chestniy_znak_desktop.ui.screens.settings_pages.app_page import AppSettingsPage
 from chestniy_znak_desktop.ui.screens.settings_pages.hub_page import SettingsHubPage
+from chestniy_znak_desktop.ui.screens.settings_pages.printer_page import (
+    PrinterSettingsPage,
+)
 from chestniy_znak_desktop.ui.screens.settings_pages.scanner_page import (
     ScannerSettingsPage,
 )
@@ -30,6 +34,8 @@ class SettingsScreen(QWidget):
     scanner_stop_requested = Signal()
     scanner_port_changed = Signal(str)
     scanner_baudrate_changed = Signal(int)
+    printer_refresh_requested = Signal()
+    printer_selected = Signal(int)
     settings_save_requested = Signal(SettingsFormData)
     theme_selected = Signal(str)
     sound_preview_requested = Signal(str)
@@ -57,6 +63,7 @@ class SettingsScreen(QWidget):
         self._hub_page = SettingsHubPage()
         self._app_page = AppSettingsPage()
         self._scanner_page = ScannerSettingsPage()
+        self._printer_page = PrinterSettingsPage()
         self._theme_page = ThemeSettingsPage()
         self._sound_page = SoundSettingsPage()
         self._status_label = QLabel("")
@@ -90,6 +97,11 @@ class SettingsScreen(QWidget):
 
         self._scanner_page.apply_state(state)
 
+    def apply_printer_state(self, state: PrinterUiState) -> None:
+        """Обновляет страницу выбора принтера."""
+
+        self._printer_page.apply_state(state)
+
     def _register_pages(self) -> None:
         """Добавляет страницы в стек настроек."""
 
@@ -97,6 +109,7 @@ class SettingsScreen(QWidget):
             self._hub_page,
             self._app_page,
             self._scanner_page,
+            self._printer_page,
             self._theme_page,
             self._sound_page,
         ):
@@ -107,11 +120,13 @@ class SettingsScreen(QWidget):
 
         self._hub_page.app_requested.connect(lambda: self._show_page(self._app_page))
         self._hub_page.scanner_requested.connect(lambda: self._show_page(self._scanner_page))
+        self._hub_page.printer_requested.connect(self._show_printer_page)
         self._hub_page.theme_requested.connect(lambda: self._show_page(self._theme_page))
         self._hub_page.sound_requested.connect(lambda: self._show_page(self._sound_page))
         for page in (
             self._app_page,
             self._scanner_page,
+            self._printer_page,
             self._theme_page,
             self._sound_page,
         ):
@@ -125,6 +140,8 @@ class SettingsScreen(QWidget):
         self._scanner_page.scanner_stop_requested.connect(self.scanner_stop_requested.emit)
         self._scanner_page.port_changed.connect(self.scanner_port_changed.emit)
         self._scanner_page.baudrate_changed.connect(self.scanner_baudrate_changed.emit)
+        self._printer_page.refresh_requested.connect(self.printer_refresh_requested.emit)
+        self._printer_page.printer_selected.connect(self.printer_selected.emit)
         self._theme_page.theme_selected.connect(self._select_theme_settings)
         self._sound_page.save_requested.connect(self._save_sound_settings)
         self._sound_page.preview_requested.connect(self.sound_preview_requested.emit)
@@ -133,6 +150,12 @@ class SettingsScreen(QWidget):
         """Возвращает пользователя на список групп настроек."""
 
         self._show_page(self._hub_page)
+
+    def _show_printer_page(self) -> None:
+        """Открывает настройки принтера и запрашивает свежий список."""
+
+        self._show_page(self._printer_page)
+        self.printer_refresh_requested.emit()
 
     def _show_page(self, page: QWidget) -> None:
         """Переключает стек на указанную страницу."""

@@ -208,7 +208,7 @@ def test_auto_packing_screen_refreshes_current_box() -> None:
     AppWindow._refresh_screen_data(window, "auto_packing")  # type: ignore[arg-type]
 
     assert auto_packing.count == 1
-    assert window._printer_controller.count == 1
+    assert window._printer_controller.count == 0
 
 
 def test_box_changed_refreshes_list_and_detail() -> None:

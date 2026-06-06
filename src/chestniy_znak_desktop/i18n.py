@@ -192,8 +192,19 @@ _MESSAGES["ru"].update(
         "settings.hub.subtitle": "Группы параметров приложения, оборудования, интерфейса и звуков.",
         "settings.hub.app": "Основные",
         "settings.hub.scanner": "Сканер",
+        "settings.hub.printer": "Принтер",
         "settings.hub.theme": "Тема",
         "settings.hub.sound": "Звук",
+        "settings.printer.title": "Принтер",
+        "settings.printer.subtitle": (
+            "Выберите принтер SSCC для этого рабочего места. "
+            "Имя и IP принтера поставщик добавляет в web-кабинете."
+        ),
+        "settings.printer.cardTitle": "Печать SSCC коробки",
+        "settings.printer.cardSubtitle": (
+            "После закрытия коробки Desktop получит задание печати с сервера "
+            "и отправит этикетку на выбранный здесь принтер."
+        ),
         "settings.scanner.title": "Сканер",
         "settings.scanner.subtitle": "COM/SPP-порт, скорость и управление чтением сканера.",
         "settings.scanner.cardTitle": "COM/SPP подключение",
@@ -698,8 +709,19 @@ _MESSAGES["en"].update(
         "settings.hub.subtitle": "Application, hardware, interface, and sound setting groups.",
         "settings.hub.app": "General",
         "settings.hub.scanner": "Scanner",
+        "settings.hub.printer": "Printer",
         "settings.hub.theme": "Theme",
         "settings.hub.sound": "Sound",
+        "settings.printer.title": "Printer",
+        "settings.printer.subtitle": (
+            "Select the SSCC printer for this workstation. "
+            "The supplier adds the printer name and IP address in the web account."
+        ),
+        "settings.printer.cardTitle": "Box SSCC printing",
+        "settings.printer.cardSubtitle": (
+            "After a box is closed, Desktop receives a print job from the server "
+            "and sends the label to the printer selected here."
+        ),
         "settings.scanner.title": "Scanner",
         "settings.scanner.subtitle": "COM/SPP port, baud rate, and scanner control.",
         "settings.scanner.cardTitle": "COM/SPP connection",
@@ -1206,8 +1228,18 @@ _MESSAGES["zh"].update(
         "settings.hub.subtitle": "应用、设备、界面和声音参数分组。",
         "settings.hub.app": "基础",
         "settings.hub.scanner": "扫描器",
+        "settings.hub.printer": "打印机",
         "settings.hub.theme": "主题",
         "settings.hub.sound": "声音",
+        "settings.printer.title": "打印机",
+        "settings.printer.subtitle": (
+            "为此工作站选择用于打印箱 SSCC 的打印机。"
+            "供应商在 Web 账号中维护打印机名称和 IP 地址。"
+        ),
+        "settings.printer.cardTitle": "箱 SSCC 打印",
+        "settings.printer.cardSubtitle": (
+            "箱关闭后，Desktop 会从服务器获取打印任务，" "并把标签发送到这里选择的打印机。"
+        ),
         "settings.scanner.title": "扫描器",
         "settings.scanner.subtitle": "COM/SPP 端口、波特率和扫描器控制。",
         "settings.scanner.cardTitle": "COM/SPP 连接",

@@ -523,22 +523,22 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
     assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
 
 
-def test_packing_screen_shows_printer_selection() -> None:
-    """Проверяет выбор SSCC-принтера на экране упаковки."""
+def test_settings_screen_shows_printer_selection() -> None:
+    """Проверяет выбор SSCC-принтера на странице настроек."""
 
     qapp()
-    screen = PackingScreen()
+    screen = SettingsScreen()
     screen.apply_printer_state(
         PrinterUiState(
-            options=[PrinterOptionUi(id=7, label="Zebra · 192.168.1.10:9100")],
+            options=[PrinterOptionUi(id=7, label="Zebra")],
             selected_printer_id=7,
             status_message="Выбран принтер: Zebra",
         )
     )
 
-    assert screen._printer_combo.count() == 1  # noqa: SLF001
-    assert screen._printer_combo.currentText().startswith("Zebra")  # noqa: SLF001
-    assert "Zebra" in screen._printer_status.text()  # noqa: SLF001
+    assert screen._printer_page._printer_combo.count() == 1  # noqa: SLF001
+    assert screen._printer_page._printer_combo.currentText() == "Zebra"  # noqa: SLF001
+    assert "Zebra" in screen._printer_page._status_label.text()  # noqa: SLF001
 
 
 def test_close_box_dialog_uses_android_assets() -> None:
@@ -615,7 +615,7 @@ def test_settings_screen_has_grouped_pages() -> None:
     qapp()
     screen = SettingsScreen()
 
-    assert screen._stack.count() == 5  # noqa: SLF001
+    assert screen._stack.count() == 6  # noqa: SLF001
     assert len(screen._theme_page.findChildren(ThemeOptionCard)) == 10  # noqa: SLF001
 
 

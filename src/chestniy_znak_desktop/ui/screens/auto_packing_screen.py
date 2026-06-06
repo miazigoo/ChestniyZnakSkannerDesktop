@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
 from chestniy_znak_desktop.controllers.auto_packing_controller import (
     AutoPackingUiState,
 )
-from chestniy_znak_desktop.controllers.printer_controller import PrinterUiState
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.code_format import format_marking_code_for_display
@@ -49,8 +48,6 @@ class AutoPackingScreen(QWidget):
     count_in_packing_changed = Signal(bool)
     order_search_changed = Signal(str)
     order_line_selected = Signal(str)
-    printer_refresh_requested = Signal()
-    printer_selected = Signal(int)
 
     def __init__(self) -> None:
         """Создает экран автосканерной упаковки."""
@@ -67,10 +64,6 @@ class AutoPackingScreen(QWidget):
         self._order_search = QLineEdit()
         self._order_combo = QComboBox()
         self._order_line_ids: list[str] = []
-        self._printer_combo = QComboBox()
-        self._printer_ids: list[int] = []
-        self._printer_refresh_button = QPushButton(tr("printer.refresh"))
-        self._printer_status = QLabel(tr("printer.notLoaded"))
         self._count_in_packing = QCheckBox(tr("packing.countInPacking"))
         self._refresh_button = QPushButton(tr("packing.refresh"))
         self._open_box_button = QPushButton(tr("packing.openBox"))
@@ -103,38 +96,6 @@ class AutoPackingScreen(QWidget):
         self._configure_actions()
         self._build_layout()
         self._set_busy(False)
-
-    def apply_printer_state(self, state: PrinterUiState) -> None:
-        """Обновляет выбор SSCC-принтера."""
-
-        self._printer_combo.blockSignals(True)
-        self._printer_combo.clear()
-        self._printer_ids = []
-        if state.is_busy:
-            self._printer_combo.addItem(tr("printer.loading"))
-        elif not state.options:
-            self._printer_combo.addItem(tr("printer.empty"))
-        else:
-            if state.selected_printer_id is None and len(state.options) > 1:
-                self._printer_ids.append(0)
-                self._printer_combo.addItem(tr("printer.choosePlaceholder"))
-            for option in state.options:
-                self._printer_ids.append(option.id)
-                self._printer_combo.addItem(option.label)
-            selected_id = state.selected_printer_id
-            selected_index = (
-                self._printer_ids.index(selected_id)
-                if selected_id is not None and selected_id in self._printer_ids
-                else -1
-            )
-            self._printer_combo.setCurrentIndex(max(selected_index, 0))
-        self._printer_combo.blockSignals(False)
-        self._printer_status.setText(state.error_message or state.status_message)
-        self._printer_status.setProperty("tone", "error" if state.error_message else "muted")
-        self._printer_status.style().unpolish(self._printer_status)
-        self._printer_status.style().polish(self._printer_status)
-        self._printer_combo.setEnabled(not state.is_busy and bool(state.options))
-        self._printer_refresh_button.setEnabled(not state.is_busy)
 
     def apply_state(self, state: AutoPackingUiState) -> None:
         """Обновляет экран из состояния контроллера автосканера."""
@@ -201,14 +162,8 @@ class AutoPackingScreen(QWidget):
         self._order_search.setPlaceholderText(tr("packing.searchPlaceholder"))
         self._order_combo.setObjectName("settingsInput")
         self._order_combo.setMinimumWidth(260)
-        self._printer_combo.setObjectName("settingsInput")
-        self._printer_combo.setMinimumWidth(260)
-        self._printer_status.setObjectName("packingMutedText")
-        self._printer_status.setWordWrap(True)
         self._order_search.textChanged.connect(self.order_search_changed.emit)
         self._order_combo.currentIndexChanged.connect(self._emit_order_line_selected)
-        self._printer_combo.currentIndexChanged.connect(self._emit_printer_selected)
-        self._printer_refresh_button.clicked.connect(self.printer_refresh_requested.emit)
         self._count_in_packing.setObjectName("packingCheckBox")
         self._count_in_packing.setChecked(True)
         self._count_in_packing.toggled.connect(self.count_in_packing_changed.emit)
@@ -308,13 +263,6 @@ class AutoPackingScreen(QWidget):
         layout.addWidget(QLabel(tr("packing.orderAndProduct")))
         layout.addWidget(self._order_search)
         layout.addWidget(self._order_combo)
-        layout.addWidget(QLabel(tr("printer.ssccPrinter")))
-        printer_row = QHBoxLayout()
-        printer_row.setSpacing(8)
-        printer_row.addWidget(self._printer_combo, 1)
-        printer_row.addWidget(self._printer_refresh_button)
-        layout.addLayout(printer_row)
-        layout.addWidget(self._printer_status)
         layout.addLayout(actions)
         layout.addWidget(self._count_in_packing)
         layout.addWidget(self._scanner_status)
@@ -353,15 +301,6 @@ class AutoPackingScreen(QWidget):
         if index < 0 or index >= len(self._order_line_ids):
             return
         self.order_line_selected.emit(self._order_line_ids[index])
-
-    def _emit_printer_selected(self, index: int) -> None:
-        """Публикует выбранный принтер."""
-
-        if index < 0 or index >= len(self._printer_ids):
-            return
-        printer_id = self._printer_ids[index]
-        if printer_id > 0:
-            self.printer_selected.emit(printer_id)
 
     def _create_local_box_panel(self) -> QFrame:
         """Создает красно-зеленую карточку локального автоскана-бокса."""

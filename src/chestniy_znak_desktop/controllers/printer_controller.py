@@ -125,7 +125,7 @@ class PrinterController(QObject):
             PrinterUiState(
                 is_busy=False,
                 options=[
-                    PrinterOptionUi(id=printer.id, label=printer.label)
+                    PrinterOptionUi(id=printer.id, label=printer.name)
                     for printer in selection.printers
                 ],
                 selected_printer_id=selection.selected_printer_id,
