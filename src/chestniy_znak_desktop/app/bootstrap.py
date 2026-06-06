@@ -214,7 +214,6 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     window.destroyed.connect(lambda _obj: scanner_controller.stop())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_orders())
-    auth_controller.authenticated.connect(lambda _user: printer_controller.refresh_selection())
     auth_controller.authenticated.connect(
         lambda _user: auto_packing_controller.refresh_current_box()
     )
