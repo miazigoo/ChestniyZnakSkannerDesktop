@@ -87,9 +87,9 @@ def test_auth_controller_logs_in_with_json_token() -> None:
     """Проверяет вход по JSON-токену и обновление runtime-сессии."""
 
     controller, runtime, service = _controller_pair()
-    controller.login_with_raw_token('{"token":"abc"}')
+    controller.login_with_raw_token('{"token":"LKIC-HDDS-NK4K"}')
 
-    assert service.last_token == "abc"
+    assert service.last_token == "LKIC-HDDS-NK4K"
     assert runtime.snapshot.session.status == SessionStatus.AUTHENTICATED
     assert runtime.snapshot.session.user_name == "Test"
 
@@ -110,7 +110,7 @@ def test_auth_controller_stores_saas_context_after_login() -> None:
         subscription_status="active",
     )
 
-    controller.login_with_raw_token("abc")
+    controller.login_with_raw_token("LKICHDDSNK4K")
 
     assert runtime.snapshot.session.plant_id == "plant-123456"
     assert runtime.snapshot.session.device_id == "device-456"
@@ -137,11 +137,11 @@ def test_auth_controller_keeps_token_preview_after_failed_login() -> None:
     controller, _runtime, service = _controller_pair()
     service.login_error = UnauthorizedError("Неверный токен")
 
-    controller.login_with_raw_token("abc123456789")
+    controller.login_with_raw_token("LKICHDDSNK4K")
 
     assert controller.state.status_message == "Авторизация не выполнена."
     assert controller.state.error_message == "Неверный токен"
-    assert controller.state.token_preview == "abc1...6789"
+    assert controller.state.token_preview == "LKIC...NK4K"
 
 
 def test_auth_controller_restore_session_failure_marks_unauthenticated() -> None:

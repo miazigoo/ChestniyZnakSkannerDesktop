@@ -83,6 +83,9 @@ def test_default_evdev_scanner_paths_discovers_generic_scanners(
         "/dev/input/by-id/usb-SCANNER_SCANNER_1E6D4D5C0000-event-kbd",
         "/dev/input/by-id/usb-zlww_USB_Keyboard_BS43-event-kbd",
         "/dev/input/by-id/usb-Unknown_2D_Scanner-event-kbd",
+        "/dev/input/by-id/usb-Compx_2.4G_Receiver-event-kbd",
+        "/dev/input/by-id/usb-Micro-Star_INT_L_CO._LTD_MSI_GK30_Gaming_Keyboard-event-kbd",
+        "/dev/input/by-id/usb-Symbol_Technologies__Inc__2008_Symbol_Bar_Code_Scanner-event-kbd",
         "/dev/input/by-id/usb-HS6209_A4tech_2.4G_Wireless_Device-event-kbd",
         "/dev/input/by-id/usb-Logitech_USB_Keyboard-event-kbd",
         "/dev/input/by-id/usb-MOSART_Semi._2.4G_Keyboard_Mouse-event-kbd",
@@ -124,6 +127,7 @@ def test_default_evdev_scanner_paths_discovers_generic_scanners(
         "/dev/input/by-id/usb-zlww_USB_Keyboard_BS43-event-kbd",
         "/dev/input/by-id/usb-SCANNER_SCANNER_1E6D4D5C0000-event-kbd",
         "/dev/input/by-id/bluetooth-2D_Barcode_Scanner-event-kbd",
+        "/dev/input/by-id/usb-Symbol_Technologies__Inc__2008_Symbol_Bar_Code_Scanner-event-kbd",
         "/dev/input/by-id/usb-Unknown_2D_Scanner-event-kbd",
     ]
 

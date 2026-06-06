@@ -22,21 +22,44 @@ EVDEV_RESTART_DELAY_MS = 1_000
 EVDEV_HEALTH_CHECK_MS = 15_000
 EVDEV_SLEEP_GAP_RESTART_SEC = 120
 HUMAN_KEYBOARD_PATH_MARKERS = (
+    "2.4g_receiver",
     "a4tech",
     "apple",
     "cherry",
     "chicony",
+    "compx",
     "dell",
+    "gaming_keyboard",
     "hp_",
     "hewlett",
     "keychron",
+    "keyboard",
     "lenovo",
     "lite-on",
     "logitech",
     "microsoft",
+    "micro-star",
     "mosart",
+    "mouse",
+    "msi",
     "primax",
     "razer",
+    "receiver",
+)
+SCANNER_PATH_MARKERS = (
+    "2d_barcode",
+    "2d_scanner",
+    "bar_code",
+    "barcode",
+    "cipherlab",
+    "datalogic",
+    "honeywell",
+    "newland",
+    "newtologic",
+    "scanner",
+    "symbol",
+    "zebra",
+    "zlww_usb_keyboard",
 )
 
 EV_KEY = 0x01
@@ -610,9 +633,11 @@ def _generic_hid_keyboard_paths() -> list[str]:
 
 
 def _is_scanner_like_hid_path(path: str) -> bool:
-    """Return False only for obvious human keyboards."""
+    """Return True for barcode scanners and False for obvious human keyboards."""
 
     normalized = Path(path).name.lower()
+    if any(marker in normalized for marker in SCANNER_PATH_MARKERS):
+        return True
     return not any(marker in normalized for marker in HUMAN_KEYBOARD_PATH_MARKERS)
 
 
