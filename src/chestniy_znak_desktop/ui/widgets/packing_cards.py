@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -21,7 +22,15 @@ from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconN
 class PackingSummaryCard(QFrame):
     """Показывает текущую коробку, прогресс и ключевые параметры."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    choose_order_requested = Signal()
+    clear_box_requested = Signal()
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        show_actions: bool = False,
+    ) -> None:
         """Создает карточку текущей коробки."""
 
         super().__init__(parent)
@@ -42,6 +51,17 @@ class PackingSummaryCard(QFrame):
         self._order_value = QLabel("-")
         self._sscc_value = QLabel("-")
         self._mode_value = QLabel("-")
+        self._choose_order_button = QPushButton(tr("packing.summary.chooseOrder"))
+        self._choose_order_button.setObjectName("packingSecondaryButton")
+        self._choose_order_button.setToolTip(tr("packing.summary.chooseOrderHint"))
+        self._clear_box_button = QPushButton(tr("packing.summary.clearBox"))
+        self._clear_box_button.setObjectName("packingDangerButton")
+        self._clear_box_button.setToolTip(tr("packing.summary.clearBoxHint"))
+        self._actions = QFrame()
+        self._actions.setObjectName("packingSummaryActions")
+        self._actions.setVisible(show_actions)
+        self._choose_order_button.clicked.connect(self.choose_order_requested.emit)
+        self._clear_box_button.clicked.connect(self.clear_box_requested.emit)
 
         header = QHBoxLayout()
         header.addWidget(VectorIcon(VectorIconName.BOX, "#66d2c7"))
@@ -65,6 +85,13 @@ class PackingSummaryCard(QFrame):
         self._add_meta_row(meta_grid, 1, "SSCC", self._sscc_value)
         self._add_meta_row(meta_grid, 2, tr("packing.mode"), self._mode_value)
 
+        actions_layout = QHBoxLayout(self._actions)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(10)
+        actions_layout.addWidget(self._choose_order_button)
+        actions_layout.addWidget(self._clear_box_button)
+        actions_layout.addStretch(1)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 18)
         layout.setSpacing(14)
@@ -72,12 +99,25 @@ class PackingSummaryCard(QFrame):
         layout.addLayout(progress_row)
         layout.addWidget(self._progress_bar)
         layout.addLayout(meta_grid)
+        layout.addStretch(1)
+        layout.addWidget(self._actions)
 
     @property
     def progress_bar(self) -> QProgressBar:
         """Возвращает прогресс-бар для тестов и внешней синхронизации."""
 
         return self._progress_bar
+
+    def set_action_state(
+        self,
+        *,
+        can_choose_order: bool,
+        can_clear_box: bool,
+    ) -> None:
+        """Обновляет доступность действий карточки."""
+
+        self._choose_order_button.setEnabled(can_choose_order)
+        self._clear_box_button.setEnabled(can_clear_box)
 
     def set_empty(self) -> None:
         """Переводит карточку в состояние без открытой коробки."""

@@ -189,6 +189,9 @@ class AppWindow(QMainWindow):
         self._main_screen.packing_screen.close_box_requested.connect(
             self._request_close_current_box
         )
+        self._main_screen.packing_screen.clear_box_requested.connect(
+            self._request_packing_clear_box
+        )
         self._main_screen.packing_screen.count_in_packing_changed.connect(
             self._packing_controller.set_count_in_packing
         )
@@ -408,6 +411,22 @@ class AppWindow(QMainWindow):
         ):
             self._auto_packing_controller.remove_box_item_at(row)
 
+    def _request_packing_clear_box(self) -> None:
+        """Запрашивает очистку текущей открытой коробки обычной упаковки."""
+
+        box = self._packing_controller.state.current_box
+        if box is None:
+            self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxMissing"))
+            return
+        if not box.items:
+            self._show_message(tr("appWindow.boxEmptyTitle"), tr("appWindow.boxEmptyText"))
+            return
+        if self._confirm_action(
+            tr("appWindow.clearBoxTitle"),
+            tr("appWindow.clearBoxText", box_id=box.box_id),
+        ):
+            self._box_edit_controller.clear_box(box.box_id)
+
     def _request_auto_clear_box(self) -> None:
         """Запрашивает очистку текущей открытой коробки автоскана."""
 
@@ -505,6 +524,16 @@ class AppWindow(QMainWindow):
 
         self._boxes_controller.refresh()
         self._boxes_controller.load_detail(box_id)
+        packing_controller = getattr(self, "_packing_controller", None)
+        if packing_controller is not None:
+            current_packing_box = packing_controller.state.current_box
+            if current_packing_box is not None and current_packing_box.box_id == box_id:
+                packing_controller.refresh_current_box()
+        auto_packing_controller = getattr(self, "_auto_packing_controller", None)
+        if auto_packing_controller is not None:
+            current_auto_box = auto_packing_controller.state.current_box
+            if current_auto_box is not None and current_auto_box.box_id == box_id:
+                auto_packing_controller.refresh_current_box()
 
     def _handle_box_deleted(self, _box_id: int) -> None:
         """Сбрасывает карточку и обновляет список после удаления коробки."""

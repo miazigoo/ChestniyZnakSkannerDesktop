@@ -38,6 +38,8 @@ class PackingScreen(QWidget):
     refresh_requested = Signal()
     open_box_requested = Signal()
     close_box_requested = Signal()
+    clear_box_requested = Signal()
+    choose_order_requested = Signal()
     count_in_packing_changed = Signal(bool)
     order_search_changed = Signal(str)
     order_line_selected = Signal(str)
@@ -50,9 +52,10 @@ class PackingScreen(QWidget):
         self._is_busy = False
         self._scanner_ready = False
         self._has_box = False
+        self._box_items_count = 0
         self._has_order_selection = False
         self._selected_order_scan_required = True
-        self._summary_card = PackingSummaryCard()
+        self._summary_card = PackingSummaryCard(show_actions=True)
         self._scan_card = PackingScanCard()
         self._progress_bar = self._summary_card.progress_bar
         self._order_search = QLineEdit()
@@ -84,10 +87,12 @@ class PackingScreen(QWidget):
         )
         self._has_box = state.current_box is not None
         if state.current_box is None:
+            self._box_items_count = 0
             self._summary_card.set_empty()
             self._items_table.setRowCount(0)
         else:
             box = state.current_box
+            self._box_items_count = len(box.items)
             self._summary_card.set_box(
                 box_id=box.box_id,
                 order_name=box.order_name,
@@ -128,6 +133,8 @@ class PackingScreen(QWidget):
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._open_box_button.clicked.connect(self.open_box_requested.emit)
         self._close_box_button.clicked.connect(self.close_box_requested.emit)
+        self._summary_card.clear_box_requested.connect(self.clear_box_requested.emit)
+        self._summary_card.choose_order_requested.connect(self._focus_order_selector)
 
     def _build_layout(self) -> None:
         """Собирает визуальную структуру рабочего экрана."""
@@ -316,3 +323,14 @@ class PackingScreen(QWidget):
             not is_busy and not self._has_box and self._has_order_selection
         )
         self._count_in_packing.setEnabled(not is_busy)
+        self._summary_card.set_action_state(
+            can_choose_order=not is_busy and not self._has_box,
+            can_clear_box=not is_busy and self._has_box and self._box_items_count > 0,
+        )
+
+    def _focus_order_selector(self) -> None:
+        """Переводит оператора к выбору заказа для следующей коробки."""
+
+        self.choose_order_requested.emit()
+        self._order_search.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._order_search.selectAll()

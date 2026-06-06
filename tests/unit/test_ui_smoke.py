@@ -516,11 +516,19 @@ def test_packing_screen_shows_box_progress_and_items() -> None:
             last_scanned_code="04601234567890ABC123",
         )
     )
+    clear_requests: list[bool] = []
+    screen.clear_box_requested.connect(lambda: clear_requests.append(True))
 
     assert screen._progress_bar.value() == 1  # noqa: SLF001
     assert screen._items_table.rowCount() == 1  # noqa: SLF001
     assert screen._items_table.item(0, 3).text() == "04601234567890ABC123<GS>91ABC"  # noqa: SLF001
     assert screen._close_box_button.isEnabled() is True  # noqa: SLF001
+    assert screen._summary_card._clear_box_button.isEnabled() is True  # noqa: SLF001
+    assert screen._summary_card._choose_order_button.isEnabled() is False  # noqa: SLF001
+
+    screen._summary_card._clear_box_button.click()  # noqa: SLF001
+
+    assert clear_requests == [True]
 
 
 def test_settings_screen_shows_printer_selection() -> None:
