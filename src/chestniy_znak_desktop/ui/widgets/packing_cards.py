@@ -108,8 +108,9 @@ class PackingSummaryCard(QFrame):
     ) -> None:
         """Показывает параметры открытой коробки."""
 
-        progress_max = max(capacity, 1)
-        progress_value = min(max(filled, 0), progress_max)
+        has_capacity = capacity > 0
+        progress_max = capacity if has_capacity else 1
+        progress_value = min(max(filled, 0), progress_max) if has_capacity else 0
         self._box_title.setText(tr("packing.summary.boxTitle", box_id=box_id))
         self._box_subtitle.setText(tr("packing.summary.ready"))
         self._status_badge.setText(
@@ -118,7 +119,8 @@ class PackingSummaryCard(QFrame):
         self._status_badge.setProperty("tone", "closed" if is_closed else "active")
         self._status_badge.style().unpolish(self._status_badge)
         self._status_badge.style().polish(self._status_badge)
-        self._progress_label.setText(f"{filled} / {capacity}")
+        capacity_text = str(capacity) if has_capacity else tr("packing.capacityUnknown")
+        self._progress_label.setText(f"{filled} / {capacity_text}")
         self._progress_bar.setRange(0, progress_max)
         self._progress_bar.setValue(progress_value)
         self._order_value.setText(order_name or "-")

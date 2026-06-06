@@ -198,4 +198,5 @@ class BoxLookupController(QObject):
 
         sscc = box.sscc or tr("lookup.ssccMissing")
         order = box.order_name or tr("lookup.noOrder")
-        return f"#{box.box_id} | {order} | {sscc} | {box.filled}/{box.capacity}"
+        capacity_text = str(box.capacity) if box.capacity > 0 else tr("packing.capacityUnknown")
+        return f"#{box.box_id} | {order} | {sscc} | {box.filled}/{capacity_text}"

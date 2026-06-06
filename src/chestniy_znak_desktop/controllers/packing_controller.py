@@ -120,6 +120,7 @@ class OrderLineOptionUi:
     product_name: str
     label: str
     scan_required: bool = True
+    package_capacity: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -452,7 +453,7 @@ class PackingController(QObject):
             scan_result.box.box_id,
         )
         self._play(self._sound_for_scan(scan_result))
-        message = scan_result.error or scan_result.reason_code
+        message = self._scan_result_message(scan_result)
         self._set_state(
             replace(
                 self._state,
@@ -541,7 +542,7 @@ class PackingController(QObject):
                 sscc=current_box.sscc,
                 filled=current_box.filled,
                 capacity=current_box.capacity,
-                is_full=current_box.filled >= current_box.capacity,
+                is_full=current_box.capacity > 0 and current_box.filled >= current_box.capacity,
                 title=tr("closeBox.notClosedTitle"),
                 message=tr("closeBox.notClosedMessage"),
                 error_message=str(exc),
@@ -653,6 +654,11 @@ class PackingController(QObject):
                 sku = product.sku if product else line.product_id
                 product_name = product.name if product else tr("packing.product")
                 label = f"{order.order_number} · {sku} · {product_name}"
+                if line.package_capacity:
+                    label = (
+                        f"{label} · "
+                        f"{tr('packing.capacityShort', capacity=line.package_capacity)}"
+                    )
                 if not order.scan_required:
                     label = f"{label} · {tr('packing.noScanSuffix')}"
                 options.append(
@@ -663,6 +669,7 @@ class PackingController(QObject):
                         sku=sku,
                         product_name=product_name,
                         scan_required=order.scan_required,
+                        package_capacity=line.package_capacity,
                         label=label,
                     )
                 )
@@ -697,7 +704,13 @@ class PackingController(QObject):
         if selected is None:
             return ""
         if selected.scan_required:
-            return selected.product_name or selected.sku
+            product = selected.product_name or selected.sku
+            if selected.package_capacity:
+                return (
+                    f"{product} · "
+                    f"{tr('packing.capacityShort', capacity=selected.package_capacity)}"
+                )
+            return product
         return tr("packing.noScanOrderResult", order=selected.order_number)
 
     def _set_state(self, state: PackingUiState) -> None:
@@ -728,7 +741,7 @@ class PackingController(QObject):
         """Преобразует backend-результат закрытия в UI-событие."""
 
         box = result.box
-        is_full = box.filled >= box.capacity
+        is_full = box.capacity > 0 and box.filled >= box.capacity
         print_ok = print_result.print_ok if print_result is not None else None
         print_error = print_result.print_error if print_result is not None else ""
         print_printer_name = (
@@ -813,6 +826,36 @@ class PackingController(QObject):
         return tr("packing.modeNotCounted")
 
     @staticmethod
+    def _scan_result_message(result: ScanToBoxResultDto) -> str:
+        """Возвращает понятный оператору текст результата сканирования."""
+
+        code = result.message_code or result.reason_code
+        if result.ok:
+            if result.duplicate or code in {"duplicate_in_box", "duplicate_in_package"}:
+                return tr("packing.scan.duplicateInBox")
+            if result.box_full_signal:
+                return tr("packing.scan.acceptedFull")
+            return tr("packing.scan.accepted")
+        messages = {
+            "code_in_other_box": "packing.scan.codeInOtherBox",
+            "mark_code_already_packed": "packing.scan.codeInOtherBox",
+            "wrong_order": "packing.scan.wrongOrder",
+            "mark_code_wrong_order": "packing.scan.wrongOrder",
+            "box_capacity_reached": "packing.scan.capacityReached",
+            "package_capacity_exceeded": "packing.scan.capacityReached",
+            "mark_code_not_found": "packing.scan.notFound",
+            "mark_code_not_issued": "packing.scan.notIssued",
+            "invalid_code_format": "packing.scan.invalidFormat",
+            "package_is_not_open": "packing.scan.packageClosed",
+            "package_capacity_required": "packing.scan.capacityMissing",
+            "scan_rejected": "packing.scan.rejected",
+        }
+        key = messages.get(code) or messages.get(result.reason_code)
+        if key is not None:
+            return tr(key)
+        return result.error or code or tr("packing.scan.rejected")
+
+    @staticmethod
     def _item_to_ui(item: BoxItemDto) -> PackingItemUi:
         """Преобразует элемент коробки backend в UI-модель."""
 
@@ -828,6 +871,8 @@ class PackingController(QObject):
         """Выбирает звук по результату сканирования в коробку."""
 
         if result.ok:
+            if result.duplicate:
+                return SoundEvent.WARNING
             return SoundEvent.OK
         if result.reason_code in {
             "wrong_order",

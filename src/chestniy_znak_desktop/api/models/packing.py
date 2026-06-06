@@ -67,6 +67,7 @@ class ScanToBoxResultDto(BaseModel):
 
     ok: bool
     reason_code: str
+    message_code: str | None = None
     error: str | None = None
     duplicate: bool | None = None
     box: BoxDto
@@ -78,6 +79,7 @@ class ScanBatchToBoxResultDto(BaseModel):
 
     ok: bool
     reason_code: str
+    message_code: str | None = None
     error: str | None = None
     added: int = 0
     box: BoxDto

@@ -385,6 +385,32 @@ _MESSAGES["ru"].update(
         "packing.boxAlreadyOpened": "Активная коробка уже была открыта",
         "packing.codeAdded": "Код добавлен",
         "packing.codeNotAdded": "Код не добавлен",
+        "packing.capacityUnknown": "не задана",
+        "packing.capacityShort": "коробка: {capacity} шт.",
+        "packing.scan.accepted": "Код принят и добавлен в коробку.",
+        "packing.scan.acceptedFull": (
+            "Код принят. Коробка заполнена: закройте ее, чтобы напечатать SSCC."
+        ),
+        "packing.scan.duplicateInBox": ("Этот код уже есть в этой коробке. Повтор не добавлен."),
+        "packing.scan.codeInOtherBox": (
+            "Код уже упакован в другую коробку. Проверьте изделие и активную коробку."
+        ),
+        "packing.scan.wrongOrder": "Код относится к другому заказу или номенклатуре.",
+        "packing.scan.capacityReached": "Коробка уже заполнена. Закройте ее и откройте новую.",
+        "packing.scan.notFound": (
+            "Код не найден в пуле этого заказа. Проверьте заказ или загрузку кодов."
+        ),
+        "packing.scan.notIssued": ("Код есть в системе, но еще не выдан поставщику для упаковки."),
+        "packing.scan.invalidFormat": (
+            "Скан не похож на код DataMatrix Честного знака. Проверьте настройки "
+            "сканера и GS-разделитель."
+        ),
+        "packing.scan.rejected": ("Код не принят. Проверьте заказ, пул кодов и состояние коробки."),
+        "packing.scan.packageClosed": "Коробка закрыта. Откройте новую коробку.",
+        "packing.scan.capacityMissing": (
+            "В заказе не задана вместимость коробки. Назначьте правило упаковки на сайте "
+            "и откройте коробку заново."
+        ),
         "packing.countModeNotChanged": "Учет коробки не изменен",
         "packing.countModeUpdated": "Учет коробки обновлен",
         "packing.operationError": "Ошибка операции",
@@ -865,6 +891,34 @@ _MESSAGES["en"].update(
         "packing.boxAlreadyOpened": "An active box was already open",
         "packing.codeAdded": "Code added",
         "packing.codeNotAdded": "Code was not added",
+        "packing.capacityUnknown": "not set",
+        "packing.capacityShort": "box: {capacity} pcs",
+        "packing.scan.accepted": "Code accepted and added to the box.",
+        "packing.scan.acceptedFull": "Code accepted. The box is full: close it to print SSCC.",
+        "packing.scan.duplicateInBox": (
+            "This code is already in this box. The duplicate was not added."
+        ),
+        "packing.scan.codeInOtherBox": (
+            "This code is already packed in another box. Check the item and the active box."
+        ),
+        "packing.scan.wrongOrder": "This code belongs to another order or product.",
+        "packing.scan.capacityReached": "The box is already full. Close it and open a new one.",
+        "packing.scan.notFound": (
+            "Code was not found in this order pool. Check the order or the code upload."
+        ),
+        "packing.scan.notIssued": "The code exists, but it has not been issued to the supplier.",
+        "packing.scan.invalidFormat": (
+            "The scan does not look like a Chestniy Znak DataMatrix code. Check scanner "
+            "settings and the GS separator."
+        ),
+        "packing.scan.rejected": (
+            "Code was not accepted. Check the order, code pool, and box state."
+        ),
+        "packing.scan.packageClosed": "The box is closed. Open a new box.",
+        "packing.scan.capacityMissing": (
+            "Box capacity is not set for this order. Assign a packaging rule in the web cabinet "
+            "and open the box again."
+        ),
         "packing.countModeNotChanged": "Box accounting was not changed",
         "packing.countModeUpdated": "Box accounting updated",
         "packing.operationError": "Operation error",
@@ -1332,6 +1386,20 @@ _MESSAGES["zh"].update(
         "packing.boxAlreadyOpened": "已有活动箱打开",
         "packing.codeAdded": "代码已添加",
         "packing.codeNotAdded": "代码未添加",
+        "packing.capacityUnknown": "未设置",
+        "packing.capacityShort": "箱容量：{capacity} 件",
+        "packing.scan.accepted": "标识码已接收并加入箱中。",
+        "packing.scan.acceptedFull": "标识码已接收。箱已装满，请关闭箱以打印 SSCC。",
+        "packing.scan.duplicateInBox": "该标识码已在当前箱中，重复扫描未添加。",
+        "packing.scan.codeInOtherBox": "该标识码已装入其他箱中。请检查产品和当前活动箱。",
+        "packing.scan.wrongOrder": "该标识码属于其他订单或产品。",
+        "packing.scan.capacityReached": "箱已装满。请关闭当前箱并打开新箱。",
+        "packing.scan.notFound": "在该订单的码池中未找到此标识码。请检查订单或码池导入。",
+        "packing.scan.notIssued": "系统中存在该标识码，但尚未发放给供应商用于包装。",
+        "packing.scan.invalidFormat": "扫描内容不像 Chestniy Znak DataMatrix 码。请检查扫描器设置和 GS 分隔符。",
+        "packing.scan.rejected": "标识码未被接收。请检查订单、码池和箱状态。",
+        "packing.scan.packageClosed": "箱已关闭。请打开新箱。",
+        "packing.scan.capacityMissing": "该订单未设置箱容量。请在网页端分配包装规则后重新打开箱。",
         "packing.countModeNotChanged": "箱计入设置未更改",
         "packing.countModeUpdated": "箱计入设置已更新",
         "packing.operationError": "操作错误",

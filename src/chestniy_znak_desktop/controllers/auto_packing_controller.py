@@ -938,7 +938,7 @@ class AutoPackingController(QObject):
                 sscc=current_box.sscc,
                 filled=current_box.filled,
                 capacity=current_box.capacity,
-                is_full=current_box.filled >= current_box.capacity,
+                is_full=current_box.capacity > 0 and current_box.filled >= current_box.capacity,
                 title=tr("closeBox.notClosedTitle"),
                 message=tr("closeBox.notClosedMessage"),
                 error_message=str(exc),

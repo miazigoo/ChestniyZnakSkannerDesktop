@@ -85,7 +85,7 @@ class CloseBoxDialog(QDialog):
 
         lines = [
             tr("closeBox.detailsBox", box_id=event.box_id),
-            tr("closeBox.detailsFill", filled=event.filled, capacity=event.capacity),
+            _fill_details(filled=event.filled, capacity=event.capacity),
         ]
         if event.sscc:
             lines.append(f"SSCC: {event.sscc}")
@@ -138,7 +138,7 @@ class CloseBoxConfirmDialog(QDialog):
         message.setObjectName("closeBoxDialogMessage")
         message.setWordWrap(True)
 
-        details = QLabel(tr("closeBox.detailsFill", filled=filled, capacity=capacity))
+        details = QLabel(_fill_details(filled=filled, capacity=capacity))
         details.setObjectName("closeBoxDialogDetails")
         details.setWordWrap(True)
 
@@ -176,6 +176,13 @@ class CloseBoxConfirmDialog(QDialog):
 
         image_path = resources.files("chestniy_znak_desktop.resources.icons").joinpath(image_name)
         return QPixmap(str(image_path))
+
+
+def _fill_details(*, filled: int, capacity: int) -> str:
+    """Формирует строку заполнения с учетом неизвестной вместимости."""
+
+    capacity_text = str(capacity) if capacity > 0 else tr("packing.capacityUnknown")
+    return tr("closeBox.detailsFill", filled=filled, capacity=capacity_text)
 
 
 class CloseBoxProgressDialog(QDialog):

@@ -361,11 +361,12 @@ class BoxesController(QObject):
     def _box_to_row(box: BoxDto) -> BoxRowUi:
         """Преобразует DTO коробки в строку таблицы."""
 
+        capacity_text = str(box.capacity) if box.capacity > 0 else tr("packing.capacityUnknown")
         return BoxRowUi(
             box_id=box.box_id,
             order_name=box.order_name or "-",
             sscc=box.sscc or "-",
-            filled=f"{box.filled} / {box.capacity}",
+            filled=f"{box.filled} / {capacity_text}",
             status=tr("boxes.status.closed") if box.is_closed else tr("boxes.status.open"),
             operator=box.active_user_name or box.created_by_name or "-",
         )

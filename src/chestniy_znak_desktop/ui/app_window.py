@@ -386,7 +386,9 @@ class AppWindow(QMainWindow):
         if box is None:
             self._show_message(tr("appWindow.boxNotOpenTitle"), tr("appWindow.openBoxFirst"))
             return
-        if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
+        if (box.capacity <= 0 or box.filled < box.capacity) and not self._confirm_incomplete_box(
+            box.filled, box.capacity
+        ):
             return
         self._show_close_progress_dialog()
         self._packing_controller.close_current_box()
@@ -466,7 +468,9 @@ class AppWindow(QMainWindow):
                 tr("appWindow.localBoxNotEmptyText"),
             )
             return
-        if box.filled < box.capacity and not self._confirm_incomplete_box(box.filled, box.capacity):
+        if (box.capacity <= 0 or box.filled < box.capacity) and not self._confirm_incomplete_box(
+            box.filled, box.capacity
+        ):
             return
         self._show_close_progress_dialog()
         self._auto_packing_controller.close_current_box()

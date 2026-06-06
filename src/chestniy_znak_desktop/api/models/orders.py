@@ -23,6 +23,8 @@ class OrderLineDto(BaseModel):
     product_id: str
     quantity: int
     required_code_quantity: int
+    package_capacity: int | None = None
+    packaging_rule_id: str | None = None
     status: str
     product: OrderProductDto | None = None
 

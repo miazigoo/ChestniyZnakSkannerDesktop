@@ -102,6 +102,7 @@ class FakePackingService:
         self.current_box_result: BoxDetailDto | None = None
         self.last_scan: tuple[int, str, str] | None = None
         self.close_result: CloseBoxResultDto | None = None
+        self.next_scan_result: ScanToBoxResultDto | None = None
         self.count_calls: list[tuple[int, bool]] = []
         self.open_calls: list[tuple[str, bool, str | None, str | None]] = []
 
@@ -133,6 +134,8 @@ class FakePackingService:
         """Возвращает fake результат скана в коробку."""
 
         self.last_scan = (box_id, code, scanner_id)
+        if self.next_scan_result is not None:
+            return self.next_scan_result
         return ScanToBoxResultDto(
             ok=True,
             reason_code="code_added",
@@ -361,6 +364,48 @@ def test_packing_controller_scan_to_box_updates_state() -> None:
     assert controller.state.current_box.filled == 1
     assert controller.state.status_message == "Код добавлен"
     assert sounds.events[-1] == SoundEvent.OK
+
+
+def test_packing_controller_shows_human_scan_rejection_message() -> None:
+    """Проверяет понятный текст ошибки сканирования по backend message_code."""
+
+    controller, service, sounds = _controller_pair()
+    controller.open_box()
+    service.next_scan_result = ScanToBoxResultDto(
+        ok=False,
+        reason_code="scan_rejected",
+        message_code="mark_code_not_found",
+        box=_box(filled=0),
+    )
+
+    controller.on_code_scanned("UNKNOWN")
+
+    assert controller.state.status_message == "Код не добавлен"
+    assert controller.state.error_message == (
+        "Код не найден в пуле этого заказа. Проверьте заказ или загрузку кодов."
+    )
+    assert sounds.events[-1] == SoundEvent.ERROR
+
+
+def test_packing_controller_warns_for_duplicate_scan_in_same_box() -> None:
+    """Проверяет отдельную подсказку и звук для дубля в текущей коробке."""
+
+    controller, service, sounds = _controller_pair()
+    controller.open_box()
+    service.next_scan_result = ScanToBoxResultDto(
+        ok=True,
+        reason_code="duplicate_in_box",
+        message_code="duplicate_in_box",
+        duplicate=True,
+        box=_box(filled=1),
+    )
+
+    controller.on_code_scanned("CODE")
+
+    assert (
+        controller.state.result_message == "Этот код уже есть в этой коробке. Повтор не добавлен."
+    )
+    assert sounds.events[-1] == SoundEvent.WARNING
 
 
 def test_packing_controller_queues_scan_while_busy() -> None:

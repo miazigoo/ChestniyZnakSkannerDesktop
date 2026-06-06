@@ -117,10 +117,12 @@ class BoxDetailPanel(QFrame):
     def set_detail(self, detail: BoxDetailUi) -> None:
         """Показывает детальную информацию по выбранной коробке."""
 
-        progress_max = max(detail.capacity, 1)
-        progress_value = min(max(detail.filled, 0), progress_max)
+        has_capacity = detail.capacity > 0
+        progress_max = detail.capacity if has_capacity else 1
+        progress_value = min(max(detail.filled, 0), progress_max) if has_capacity else 0
+        capacity_text = str(detail.capacity) if has_capacity else tr("packing.capacityUnknown")
         self._summary.setText(tr("packing.summary.boxTitle", box_id=detail.box_id))
-        self._progress_label.setText(f"{detail.filled} / {detail.capacity}")
+        self._progress_label.setText(f"{detail.filled} / {capacity_text}")
         self._progress_bar.setRange(0, progress_max)
         self._progress_bar.setValue(progress_value)
         self._order_value.setText(detail.order_name)
