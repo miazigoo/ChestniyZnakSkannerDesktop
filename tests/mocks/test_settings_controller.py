@@ -244,6 +244,28 @@ def test_settings_controller_applies_theme_immediately(
     assert states[-1].status_message == "Тема применена: Graphite Pro"
 
 
+def test_settings_controller_saves_login_language_without_modal(tmp_path: Path) -> None:
+    """Проверяет быструю смену языка с экрана входа."""
+
+    controller, store = _controller(tmp_path)
+    states: list[SettingsUiState] = []
+    saved_messages: list[str] = []
+    languages: list[str] = []
+    controller.state_changed.connect(states.append)
+    controller.settings_saved.connect(saved_messages.append)
+    controller.language_changed.connect(languages.append)
+
+    controller.set_language("zh-CN")
+
+    loaded = store.load(AppConfig())
+    assert loaded.language == "zh"
+    assert controller.settings.language == "zh"
+    assert states[-1].language == "zh"
+    assert states[-1].status_message == "语言已保存，并会用于新的请求。"
+    assert saved_messages == []
+    assert languages == ["zh"]
+
+
 def test_settings_controller_previews_sound_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

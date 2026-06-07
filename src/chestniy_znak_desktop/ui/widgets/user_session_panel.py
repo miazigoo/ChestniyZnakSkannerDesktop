@@ -23,6 +23,7 @@ class UserSessionPanel(QWidget):
         """Создает компактный блок сессии для рабочего экрана."""
 
         super().__init__()
+        self._snapshot: RuntimeSnapshot | None = None
         self.setObjectName("userSessionPanel")
         self.setFixedHeight(124)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -46,6 +47,7 @@ class UserSessionPanel(QWidget):
     def apply_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет отображение сессии из общего runtime snapshot."""
 
+        self._snapshot = snapshot
         self._user_label.setText(self._format_user(snapshot))
         self._connection_label.setText(self._format_connection(snapshot))
         self._scanner_label.setText(self._format_scanner(snapshot))
@@ -82,3 +84,14 @@ class UserSessionPanel(QWidget):
         if snapshot.scanner.status == ScannerStatus.ERROR:
             return tr("session.scannerError", message=snapshot.scanner.message)
         return tr("session.scannerStopped")
+
+    def retranslate(self) -> None:
+        """Переотрисовывает данные сессии после смены языка."""
+
+        self._logout_button.setText(tr("session.logout"))
+        if self._snapshot is None:
+            self._user_label.setText(tr("session.operatorNone"))
+            self._connection_label.setText(tr("session.backendUnknown"))
+            self._scanner_label.setText(tr("session.scannerStopped"))
+            return
+        self.apply_snapshot(self._snapshot)

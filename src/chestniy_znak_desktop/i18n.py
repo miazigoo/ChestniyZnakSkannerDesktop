@@ -19,6 +19,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
     "ru": {
         "common.save": "Сохранить",
         "common.language": "Язык",
+        "common.backendUrl": "Backend URL",
+        "common.deviceId": "Device ID",
         "settings.main.title": "Основные",
         "settings.main.subtitle": "Backend URL и идентификатор рабочего места.",
         "settings.connection.title": "Подключение",
@@ -70,6 +72,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
     "en": {
         "common.save": "Save",
         "common.language": "Language",
+        "common.backendUrl": "Backend URL",
+        "common.deviceId": "Device ID",
         "settings.main.title": "General",
         "settings.main.subtitle": "Backend URL and workstation identifier.",
         "settings.connection.title": "Connection",
@@ -117,6 +121,8 @@ _MESSAGES: Final[dict[str, dict[str, str]]] = {
     "zh": {
         "common.save": "保存",
         "common.language": "语言",
+        "common.backendUrl": "后端 URL",
+        "common.deviceId": "设备 ID",
         "settings.main.title": "基础",
         "settings.main.subtitle": "后端 URL 和工作站标识。",
         "settings.connection.title": "连接",
@@ -1733,6 +1739,12 @@ def set_current_language(value: str | None) -> None:
     _current_language = normalize_language(value)
 
 
+def current_language() -> str:
+    """Возвращает текущий язык UI процесса."""
+
+    return _current_language
+
+
 def tr(key: str, **params: object) -> str:
     """Returns a localized UI string."""
 
@@ -1743,6 +1755,20 @@ def tr(key: str, **params: object) -> str:
     if not params:
         return template
     return template.format(**params)
+
+
+def translation_key_for_text(text: str) -> str | None:
+    """Возвращает ключ локализации для статического текста UI."""
+
+    if not text:
+        return None
+    for messages in _MESSAGES.values():
+        for key, value in messages.items():
+            if "{" in value or "}" in value:
+                continue
+            if value == text:
+                return key
+    return None
 
 
 def accept_language(value: str | None) -> str:

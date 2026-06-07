@@ -16,6 +16,7 @@ class RuntimeStatusBar(QWidget):
         """Создает компактную статусную панель."""
 
         super().__init__()
+        self._snapshot: RuntimeSnapshot | None = None
         self._connection_label = QLabel(tr("runtime.connectionStopped"))
         self._session_label = QLabel(tr("runtime.sessionUnknown"))
         self._scanner_label = QLabel(tr("runtime.scannerStopped"))
@@ -40,6 +41,7 @@ class RuntimeStatusBar(QWidget):
     def update_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет тексты панели из runtime snapshot."""
 
+        self._snapshot = snapshot
         self._connection_label.setText(
             tr("runtime.connection", message=snapshot.connection.message)
         )
@@ -51,3 +53,14 @@ class RuntimeStatusBar(QWidget):
         self._session_label.setText(tr("runtime.session", user=user))
         scanner = snapshot.scanner.port or snapshot.scanner.status.value
         self._scanner_label.setText(tr("runtime.scanner", scanner=scanner))
+
+    def retranslate(self) -> None:
+        """Переотрисовывает статусы после смены языка."""
+
+        self._version_label.setText(tr("runtime.version", version=__version__))
+        if self._snapshot is None:
+            self._connection_label.setText(tr("runtime.connectionStopped"))
+            self._session_label.setText(tr("runtime.sessionUnknown"))
+            self._scanner_label.setText(tr("runtime.scannerStopped"))
+            return
+        self.update_snapshot(self._snapshot)

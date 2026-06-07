@@ -36,6 +36,7 @@ from chestniy_znak_desktop.services.scanner_command_service import (
 )
 from chestniy_znak_desktop.ui.screens.login_screen import LoginScreen
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen
+from chestniy_znak_desktop.ui.i18n_widgets import retranslate_widget_tree
 from chestniy_znak_desktop.ui.widgets.blocking_overlay import BlockingOverlay
 from chestniy_znak_desktop.ui.widgets.close_box_dialog import (
     CloseBoxConfirmDialog,
@@ -110,6 +111,7 @@ class AppWindow(QMainWindow):
         self._login_screen.manual_token_submitted.connect(
             self._auth_controller.login_with_raw_token
         )
+        self._login_screen.language_changed.connect(self._settings_controller.set_language)
         self._auth_controller.authenticated.connect(lambda _user: self.show_main_screen())
         self._auth_controller.unauthenticated.connect(self.show_login_screen)
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
@@ -247,6 +249,7 @@ class AppWindow(QMainWindow):
         self._settings_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_settings_state
         )
+        self._settings_controller.language_changed.connect(self._handle_language_changed)
         self._settings_controller.settings_saved.connect(self._show_settings_saved_dialog)
         self._main_screen.settings_screen.settings_save_requested.connect(
             self._settings_controller.save_form
@@ -306,6 +309,16 @@ class AppWindow(QMainWindow):
             self._blocking_overlay.set_blocking(False, "")
             return
         self._blocking_overlay.set_blocking(is_blocking, message)
+
+    def _handle_language_changed(self, _language: str) -> None:
+        """Обновляет статические тексты уже созданного интерфейса."""
+
+        retranslate_widget_tree(self)
+        self._login_screen.set_language(_language)
+        self._login_screen.retranslate()
+        self._status_bar.retranslate()
+        self._main_screen.retranslate()
+        self._settings_controller.publish_state()
 
     def _set_scan_target(self, screen_name: str) -> None:
         """Сохраняет активный рабочий сценарий для входящих сканов."""

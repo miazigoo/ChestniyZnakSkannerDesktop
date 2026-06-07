@@ -26,6 +26,7 @@ from chestniy_znak_desktop.ui.screens.diagnostics_screen import DiagnosticsScree
 from chestniy_znak_desktop.ui.screens.packing_screen import PackingScreen
 from chestniy_znak_desktop.ui.screens.settings_screen import SettingsScreen
 from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen
+from chestniy_znak_desktop.ui.i18n_widgets import retranslate_widget_tree
 from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import AdaptiveScrollArea
 from chestniy_znak_desktop.ui.widgets.main_navigation import MainSidebar, MainWorkspace, NavItem
 from chestniy_znak_desktop.ui.widgets.user_session_panel import UserSessionPanel
@@ -52,6 +53,10 @@ class MainScreen(QWidget):
         self._stack_animation.setDuration(180)
         self._stack_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._nav_items: list[NavItem] = []
+        self._workspace_title: QLabel | None = None
+        self._workspace_subtitle: QLabel | None = None
+        self._workplace_section: QLabel | None = None
+        self._service_section: QLabel | None = None
         self._is_compact = False
         self._sidebar: MainSidebar | None = None
         self._root_layout: QHBoxLayout | None = None
@@ -129,6 +134,22 @@ class MainScreen(QWidget):
         self._defect_screen.apply_runtime_snapshot(snapshot)
         self._diagnostics_screen.apply_runtime_snapshot(snapshot)
 
+    def retranslate(self) -> None:
+        """Обновляет статические тексты рабочего экрана после смены языка."""
+
+        retranslate_widget_tree(self)
+        self._session_panel.retranslate()
+        if self._workspace_title is not None:
+            self._workspace_title.setText(tr("main.title"))
+        if self._workspace_subtitle is not None:
+            self._workspace_subtitle.setText(tr("main.subtitle"))
+        if self._workplace_section is not None:
+            self._workplace_section.setText(tr("main.workplace"))
+        if self._service_section is not None:
+            self._service_section.setText(tr("main.service"))
+        for item, (title_key, subtitle_key) in zip(self._nav_items, self._nav_translation_keys()):
+            item.set_texts(tr(title_key), tr(subtitle_key))
+
     def show_boxes(self) -> None:
         """Переключает рабочую область на список коробок."""
 
@@ -199,18 +220,18 @@ class MainScreen(QWidget):
 
         brand = QLabel("CZ Desktop")
         brand.setObjectName("mainBrand")
-        section = QLabel(tr("main.workplace"))
-        section.setObjectName("mainSection")
+        self._workplace_section = QLabel(tr("main.workplace"))
+        self._workplace_section.setObjectName("mainSection")
         layout.addWidget(brand)
-        layout.addWidget(section)
+        layout.addWidget(self._workplace_section)
         layout.addWidget(self._session_panel)
         layout.addSpacing(6)
         for item in self._main_nav_items():
             layout.addWidget(item)
         layout.addStretch(1)
-        utility = QLabel(tr("main.service"))
-        utility.setObjectName("mainSection")
-        layout.addWidget(utility)
+        self._service_section = QLabel(tr("main.service"))
+        self._service_section.setObjectName("mainSection")
+        layout.addWidget(self._service_section)
         for item in self._utility_nav_items():
             layout.addWidget(item)
         scroll_area.setWidget(content)
@@ -248,15 +269,15 @@ class MainScreen(QWidget):
     def _workspace_header(self) -> QHBoxLayout:
         """Создает шапку рабочей области."""
 
-        title = QLabel(tr("main.title"))
-        title.setObjectName("workspaceTitle")
-        subtitle = QLabel(tr("main.subtitle"))
-        subtitle.setObjectName("workspaceSubtitle")
+        self._workspace_title = QLabel(tr("main.title"))
+        self._workspace_title.setObjectName("workspaceTitle")
+        self._workspace_subtitle = QLabel(tr("main.subtitle"))
+        self._workspace_subtitle.setObjectName("workspaceSubtitle")
         title_box = QVBoxLayout()
         title_box.setContentsMargins(0, 0, 0, 0)
         title_box.setSpacing(2)
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
+        title_box.addWidget(self._workspace_title)
+        title_box.addWidget(self._workspace_subtitle)
 
         accent = QFrame()
         accent.setObjectName("workspaceAccent")
@@ -314,6 +335,21 @@ class MainScreen(QWidget):
                 5,
                 "defect",
             ),
+        ]
+
+    @staticmethod
+    def _nav_translation_keys() -> list[tuple[str, str]]:
+        """Возвращает ключи переводов пунктов навигации в порядке их создания."""
+
+        return [
+            ("main.nav.packing", "main.nav.packingHint"),
+            ("main.nav.autoPacking", "main.nav.autoPackingHint"),
+            ("main.nav.boxes", "main.nav.boxesHint"),
+            ("main.nav.lookup", "main.nav.lookupHint"),
+            ("main.nav.verify", "main.nav.verifyHint"),
+            ("main.nav.defect", "main.nav.defectHint"),
+            ("main.nav.settings", "main.nav.settingsHint"),
+            ("main.nav.diagnostics", "main.nav.diagnosticsHint"),
         ]
 
     def _utility_nav_items(self) -> list[NavItem]:

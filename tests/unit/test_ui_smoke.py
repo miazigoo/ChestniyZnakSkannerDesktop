@@ -60,6 +60,7 @@ from chestniy_znak_desktop.controllers.printer_controller import (  # noqa: E402
 )
 from chestniy_znak_desktop.controllers.settings_controller import SettingsUiState  # noqa: E402
 from chestniy_znak_desktop.controllers.verify_controller import VerifyUiState  # noqa: E402
+from chestniy_znak_desktop.i18n import set_current_language  # noqa: E402
 from chestniy_znak_desktop.ui.screens.main_screen import MainScreen  # noqa: E402
 from chestniy_znak_desktop.ui.screens.auto_packing_screen import (  # noqa: E402
     AutoPackingScreen,
@@ -75,6 +76,7 @@ from chestniy_znak_desktop.ui.screens.verify_screen import VerifyScreen  # noqa:
 from chestniy_znak_desktop.ui.screens.settings_pages.theme_page import (  # noqa: E402
     ThemeOptionCard,
 )
+from chestniy_znak_desktop.ui.i18n_widgets import retranslate_widget_tree  # noqa: E402
 from chestniy_znak_desktop.ui.widgets.adaptive_scroll_area import (  # noqa: E402
     AdaptiveScrollArea,
 )
@@ -713,6 +715,19 @@ def test_login_screen_shows_token_preview() -> None:
     assert screen is not None
 
 
+def test_login_screen_emits_language_selection() -> None:
+    """Проверяет выбор языка до авторизации."""
+
+    qapp()
+    screen = LoginScreen()
+    selected: list[str] = []
+    screen.language_changed.connect(selected.append)
+
+    screen._language_select.setCurrentIndex(1)  # noqa: SLF001
+
+    assert selected == ["en"]
+
+
 def test_login_screen_has_compact_minimum_size() -> None:
     """Проверяет, что логин не требует большой монитор."""
 
@@ -762,6 +777,31 @@ def test_runtime_status_bar_accepts_snapshot() -> None:
     )
     assert widget is not None
     assert widget._version_label.text() == "Версия: v1.0.0"  # noqa: SLF001
+
+
+def test_existing_widgets_retranslate_after_language_change() -> None:
+    """Проверяет смену языка без пересоздания основных виджетов."""
+
+    qapp()
+    set_current_language("ru")
+    main = MainScreen()
+    assert main._workspace_title.text() == "Операционный центр"  # noqa: SLF001
+
+    set_current_language("zh")
+    main.retranslate()
+    assert main._workspace_title.text() == "运营中心"  # noqa: SLF001
+    assert main._nav_items[0]._title.text() == "包装"  # noqa: SLF001
+
+    set_current_language("ru")
+    login = LoginScreen()
+    assert login._manual_button.text() == "Войти"  # noqa: SLF001
+
+    set_current_language("en")
+    retranslate_widget_tree(login)
+    assert login._manual_button.text() == "Sign in"  # noqa: SLF001
+
+    login.set_language("zh")
+    assert login._language_select.currentData() == "zh"  # noqa: SLF001
 
 
 def test_blocking_overlay_changes_visibility() -> None:

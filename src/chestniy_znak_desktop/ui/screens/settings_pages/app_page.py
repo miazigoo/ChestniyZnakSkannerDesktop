@@ -29,10 +29,10 @@ class AppSettingsPage(QWidget):
         self.setObjectName("settingsPage")
         self._backend_input = QLineEdit()
         self._backend_input.setObjectName("settingsInput")
-        self._backend_input.setPlaceholderText("Backend URL")
+        self._backend_input.setPlaceholderText(tr("common.backendUrl"))
         self._device_input = QLineEdit()
         self._device_input.setObjectName("settingsInput")
-        self._device_input.setPlaceholderText("Device ID")
+        self._device_input.setPlaceholderText(tr("common.deviceId"))
         self._language_select = QComboBox()
         self._language_select.setObjectName("settingsInput")
         for language in SUPPORTED_LANGUAGES:
@@ -55,8 +55,8 @@ class AppSettingsPage(QWidget):
             icon_name=VectorIconName.LINK,
             icon_color="#66d2c7",
         )
-        card_layout.addWidget(create_form_row("Backend URL", self._backend_input))
-        card_layout.addWidget(create_form_row("Device ID", self._device_input))
+        card_layout.addWidget(create_form_row(tr("common.backendUrl"), self._backend_input))
+        card_layout.addWidget(create_form_row(tr("common.deviceId"), self._device_input))
         card_layout.addWidget(create_form_row(tr("common.language"), self._language_select))
         actions = QHBoxLayout()
         actions.addWidget(self._save_button)

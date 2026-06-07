@@ -137,6 +137,12 @@ class NavItem(QFrame):
         self.style().polish(self)
         self.update()
 
+    def set_texts(self, title: str, subtitle: str) -> None:
+        """Обновляет локализованные тексты пункта навигации."""
+
+        self._title.setText(title)
+        self._subtitle.setText(subtitle)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Публикует переход по нажатию мышью."""
 

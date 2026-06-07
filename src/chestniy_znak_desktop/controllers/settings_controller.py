@@ -90,13 +90,15 @@ class SettingsController(QObject):
         api_base_url = form_data.api_base_url.strip()
         device_id = form_data.device_id.strip()
         language = normalize_language(form_data.language)
-        set_current_language(language)
         if not api_base_url:
             self._emit_state(error_message=tr("settings.backendRequired"))
             return
         if not device_id:
             self._emit_state(error_message=tr("settings.deviceRequired"))
             return
+        language_changed = language != self._settings.language
+        if language_changed:
+            set_current_language(language)
         message = self._save_message_for(form_data, api_base_url, device_id, language)
         self._settings = replace(
             self._settings,
@@ -113,7 +115,8 @@ class SettingsController(QObject):
         )
         self._apply_live_settings()
         self._save(message)
-        self.language_changed.emit(language)
+        if language_changed:
+            self.language_changed.emit(language)
         self.settings_saved.emit(message)
 
     def set_scanner_port(self, port: str) -> None:
@@ -135,6 +138,18 @@ class SettingsController(QObject):
         self._settings = replace(self._settings, theme_name=theme.name)
         self._theme_manager.set_theme(theme.name, self._qt_app)
         self._save(tr("settings.themeApplied", theme=theme.title))
+
+    def set_language(self, language: str) -> None:
+        """Сохраняет язык из login-экрана без модалки настроек."""
+
+        normalized_language = normalize_language(language)
+        if normalized_language == self._settings.language:
+            return
+        set_current_language(normalized_language)
+        self._settings = replace(self._settings, language=normalized_language)
+        self._settings_store.save(self._settings)
+        self._emit_state(status_message=tr("settings.languageSaved"))
+        self.language_changed.emit(normalized_language)
 
     def preview_sound_file(self, filename: str) -> None:
         """Проигрывает выбранный звук из настроек."""

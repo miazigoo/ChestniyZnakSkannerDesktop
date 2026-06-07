@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPaintEvent, QPen
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -16,8 +17,14 @@ from PySide6.QtWidgets import (
 )
 
 from chestniy_znak_desktop.controllers.auth_controller import AuthUiState
-from chestniy_znak_desktop.i18n import tr
+from chestniy_znak_desktop.i18n import (
+    LANGUAGE_TITLES,
+    SUPPORTED_LANGUAGES,
+    current_language,
+    tr,
+)
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.ui.i18n_widgets import retranslate_widget_tree
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -64,6 +71,7 @@ class LoginScreen(QWidget):
     """Экран входа по токену авторизации."""
 
     manual_token_submitted = Signal(str)
+    language_changed = Signal(str)
 
     def __init__(self) -> None:
         """Создает современный экран ожидания скана авторизационного токена."""
@@ -78,6 +86,14 @@ class LoginScreen(QWidget):
         self._description_label = QLabel(tr("login.description"))
         self._description_label.setObjectName("loginHeroDescription")
         self._description_label.setWordWrap(True)
+        self._language_label = QLabel(tr("common.language"))
+        self._language_label.setObjectName("loginStatusTitle")
+        self._language_select = QComboBox()
+        self._language_select.setObjectName("settingsInput")
+        for language in SUPPORTED_LANGUAGES:
+            self._language_select.addItem(LANGUAGE_TITLES[language], language)
+        self.set_language(current_language())
+        self._language_select.currentIndexChanged.connect(self._emit_language_change)
 
         self._status_badge = QLabel(tr("login.waitBadge"))
         self._status_badge.setObjectName("loginStatusBadge")
@@ -119,6 +135,19 @@ class LoginScreen(QWidget):
             "#95d5b2",
         )
         self._build_layout()
+
+    def set_language(self, language: str) -> None:
+        """Синхронизирует выбранный язык без публикации сигнала."""
+
+        index = self._language_select.findData(language)
+        self._language_select.blockSignals(True)
+        self._language_select.setCurrentIndex(max(index, 0))
+        self._language_select.blockSignals(False)
+
+    def retranslate(self) -> None:
+        """Обновляет статические тексты login-экрана после смены языка."""
+
+        retranslate_widget_tree(self)
 
     def apply_state(self, state: AuthUiState) -> None:
         """Обновляет экран из состояния контроллера авторизации."""
@@ -163,6 +192,13 @@ class LoginScreen(QWidget):
         hero.addWidget(self._title_label)
         hero.addWidget(self._subtitle_label)
         hero.addWidget(self._description_label)
+        language_row = QHBoxLayout()
+        language_row.setContentsMargins(0, 0, 0, 0)
+        language_row.setSpacing(10)
+        language_row.addWidget(self._language_label)
+        language_row.addWidget(self._language_select)
+        language_row.addStretch(1)
+        hero.addLayout(language_row)
         hero.addStretch(1)
         hero.addWidget(self._connection_row)
 
@@ -215,6 +251,11 @@ class LoginScreen(QWidget):
         if not value:
             return
         self.manual_token_submitted.emit(value)
+
+    def _emit_language_change(self) -> None:
+        """Публикует выбранный язык login-экрана."""
+
+        self.language_changed.emit(str(self._language_select.currentData() or "ru"))
 
     def _draw_scan_beams(self, painter: QPainter) -> None:
         """Рисует декоративные лучи сканирования."""
