@@ -49,6 +49,7 @@ from chestniy_znak_desktop.services.sound_service import SoundEvent
 TAutoPackingResult = TypeVar("TAutoPackingResult")
 logger = logging.getLogger(__name__)
 GS1_CODE_START_RE = re.compile(r"01\d{14}21")
+SCAN_QUEUE_STATUS_STEP = 25
 
 
 class AutoPackingBackend(Protocol):
@@ -1328,13 +1329,14 @@ class AutoPackingController(QObject):
             return
         self._scan_queue.append(normalized)
         self._queued_raw_codes.add(normalized)
-        self._set_state(
-            replace(
-                self._state,
-                result_message=tr("autoPacking.queued", count=len(self._scan_queue)),
-                last_scanned_code=normalized,
+        if self._should_publish_queue_status():
+            self._set_state(
+                replace(
+                    self._state,
+                    result_message=tr("autoPacking.queued", count=len(self._scan_queue)),
+                    last_scanned_code=normalized,
+                )
             )
-        )
 
     def _process_next_queued_scan(self) -> None:
         """Запускает следующий скан из очереди после завершения операции."""
@@ -1344,6 +1346,12 @@ class AutoPackingController(QObject):
         next_code = self._scan_queue.popleft()
         self._queued_raw_codes.discard(next_code)
         self.on_code_scanned(next_code)
+
+    def _should_publish_queue_status(self) -> bool:
+        """Ограничивает частоту UI-обновлений при быстром HID/COM потоке."""
+
+        queued = len(self._scan_queue)
+        return queued == 1 or queued % SCAN_QUEUE_STATUS_STEP == 0
 
     def _is_local_raw_duplicate(self, code: str) -> bool:
         """Проверяет повтор raw-кода в активном скане, очереди и локальном боксе."""

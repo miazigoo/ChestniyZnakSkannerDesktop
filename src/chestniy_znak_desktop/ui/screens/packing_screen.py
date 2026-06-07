@@ -66,6 +66,7 @@ class PackingScreen(QWidget):
         self._open_box_button = QPushButton(tr("packing.openBox"))
         self._close_box_button = QPushButton(tr("packing.closeBox"))
         self._items_table = self._create_items_table()
+        self._items_table_signature: tuple[tuple[int, int, str, str, str], ...] = ()
 
         self._configure_actions()
         self._build_layout()
@@ -89,7 +90,7 @@ class PackingScreen(QWidget):
         if state.current_box is None:
             self._box_items_count = 0
             self._summary_card.set_empty()
-            self._items_table.setRowCount(0)
+            self._fill_items_table_if_changed(state)
         else:
             box = state.current_box
             self._box_items_count = len(box.items)
@@ -102,7 +103,7 @@ class PackingScreen(QWidget):
                 count_in_packing=box.count_in_packing,
                 is_closed=box.is_closed,
             )
-            self._fill_items_table(state)
+            self._fill_items_table_if_changed(state)
         self._set_busy(state.is_busy)
 
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
@@ -288,13 +289,19 @@ class PackingScreen(QWidget):
         table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         return table
 
-    def _fill_items_table(self, state: PackingUiState) -> None:
-        """Заполняет таблицу изделиями из текущей коробки."""
+    def _fill_items_table_if_changed(self, state: PackingUiState) -> None:
+        """Заполняет таблицу изделиями только при изменении списка кодов."""
 
-        if state.current_box is None:
+        items = state.current_box.items if state.current_box is not None else []
+        signature = tuple(
+            (item.id, item.code_id, item.gtin, item.serial, item.visible_code) for item in items
+        )
+        if signature == self._items_table_signature:
             return
-        self._items_table.setRowCount(len(state.current_box.items))
-        for row, item in enumerate(state.current_box.items):
+        self._items_table_signature = signature
+
+        self._items_table.setRowCount(len(items))
+        for row, item in enumerate(items):
             values = [
                 str(row + 1),
                 item.gtin,

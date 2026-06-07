@@ -28,6 +28,7 @@ from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 TPackingResult = TypeVar("TPackingResult")
 logger = logging.getLogger(__name__)
+SCAN_QUEUE_STATUS_STEP = 25
 
 
 class PackingBackend(Protocol):
@@ -368,15 +369,19 @@ class PackingController(QObject):
         )
         if self._state.is_busy:
             self._scan_queue.append(code)
-            self._set_state(
-                replace(
-                    self._state,
-                    status_message=tr("packing.scanQueued"),
-                    result_message=tr("packing.scanQueuedResult", count=len(self._scan_queue)),
-                    error_message="",
-                    last_scanned_code=code,
+            if self._should_publish_queue_status():
+                self._set_state(
+                    replace(
+                        self._state,
+                        status_message=tr("packing.scanQueued"),
+                        result_message=tr(
+                            "packing.scanQueuedResult",
+                            count=len(self._scan_queue),
+                        ),
+                        error_message="",
+                        last_scanned_code=code,
+                    )
                 )
-            )
             return
         if self._state.current_box is None:
             self._play(SoundEvent.WARNING)
@@ -734,6 +739,12 @@ class PackingController(QObject):
             return
         next_code = self._scan_queue.popleft()
         self.on_code_scanned(next_code)
+
+    def _should_publish_queue_status(self) -> bool:
+        """Ограничивает частоту UI-обновлений при быстром потоке сканера."""
+
+        queued = len(self._scan_queue)
+        return queued == 1 or queued % SCAN_QUEUE_STATUS_STEP == 0
 
     def _play(self, event: SoundEvent) -> None:
         """Проигрывает звук, если сервис звука подключен."""
