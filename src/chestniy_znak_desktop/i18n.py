@@ -201,6 +201,11 @@ _MESSAGES["ru"].update(
         "settings.hub.printer": "Принтер",
         "settings.hub.theme": "Тема",
         "settings.hub.sound": "Звук",
+        "settings.hub.appHint": "Backend, устройство и язык интерфейса",
+        "settings.hub.scannerHint": "COM/HID-порт и скорость обмена",
+        "settings.hub.printerHint": "Принтер SSCC-этикеток коробок",
+        "settings.hub.themeHint": "Оформление рабочего места",
+        "settings.hub.soundHint": "Звуки успешных и ошибочных сканов",
         "settings.printer.title": "Принтер",
         "settings.printer.subtitle": (
             "Выберите принтер SSCC для этого рабочего места. "
@@ -324,6 +329,8 @@ _MESSAGES["ru"].update(
         "diagnostics.log": "Лог: {path}",
         "diagnostics.refreshLogs": "Обновить логи",
         "diagnostics.clearLogs": "Очистить логи",
+        "diagnostics.refreshHint": "Перечитать последние строки лог-файла.",
+        "diagnostics.clearHint": "Очистить локальный лог-файл приложения.",
         "diagnostics.heroSubtitle": (
             "Состояние backend, WebSocket, сессии, сканера и последние строки логов."
         ),
@@ -333,6 +340,17 @@ _MESSAGES["ru"].update(
         "diagnostics.connection": "Связь",
         "diagnostics.session": "Сессия",
         "diagnostics.scanner": "Сканер",
+        "diagnostics.connection.connected": "Связь подключена",
+        "diagnostics.connection.connecting": "Связь устанавливается",
+        "diagnostics.connection.disconnected": "Связь потеряна",
+        "diagnostics.connection.stopped": "Связь остановлена",
+        "diagnostics.session.authenticated": "Сессия активна",
+        "diagnostics.session.unauthenticated": "Пользователь не авторизован",
+        "diagnostics.session.unknown": "Сессия неизвестна",
+        "diagnostics.scanner.running": "Сканер работает",
+        "diagnostics.scanner.starting": "Сканер запускается",
+        "diagnostics.scanner.error": "Ошибка сканера",
+        "diagnostics.scanner.stopped": "Сканер остановлен",
         "diagnostics.logs": "Логи",
         "diagnostics.logsReadError": "Ошибка чтения логов",
         "diagnostics.logsUpdated": "Логи обновлены",
@@ -588,6 +606,11 @@ _MESSAGES["ru"].update(
         "lookup.lastScan": "Последний скан: {code}",
         "lookup.found": "Коробка: {value}",
         "lookup.reset": "Сбросить статус",
+        "lookup.resetHint": "Очистить результат последнего поиска и журнал на экране.",
+        "lookup.resultHint": (
+            "Если коробка найдена, приложение автоматически откроет ее карточку во вкладке "
+            "«Коробки»."
+        ),
         "lookup.heroSubtitle": (
             "Сканируйте SSCC или ID коробки. После успешного поиска откроются детали "
             "в общем списке коробок."
@@ -770,6 +793,11 @@ _MESSAGES["en"].update(
         "settings.hub.printer": "Printer",
         "settings.hub.theme": "Theme",
         "settings.hub.sound": "Sound",
+        "settings.hub.appHint": "Backend, device ID, and interface language",
+        "settings.hub.scannerHint": "COM/HID port and baud rate",
+        "settings.hub.printerHint": "Printer for box SSCC labels",
+        "settings.hub.themeHint": "Workstation appearance",
+        "settings.hub.soundHint": "Sounds for successful and failed scans",
         "settings.printer.title": "Printer",
         "settings.printer.subtitle": (
             "Select the SSCC printer for this workstation. "
@@ -893,6 +921,8 @@ _MESSAGES["en"].update(
         "diagnostics.log": "Log: {path}",
         "diagnostics.refreshLogs": "Refresh logs",
         "diagnostics.clearLogs": "Clear logs",
+        "diagnostics.refreshHint": "Reload the latest lines from the local log file.",
+        "diagnostics.clearHint": "Clear the application's local log file.",
         "diagnostics.heroSubtitle": (
             "Backend, WebSocket, session, scanner status, and latest log lines."
         ),
@@ -902,6 +932,17 @@ _MESSAGES["en"].update(
         "diagnostics.connection": "Connection",
         "diagnostics.session": "Session",
         "diagnostics.scanner": "Scanner",
+        "diagnostics.connection.connected": "Connection is online",
+        "diagnostics.connection.connecting": "Connection is starting",
+        "diagnostics.connection.disconnected": "Connection is lost",
+        "diagnostics.connection.stopped": "Connection is stopped",
+        "diagnostics.session.authenticated": "Session is active",
+        "diagnostics.session.unauthenticated": "User is not signed in",
+        "diagnostics.session.unknown": "Session is unknown",
+        "diagnostics.scanner.running": "Scanner is running",
+        "diagnostics.scanner.starting": "Scanner is starting",
+        "diagnostics.scanner.error": "Scanner error",
+        "diagnostics.scanner.stopped": "Scanner is stopped",
         "diagnostics.logs": "Logs",
         "diagnostics.logsReadError": "Log read error",
         "diagnostics.logsUpdated": "Logs updated",
@@ -1159,6 +1200,10 @@ _MESSAGES["en"].update(
         "lookup.lastScan": "Last scan: {code}",
         "lookup.found": "Box: {value}",
         "lookup.reset": "Reset status",
+        "lookup.resetHint": "Clear the last lookup result and the on-screen log.",
+        "lookup.resultHint": (
+            "When a box is found, the app opens its card on the Boxes tab automatically."
+        ),
         "lookup.heroSubtitle": (
             "Scan the box SSCC or ID. After a successful lookup, details will open "
             "in the shared box list."
@@ -1337,6 +1382,11 @@ _MESSAGES["zh"].update(
         "settings.hub.printer": "打印机",
         "settings.hub.theme": "主题",
         "settings.hub.sound": "声音",
+        "settings.hub.appHint": "Backend、设备 ID 和界面语言",
+        "settings.hub.scannerHint": "COM/HID 端口和波特率",
+        "settings.hub.printerHint": "箱 SSCC 标签打印机",
+        "settings.hub.themeHint": "工作站外观",
+        "settings.hub.soundHint": "成功和失败扫描的声音",
         "settings.printer.title": "打印机",
         "settings.printer.subtitle": (
             "为此工作站选择用于打印箱 SSCC 的打印机。"
@@ -1455,6 +1505,8 @@ _MESSAGES["zh"].update(
         "diagnostics.log": "日志：{path}",
         "diagnostics.refreshLogs": "刷新日志",
         "diagnostics.clearLogs": "清空日志",
+        "diagnostics.refreshHint": "重新读取本地日志文件的最新行。",
+        "diagnostics.clearHint": "清空应用的本地日志文件。",
         "diagnostics.heroSubtitle": "Backend、WebSocket、会话、扫描器状态和最新日志行。",
         "diagnostics.config": "配置",
         "diagnostics.configSubtitle": "应用启动时使用的参数",
@@ -1462,6 +1514,17 @@ _MESSAGES["zh"].update(
         "diagnostics.connection": "连接",
         "diagnostics.session": "会话",
         "diagnostics.scanner": "扫描器",
+        "diagnostics.connection.connected": "连接已在线",
+        "diagnostics.connection.connecting": "正在建立连接",
+        "diagnostics.connection.disconnected": "连接已断开",
+        "diagnostics.connection.stopped": "连接已停止",
+        "diagnostics.session.authenticated": "会话已激活",
+        "diagnostics.session.unauthenticated": "用户未登录",
+        "diagnostics.session.unknown": "会话未知",
+        "diagnostics.scanner.running": "扫描器正在运行",
+        "diagnostics.scanner.starting": "扫描器正在启动",
+        "diagnostics.scanner.error": "扫描器错误",
+        "diagnostics.scanner.stopped": "扫描器已停止",
         "diagnostics.logs": "日志",
         "diagnostics.logsReadError": "日志读取错误",
         "diagnostics.logsUpdated": "日志已更新",
@@ -1678,6 +1741,8 @@ _MESSAGES["zh"].update(
         "lookup.lastScan": "上次扫描：{code}",
         "lookup.found": "箱：{value}",
         "lookup.reset": "重置状态",
+        "lookup.resetHint": "清除上次查找结果和屏幕日志。",
+        "lookup.resultHint": "找到箱后，应用会自动在“箱列表”页打开其卡片。",
         "lookup.heroSubtitle": "扫描箱的 SSCC 或 ID。查找成功后，详情会在箱列表中打开。",
         "lookup.source": "数据来源",
         "lookup.sourceNote": "禁用手动输入",

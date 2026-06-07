@@ -379,6 +379,9 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #defectWarning {{
             color: {palette.button_text};
             background: {palette.accent};
+            border-radius: 12px;
+            padding: 9px 12px;
+            font-weight: 800;
         }}
 
         #packingScannerStatus[tone="error"],

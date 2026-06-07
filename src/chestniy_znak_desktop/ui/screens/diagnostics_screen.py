@@ -16,7 +16,12 @@ from PySide6.QtWidgets import (
 
 from chestniy_znak_desktop.controllers.diagnostics_controller import DiagnosticsUiState
 from chestniy_znak_desktop.i18n import tr
-from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
+from chestniy_znak_desktop.runtime.state_models import (
+    ConnectionStatus,
+    RuntimeSnapshot,
+    ScannerStatus,
+    SessionStatus,
+)
 from chestniy_znak_desktop.ui.widgets.vector_icon import VectorIcon, VectorIconName
 
 
@@ -66,18 +71,9 @@ class DiagnosticsScreen(QWidget):
     def apply_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Обновляет runtime-состояние приложения."""
 
-        self._connection_value.setText(
-            f"{snapshot.connection.status.value} | {snapshot.connection.message}"
-        )
-        self._session_value.setText(
-            f"{snapshot.session.status.value} | {snapshot.session.user_name or '-'}"
-        )
-        self._scanner_value.setText(
-            (
-                f"{snapshot.scanner.status.value} | "
-                f"{snapshot.scanner.port or '-'} | {snapshot.scanner.message}"
-            )
-        )
+        self._connection_value.setText(self._connection_text(snapshot))
+        self._session_value.setText(self._session_text(snapshot))
+        self._scanner_value.setText(self._scanner_text(snapshot))
 
     def _configure_widgets(self) -> None:
         """Настраивает objectName, переносы и сигналы."""
@@ -88,6 +84,8 @@ class DiagnosticsScreen(QWidget):
         self._log_path.setObjectName("diagnosticsMutedText")
         self._refresh_button.setObjectName("diagnosticsPrimaryButton")
         self._clear_button.setObjectName("diagnosticsDangerButton")
+        self._refresh_button.setToolTip(tr("diagnostics.refreshHint"))
+        self._clear_button.setToolTip(tr("diagnostics.clearHint"))
         self._log_view.setObjectName("diagnosticsLog")
         self._refresh_button.clicked.connect(self.logs_refresh_requested.emit)
         self._clear_button.clicked.connect(self.logs_clear_requested.emit)
@@ -265,3 +263,58 @@ class DiagnosticsScreen(QWidget):
         value.setWordWrap(True)
         grid.addWidget(title_label, row, 0)
         grid.addWidget(value, row, 1)
+
+    @staticmethod
+    def _connection_text(snapshot: RuntimeSnapshot) -> str:
+        """Возвращает понятный статус backend/WebSocket."""
+
+        titles = {
+            ConnectionStatus.CONNECTED: tr("diagnostics.connection.connected"),
+            ConnectionStatus.CONNECTING: tr("diagnostics.connection.connecting"),
+            ConnectionStatus.DISCONNECTED: tr("diagnostics.connection.disconnected"),
+            ConnectionStatus.STOPPED: tr("diagnostics.connection.stopped"),
+        }
+        return DiagnosticsScreen._status_text(
+            titles.get(snapshot.connection.status, snapshot.connection.status.value),
+            snapshot.connection.message,
+        )
+
+    @staticmethod
+    def _session_text(snapshot: RuntimeSnapshot) -> str:
+        """Возвращает понятный статус пользовательской сессии."""
+
+        titles = {
+            SessionStatus.AUTHENTICATED: tr("diagnostics.session.authenticated"),
+            SessionStatus.UNAUTHENTICATED: tr("diagnostics.session.unauthenticated"),
+            SessionStatus.UNKNOWN: tr("diagnostics.session.unknown"),
+        }
+        detail = snapshot.session.user_name or snapshot.session.supplier_name or "-"
+        return DiagnosticsScreen._status_text(
+            titles.get(snapshot.session.status, snapshot.session.status.value),
+            detail,
+        )
+
+    @staticmethod
+    def _scanner_text(snapshot: RuntimeSnapshot) -> str:
+        """Возвращает понятный статус сканера."""
+
+        titles = {
+            ScannerStatus.RUNNING: tr("diagnostics.scanner.running"),
+            ScannerStatus.STARTING: tr("diagnostics.scanner.starting"),
+            ScannerStatus.ERROR: tr("diagnostics.scanner.error"),
+            ScannerStatus.STOPPED: tr("diagnostics.scanner.stopped"),
+        }
+        detail = snapshot.scanner.port or snapshot.scanner.message or "-"
+        return DiagnosticsScreen._status_text(
+            titles.get(snapshot.scanner.status, snapshot.scanner.status.value),
+            detail,
+        )
+
+    @staticmethod
+    def _status_text(title: str, detail: str) -> str:
+        """Склеивает короткий статус и деталь без технических разделителей."""
+
+        clean_detail = (detail or "").strip()
+        if not clean_detail or clean_detail == "-":
+            return title
+        return f"{title}\n{clean_detail}"

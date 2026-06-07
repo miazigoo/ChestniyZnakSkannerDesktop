@@ -36,6 +36,7 @@ class BoxLookupScreen(QWidget):
         self._error = QLabel("")
         self._last_code = QLabel(tr("lookup.lastScan", code="-"))
         self._found = QLabel(tr("lookup.found", value="-"))
+        self._found_hint = QLabel(tr("lookup.resultHint"))
         self._reset_button = QPushButton(tr("lookup.reset"))
         self._log = QTextEdit()
         self._log.setReadOnly(True)
@@ -80,10 +81,13 @@ class BoxLookupScreen(QWidget):
         self._error.setObjectName("lookupError")
         self._last_code.setObjectName("lookupLastCode")
         self._found.setObjectName("lookupFoundBox")
+        self._found_hint.setObjectName("lookupMutedText")
         self._reset_button.setObjectName("lookupSecondaryButton")
+        self._reset_button.setToolTip(tr("lookup.resetHint"))
         self._log.setObjectName("lookupLog")
         self._last_code.setWordWrap(True)
         self._found.setWordWrap(True)
+        self._found_hint.setWordWrap(True)
         self._reset_button.clicked.connect(self.reset_requested.emit)
 
     def _build_layout(self) -> None:
@@ -170,6 +174,7 @@ class BoxLookupScreen(QWidget):
         layout.addLayout(header)
         layout.addWidget(self._error)
         layout.addWidget(self._found)
+        layout.addWidget(self._found_hint)
         layout.addWidget(self._last_code)
         layout.addStretch(1)
         return card

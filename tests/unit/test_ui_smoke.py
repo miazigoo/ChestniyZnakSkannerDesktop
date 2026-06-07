@@ -345,6 +345,8 @@ def test_box_lookup_screen_shows_scanner_result() -> None:
 
     assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
     assert "Коробка:" in screen._found.text()  # noqa: SLF001
+    assert "Коробки" in screen._found_hint.text()  # noqa: SLF001
+    assert screen._reset_button.toolTip()  # noqa: SLF001
     assert screen._reset_button.isEnabled() is True  # noqa: SLF001
 
 
@@ -473,7 +475,10 @@ def test_diagnostics_screen_shows_runtime_and_logs() -> None:
     )
 
     assert "backend" in screen._backend_value.text()  # noqa: SLF001
-    assert "connected" in screen._connection_value.text()  # noqa: SLF001
+    assert "Связь подключена" in screen._connection_value.text()  # noqa: SLF001
+    assert "Сессия активна" in screen._session_value.text()  # noqa: SLF001
+    assert "Сканер работает" in screen._scanner_value.text()  # noqa: SLF001
+    assert screen._refresh_button.toolTip()  # noqa: SLF001
     assert "line two" in screen._log_view.toPlainText()  # noqa: SLF001
 
 
@@ -635,6 +640,7 @@ def test_settings_screen_has_grouped_pages() -> None:
     screen = SettingsScreen()
 
     assert screen._stack.count() == 6  # noqa: SLF001
+    assert "Backend" in screen._hub_page.findChildren(QPushButton)[0].text()  # noqa: SLF001
     assert len(screen._theme_page.findChildren(ThemeOptionCard)) == 10  # noqa: SLF001
 
 
