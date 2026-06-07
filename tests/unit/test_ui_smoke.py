@@ -284,6 +284,8 @@ def test_boxes_screen_shows_rows_and_detail_panel() -> None:
 
     assert screen._table.rowCount() == 1  # noqa: SLF001
     assert screen._detail_items_table.rowCount() == 1  # noqa: SLF001
+    assert "увидеть состав" in screen._table.item(0, 0).toolTip()  # noqa: SLF001
+    assert "Удалить все коды" in screen._clear_box_button.toolTip()  # noqa: SLF001
     assert (  # noqa: SLF001
         screen._detail_items_table.item(0, 3).text() == "04601234567890SERIAL77<GS>91ABC"
     )
@@ -398,6 +400,10 @@ def test_verify_screen_shows_processed_code() -> None:
             technical_status="OK",
             order_name="26-0001",
             device_name="Device",
+            box_id=101,
+            box_sscc="SSCC-101",
+            box_status="закрыта",
+            box_hint="Код уже лежит в закрытой коробке #101. SSCC: SSCC-101",
             exists=True,
             warnings=["Повторная проверка"],
             log=["010460123456789021SERIAL: Код найден"],
@@ -407,6 +413,9 @@ def test_verify_screen_shows_processed_code() -> None:
     assert "Сканер готов" in screen._scanner_status.text()  # noqa: SLF001
     assert "Код найден" in screen._result.text()  # noqa: SLF001
     assert "код найден" in screen._exists.text()  # noqa: SLF001
+    assert "SSCC-101" in screen._box.text()  # noqa: SLF001
+    assert "закрыта" in screen._box_status.text()  # noqa: SLF001
+    assert "SSCC-101" in screen._box_hint.text()  # noqa: SLF001
     assert "Повторная проверка" in screen._warnings.text()  # noqa: SLF001
 
 

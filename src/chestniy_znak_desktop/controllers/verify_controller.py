@@ -46,6 +46,10 @@ class VerifyUiState:
     technical_status: str = ""
     order_name: str = ""
     device_name: str = ""
+    box_id: int | None = None
+    box_sscc: str = ""
+    box_status: str = ""
+    box_hint: str = field(default_factory=lambda: tr("verify.boxEmpty"))
     exists: bool | None = None
     check_duplicates: bool = False
     warnings: list[str] = field(default_factory=list)
@@ -131,6 +135,10 @@ class VerifyController(QObject):
                 technical_status=result.status,
                 order_name=self._order_name(result),
                 device_name=self._device_name(result),
+                box_id=self._box_id(result),
+                box_sscc=self._box_sscc(result),
+                box_status=self._box_status(result),
+                box_hint=self._box_hint(result),
                 exists=result.exists,
                 check_duplicates=self._state.check_duplicates,
                 warnings=result.warnings,
@@ -205,3 +213,45 @@ class VerifyController(QObject):
         if result.code is None:
             return ""
         return result.code.device_name
+
+    @staticmethod
+    def _box_id(result: VerifyExistsResponseDto) -> int | None:
+        """Возвращает legacy ID коробки, если код уже упакован."""
+
+        if result.box is None:
+            return None
+        return result.box.box_id
+
+    @staticmethod
+    def _box_sscc(result: VerifyExistsResponseDto) -> str:
+        """Возвращает SSCC/код коробки, если backend его прислал."""
+
+        if result.box is None:
+            return ""
+        return result.box.sscc or ""
+
+    @staticmethod
+    def _box_status(result: VerifyExistsResponseDto) -> str:
+        """Возвращает человекочитаемый статус коробки."""
+
+        if result.box is None:
+            return tr("verify.boxNotPacked")
+        if result.box.is_closed is True:
+            return tr("verify.boxClosed")
+        if result.box.is_closed is False:
+            return tr("verify.boxOpen")
+        return tr("verify.boxUnknown")
+
+    @staticmethod
+    def _box_hint(result: VerifyExistsResponseDto) -> str:
+        """Формирует подсказку по расположению кода для оператора."""
+
+        if not result.ok or not result.exists:
+            return tr("verify.boxNoCodeHint")
+        if result.box is None:
+            return tr("verify.boxNotPackedHint")
+        box_id = result.box.box_id or "-"
+        sscc = result.box.sscc or "-"
+        if result.box.is_closed is True:
+            return tr("verify.boxClosedHint", box_id=box_id, sscc=sscc)
+        return tr("verify.boxOpenHint", box_id=box_id, sscc=sscc)

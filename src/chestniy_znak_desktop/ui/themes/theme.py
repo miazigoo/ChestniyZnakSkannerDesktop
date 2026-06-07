@@ -393,6 +393,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #boxesDetailTitle,
         #lookupFoundBox,
         #verifyResult,
+        #verifyBoxHint,
         #defectResult {{
             color: {palette.text};
             border-radius: 16px;

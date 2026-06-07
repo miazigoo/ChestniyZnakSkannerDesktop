@@ -41,6 +41,9 @@ class VerifyScreen(QWidget):
         self._exists = QLabel(tr("verify.exists", exists="-"))
         self._order = QLabel(tr("verify.order", order="-"))
         self._device = QLabel(tr("verify.device", device="-"))
+        self._box = QLabel(tr("verify.box", box="-"))
+        self._box_status = QLabel(tr("verify.boxStatus", status="-"))
+        self._box_hint = QLabel(tr("verify.boxEmpty"))
         self._warnings = QLabel("")
         self._log = QTextEdit()
         self._log.setReadOnly(True)
@@ -67,6 +70,9 @@ class VerifyScreen(QWidget):
         self._sync_duplicate_check(state.check_duplicates)
         self._order.setText(tr("verify.order", order=state.order_name or "-"))
         self._device.setText(tr("verify.device", device=state.device_name or "-"))
+        self._box.setText(tr("verify.box", box=self._box_text(state)))
+        self._box_status.setText(tr("verify.boxStatus", status=state.box_status or "-"))
+        self._box_hint.setText(state.box_hint)
         warnings = "; ".join(state.warnings)
         self._warnings.setText(tr("verify.warnings", warnings=warnings) if warnings else "")
         self._warnings.setVisible(bool(warnings))
@@ -100,6 +106,9 @@ class VerifyScreen(QWidget):
         self._exists.setObjectName("verifyMetaValue")
         self._order.setObjectName("verifyMetaValue")
         self._device.setObjectName("verifyMetaValue")
+        self._box.setObjectName("verifyMetaValue")
+        self._box_status.setObjectName("verifyMetaValue")
+        self._box_hint.setObjectName("verifyBoxHint")
         self._warnings.setObjectName("verifyWarning")
         self._log.setObjectName("verifyLog")
         for label in (
@@ -111,6 +120,9 @@ class VerifyScreen(QWidget):
             self._exists,
             self._order,
             self._device,
+            self._box,
+            self._box_status,
+            self._box_hint,
             self._warnings,
         ):
             label.setWordWrap(True)
@@ -208,6 +220,7 @@ class VerifyScreen(QWidget):
         layout.addLayout(header)
         layout.addWidget(self._error)
         layout.addWidget(self._result)
+        layout.addWidget(self._box_hint)
         layout.addWidget(self._last_code)
         layout.addStretch(1)
         return card
@@ -226,7 +239,9 @@ class VerifyScreen(QWidget):
         grid.addWidget(self._exists, 0, 1)
         grid.addWidget(self._order, 1, 0)
         grid.addWidget(self._device, 1, 1)
-        grid.addWidget(self._warnings, 2, 0, 1, 2)
+        grid.addWidget(self._box, 2, 0)
+        grid.addWidget(self._box_status, 2, 1)
+        grid.addWidget(self._warnings, 3, 0, 1, 2)
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 18, 20, 18)
@@ -277,6 +292,18 @@ class VerifyScreen(QWidget):
         if exists is False:
             return tr("verify.notFound")
         return "-"
+
+    @staticmethod
+    def _box_text(state: VerifyUiState) -> str:
+        """Возвращает компактное отображение коробки для карточки деталей."""
+
+        if state.box_id is None and not state.box_sscc:
+            return "-"
+        if state.box_id is None:
+            return state.box_sscc
+        if not state.box_sscc:
+            return f"#{state.box_id}"
+        return f"#{state.box_id} · {state.box_sscc}"
 
     def _sync_duplicate_check(self, checked: bool) -> None:
         """Синхронизирует переключатель дублей без повторного сигнала."""

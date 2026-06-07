@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from chestniy_znak_desktop.api.models.verify import (
     RemoteCodeDto,
+    VerifyBoxDto,
     VerifyExistsResponseDto,
 )
 from chestniy_znak_desktop.controllers.verify_controller import (
@@ -56,6 +57,11 @@ class FakeVerifyService:
                 visible_code="010460123456789021SERIAL",
                 order_name="26-0001",
                 device_name="Device",
+            ),
+            box=VerifyBoxDto(
+                box_id=101,
+                sscc="SSCC-101",
+                is_closed=True,
             ),
         )
 
@@ -113,6 +119,10 @@ def test_verify_controller_checks_scanned_code() -> None:
     assert controller.state.result_message == "Код найден"
     assert controller.state.order_name == "26-0001"
     assert controller.state.device_name == "Device"
+    assert controller.state.box_id == 101
+    assert controller.state.box_sscc == "SSCC-101"
+    assert controller.state.box_status == "закрыта"
+    assert "SSCC-101" in controller.state.box_hint
     assert controller.state.exists is True
     assert sounds.events == [SoundEvent.OK]
 
@@ -158,6 +168,8 @@ def test_verify_controller_reports_missing_code() -> None:
 
     assert controller.state.error_message == "Код не найден"
     assert controller.state.exists is False
+    assert controller.state.box_id is None
+    assert controller.state.box_status == "не упакован"
     assert sounds.events == [SoundEvent.ERROR]
 
 

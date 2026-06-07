@@ -20,6 +20,14 @@ class RemoteCodeDto(BaseModel):
     device_name: str = ""
 
 
+class VerifyBoxDto(BaseModel):
+    """Место нахождения кода в коробке."""
+
+    box_id: int | None = None
+    sscc: str | None = None
+    is_closed: bool | None = None
+
+
 class VerifyResponseDto(BaseModel):
     """Результат проверки DataMatrix-кода."""
 
@@ -27,6 +35,7 @@ class VerifyResponseDto(BaseModel):
     message: str
     scan_id: int | None = None
     code: RemoteCodeDto | None = None
+    box: VerifyBoxDto | None = None
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -41,6 +50,7 @@ class VerifyExistsResponseDto(BaseModel):
     device_name: str | None = None
     scan_id: int | None = None
     code: RemoteCodeDto | None = None
+    box: VerifyBoxDto | None = None
     warnings: list[str] = Field(default_factory=list)
 
 

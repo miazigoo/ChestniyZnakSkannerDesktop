@@ -128,9 +128,7 @@ class AutoPackingScreen(QWidget):
         self._fill_box_items_table_if_changed(state)
         self._update_table_tabs(state)
         self._apply_pending_tone(state)
-        self._status_detail.setText(
-            state.error_message or state.result_message or state.status_message
-        )
+        self._status_detail.setText(self._status_detail_text(state))
         self._error_label.setText(state.error_message)
         self._error_label.setVisible(bool(state.error_message))
         self._set_busy(state.is_busy)
@@ -478,19 +476,28 @@ class AutoPackingScreen(QWidget):
         """Подкрашивает локальный бокс по заполненности."""
 
         tone = "full" if state.is_pending_full else "partial"
-        self._status_title.setText(
-            tr(
-                "autoPacking.boxFull",
-                count=state.pending_count,
-                capacity=state.codes_per_item,
+        if state.pending_count == 0 and state.current_box is not None:
+            self._status_title.setText(
+                tr(
+                    "autoPacking.serverBoxProgress",
+                    filled=state.current_box.filled,
+                    capacity=state.current_box.capacity,
+                )
             )
-            if state.is_pending_full
-            else tr(
-                "autoPacking.boxPartial",
-                count=state.pending_count,
-                capacity=state.codes_per_item,
+        else:
+            self._status_title.setText(
+                tr(
+                    "autoPacking.boxFull",
+                    count=state.pending_count,
+                    capacity=state.codes_per_item,
+                )
+                if state.is_pending_full
+                else tr(
+                    "autoPacking.boxPartial",
+                    count=state.pending_count,
+                    capacity=state.codes_per_item,
+                )
             )
-        )
         parent = self._status_title.parentWidget()
         while parent is not None and parent.objectName() != "autoPackingBoxPanel":
             parent = parent.parentWidget()
@@ -498,6 +505,20 @@ class AutoPackingScreen(QWidget):
             parent.setProperty("tone", tone)
             parent.style().unpolish(parent)
             parent.style().polish(parent)
+
+    @staticmethod
+    def _status_detail_text(state: AutoPackingUiState) -> str:
+        """Возвращает понятную подсказку локального бокса и текущей коробки."""
+
+        if state.error_message:
+            return state.error_message
+        if state.pending_count == 0 and state.current_box is not None:
+            return tr(
+                "autoPacking.serverBoxReady",
+                filled=state.current_box.filled,
+                capacity=state.current_box.capacity,
+            )
+        return state.result_message or state.status_message
 
     def _emit_remove_selected(self) -> None:
         """Публикует запрос удаления выбранной строки локального бокса."""

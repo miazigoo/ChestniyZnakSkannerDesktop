@@ -195,7 +195,7 @@ class PackingScreen(QWidget):
         hint.setObjectName("packingMutedText")
         hint.setWordWrap(True)
 
-        buttons = QHBoxLayout()
+        buttons = QVBoxLayout()
         buttons.setSpacing(10)
         buttons.addWidget(self._refresh_button)
         buttons.addWidget(self._open_box_button)

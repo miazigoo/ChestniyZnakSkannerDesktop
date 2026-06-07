@@ -120,6 +120,8 @@ class BoxesScreen(QWidget):
         self._status_filter.setObjectName("boxesCombo")
         self._search_input.setObjectName("boxesSearchInput")
         self._search_input.setPlaceholderText(tr("boxes.searchPlaceholder"))
+        self._status_filter.setToolTip(tr("boxes.hint.statusFilter"))
+        self._search_input.setToolTip(tr("boxes.hint.search"))
         self._search_input.returnPressed.connect(self._emit_search)
         self._status_filter.currentIndexChanged.connect(self._emit_status_filter)
         self._search_button.setObjectName("boxesPrimaryButton")
@@ -132,6 +134,16 @@ class BoxesScreen(QWidget):
         self._remove_item_button.setObjectName("boxesDangerButton")
         self._clear_box_button.setObjectName("boxesDangerButton")
         self._delete_empty_button.setObjectName("boxesDangerButton")
+        self._search_button.setToolTip(tr("boxes.hint.find"))
+        self._refresh_button.setToolTip(tr("boxes.hint.refresh"))
+        self._previous_button.setToolTip(tr("boxes.hint.previous"))
+        self._next_button.setToolTip(tr("boxes.hint.next"))
+        self._detail_button.setToolTip(tr("boxes.hint.details"))
+        self._edit_open_button.setToolTip(tr("boxes.hint.editOpen"))
+        self._edit_close_button.setToolTip(tr("boxes.hint.editClose"))
+        self._remove_item_button.setToolTip(tr("boxes.hint.removeCode"))
+        self._clear_box_button.setToolTip(tr("boxes.hint.clearBox"))
+        self._delete_empty_button.setToolTip(tr("boxes.hint.deleteEmpty"))
         self._search_button.clicked.connect(self._emit_search)
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._previous_button.clicked.connect(self.previous_page_requested.emit)
@@ -371,6 +383,7 @@ class BoxesScreen(QWidget):
             ]
             for column_index, value in enumerate(values):
                 cell = QTableWidgetItem(value)
+                cell.setToolTip(tr("boxes.hint.rowDetails", box_id=row.box_id))
                 if column_index == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._table.setItem(row_index, column_index, cell)
@@ -499,6 +512,8 @@ class BoxesScreen(QWidget):
                 cell = QTableWidgetItem(value)
                 if column_index == 3 and value:
                     cell.setToolTip(value)
+                elif column_index != 3:
+                    cell.setToolTip(tr("boxes.hint.itemRow", item_id=item.id))
                 if column_index == 0:
                     cell.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._detail_items_table.setItem(row_index, column_index, cell)
