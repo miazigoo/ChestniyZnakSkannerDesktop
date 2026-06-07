@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import replace
 from typing import TypeAlias
@@ -45,6 +46,7 @@ from chestniy_znak_desktop.scanner.hid_process_worker import HidProcessScanner
 from chestniy_znak_desktop.scanner.windows_hid_scanner import WindowsHidScanner
 from chestniy_znak_desktop.scanner.windows_raw_input_scanner import WindowsRawInputScanner
 from chestniy_znak_desktop.services.auto_pack_ws_verifier import AutoPackWsVerifier
+from chestniy_znak_desktop.services.order_local_pool_cache import OrderLocalPoolCache
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 from chestniy_znak_desktop.services.log_service import LogService
 from chestniy_znak_desktop.ui.app_window import AppWindow
@@ -113,7 +115,8 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     )
     packing_service = PackingService(api_client)
     printer_service = PrinterService(api_client)
-    order_service = OrderService(api_client)
+    local_pool_cache = OrderLocalPoolCache(config.data_dir / "local_pool.sqlite3")
+    order_service = OrderService(api_client, local_pool_cache=local_pool_cache)
     chz_service = ChestniyZnakService(api_client)
     box_edit_service = BoxEditService(api_client)
     auto_pack_ws_verifier = AutoPackWsVerifier(connection_monitor=connection_monitor)
@@ -218,6 +221,13 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         lambda _user: auto_packing_controller.refresh_current_box()
     )
     auth_controller.authenticated.connect(lambda _user: auto_packing_controller.refresh_orders())
+    connection_monitor.message_received.connect(
+        lambda message: _handle_package_realtime_message(
+            message,
+            packing_controller=packing_controller,
+            auto_packing_controller=auto_packing_controller,
+        )
+    )
     runtime_controller.start()
     scanner_controller.refresh_ports()
     scanner_controller.start_hid_keyboard()
@@ -227,6 +237,27 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
     diagnostics_controller.refresh_logs()
     auth_controller.restore_session()
     return window
+
+
+def _handle_package_realtime_message(
+    message: str,
+    *,
+    packing_controller: PackingController,
+    auto_packing_controller: AutoPackingController,
+) -> None:
+    """Refresh Desktop packing screens on package realtime events."""
+
+    try:
+        payload = json.loads(message)
+    except json.JSONDecodeError:
+        return
+    if not isinstance(payload, dict):
+        return
+    message_type = str(payload.get("type") or "")
+    if not message_type.startswith("package."):
+        return
+    packing_controller.refresh_current_box()
+    auto_packing_controller.handle_realtime_message(message)
 
 
 def _create_hid_scanner() -> HidScannerSource:

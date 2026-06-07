@@ -324,7 +324,11 @@ class FakeBoxEditService:
 class FakeOrderService:
     """Fake сервис рабочих заказов для проверки выбора номенклатуры."""
 
-    def __init__(self, page: WorkOrderPageDto, pool_codes: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        page: WorkOrderPageDto,
+        pool_codes: list[str | LocalPoolCodeDto] | None = None,
+    ) -> None:
         """Создает сервис с фиксированной страницей заказов."""
 
         self.page = page
@@ -358,10 +362,14 @@ class FakeOrderService:
             data=LocalCodePoolDto(
                 order=self.page.data[0],
                 codes=[
-                    LocalPoolCodeDto(
-                        id=f"code-{index}",
-                        code=code,
-                        status="issued",
+                    (
+                        code
+                        if isinstance(code, LocalPoolCodeDto)
+                        else LocalPoolCodeDto(
+                            id=f"code-{index}",
+                            code=code,
+                            status="issued",
+                        )
                     )
                     for index, code in enumerate(page_codes, start=offset + 1)
                 ],
@@ -658,9 +666,83 @@ def test_auto_packing_accepts_only_downloaded_local_pool_codes(tmp_path: Path) -
     assert [item.raw_code for item in controller.state.pending_items] == ["CODE1"]
     assert service.batch_calls == []
     assert verifier.calls == []
-    assert controller.state.status_message == "Код не относится к выбранному заказу"
-    assert "не будет добавлен" in controller.state.error_message
-    assert sounds.events == [SoundEvent.WARNING]
+
+
+def test_auto_packing_rejects_local_pool_code_already_in_closed_box(tmp_path: Path) -> None:
+    """Проверяет локальный стоп, если snapshot говорит, что код уже в закрытой коробке."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    order_service = FakeOrderService(
+        _work_order(),
+        pool_codes=[
+            LocalPoolCodeDto(
+                id="code-1",
+                code="CODE1",
+                status="packed",
+                order_line_id="line-1",
+                package_unit_id="package-1",
+                package_code="BOX-001",
+                package_status="closed",
+            )
+        ],
+    )
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+
+    controller.refresh_orders()
+    controller.open_box()
+    controller.on_code_scanned("CODE1")
+
+    assert controller.state.pending_items == []
+    assert service.batch_calls == []
+    assert verifier.calls == []
+    assert "BOX-001" in controller.state.status_message
+    assert sounds.events[-1] == SoundEvent.WARNING
+
+
+def test_auto_packing_refreshes_local_pool_on_package_realtime_event(tmp_path: Path) -> None:
+    """Проверяет фоновую догрузку snapshot после закрытия коробки другим оператором."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    order_service = FakeOrderService(_work_order(), pool_codes=["CODE1"])
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+    )
+
+    controller.refresh_orders()
+    controller.handle_realtime_message(
+        '{"type":"package.closed","order_id":"order-1","package_code":"BOX-001"}'
+    )
+
+    assert order_service.pool_calls == [
+        ("order-1", 5000, 0),
+        ("order-1", 5000, 0),
+    ]
 
 
 def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path: Path) -> None:

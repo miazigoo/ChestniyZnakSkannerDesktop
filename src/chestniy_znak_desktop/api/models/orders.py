@@ -57,6 +57,11 @@ class LocalPoolCodeDto(BaseModel):
     code: str
     status: str
     order_line_id: str | None = None
+    package_unit_id: str | None = None
+    package_code: str | None = None
+    package_status: str | None = None
+    package_closed_at: str | None = None
+    updated_at: str | None = None
 
 
 class LocalCodePoolDto(BaseModel):

@@ -6,9 +6,11 @@ from typing import Any
 
 from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
+from chestniy_znak_desktop.api.services.order_service import OrderService
 from chestniy_znak_desktop.api.services.packing_service import PackingService
 from chestniy_znak_desktop.api.services.printer_service import PrinterService
 from chestniy_znak_desktop.api.models.printers import PrintJobDto
+from chestniy_znak_desktop.services.order_local_pool_cache import OrderLocalPoolCache
 
 
 class FakeApiClient:
@@ -374,6 +376,68 @@ def test_packing_service_close_box_only_closes_remote_box() -> None:
         "chestniy-znak/packing/boxes/1/close",
         {"json": None, "params": {"device_id": "pc-1"}},
     )
+
+
+def test_order_service_caches_local_pool_for_offline_desktop(tmp_path) -> None:
+    """Desktop can keep working with a selected order when the API is temporarily unavailable."""
+
+    client = FakeApiClient()
+
+    def local_pool_get(url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        client.last_call = ("GET", url, {"params": params})
+        client.calls.append(client.last_call)
+        if url == "orders/order-1/local-pool":
+            return {
+                "data": {
+                    "order": {
+                        "id": "order-1",
+                        "plant_id": "plant-1",
+                        "supplier_id": "supplier-1",
+                        "order_number": "PO-1",
+                        "status": "in_progress",
+                        "scan_required": True,
+                        "lines": [],
+                    },
+                    "codes": [
+                        {
+                            "id": "code-1",
+                            "code": "010460123456789021SERIAL",
+                            "status": "packed",
+                            "order_line_id": "line-1",
+                            "package_unit_id": "box-uuid-1",
+                            "package_code": "BOX-001",
+                            "package_status": "closed",
+                            "package_closed_at": "2026-06-07T10:00:00+00:00",
+                            "updated_at": "2026-06-07T10:00:00+00:00",
+                        }
+                    ],
+                    "total": 1,
+                    "count": 1,
+                    "limit": 5000,
+                    "offset": 0,
+                    "next_offset": None,
+                    "has_more": False,
+                }
+            }
+        return FakeApiClient.get(client, url, params)
+
+    client.get = local_pool_get  # type: ignore[method-assign]
+    cache = OrderLocalPoolCache(tmp_path / "local_pool.sqlite3")
+    service = OrderService(client, local_pool_cache=cache)
+
+    first = service.download_local_pool("order-1")
+    assert first.data.codes[0].package_code == "BOX-001"
+
+    def failing_get(url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        raise RuntimeError("network down")
+
+    client.get = failing_get  # type: ignore[method-assign]
+    cached = service.download_local_pool("order-1")
+
+    assert cached.data.order.order_number == "PO-1"
+    assert cached.data.codes[0].code == "010460123456789021SERIAL"
+    assert cached.data.codes[0].status == "packed"
+    assert cached.data.codes[0].package_code == "BOX-001"
 
 
 def test_printer_service_autoselects_single_printer_and_reports_print_result() -> None:

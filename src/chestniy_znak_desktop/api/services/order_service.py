@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from chestniy_znak_desktop.api.errors import UnauthorizedError
 from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto, WorkOrderPageDto
 from chestniy_znak_desktop.api.services.api_client_protocol import ApiClientProtocol
+from chestniy_znak_desktop.services.order_local_pool_cache import OrderLocalPoolCache
 
 
 class OrderService:
     """Получает заказы и строки номенклатуры для Desktop/TSD сценариев."""
 
-    def __init__(self, api_client: ApiClientProtocol) -> None:
+    def __init__(
+        self,
+        api_client: ApiClientProtocol,
+        local_pool_cache: OrderLocalPoolCache | None = None,
+    ) -> None:
         """Сохраняет API-клиент сервиса."""
 
         self._api_client = api_client
+        self._local_pool_cache = local_pool_cache
 
     def list_orders(
         self,
@@ -39,8 +46,20 @@ class OrderService:
     ) -> LocalCodePoolPageDto:
         """Возвращает страницу кодов заказа для локального сканирования."""
 
-        payload = self._api_client.get(
-            f"orders/{order_id}/local-pool",
-            params={"limit": limit, "offset": offset},
-        )
-        return LocalCodePoolPageDto.model_validate(payload)
+        try:
+            payload = self._api_client.get(
+                f"orders/{order_id}/local-pool",
+                params={"limit": limit, "offset": offset},
+            )
+        except UnauthorizedError:
+            raise
+        except Exception:
+            if self._local_pool_cache is not None:
+                cached = self._local_pool_cache.load_page(order_id, limit=limit, offset=offset)
+                if cached is not None:
+                    return cached
+            raise
+        page = LocalCodePoolPageDto.model_validate(payload)
+        if self._local_pool_cache is not None:
+            self._local_pool_cache.save_page(page)
+        return page

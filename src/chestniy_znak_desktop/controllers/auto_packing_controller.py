@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import re
 from collections import deque
 from dataclasses import dataclass, field, replace
@@ -10,7 +11,11 @@ from typing import Any, Protocol, TypeVar, cast
 
 from PySide6.QtCore import QObject, Signal
 
-from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto, WorkOrderPageDto
+from chestniy_znak_desktop.api.models.orders import (
+    LocalCodePoolPageDto,
+    LocalPoolCodeDto,
+    WorkOrderPageDto,
+)
 from chestniy_znak_desktop.api.models.packing import (
     BoxActionResultDto,
     BoxDetailDto,
@@ -216,7 +221,7 @@ class AutoPackingController(QObject):
         self._box_code_ids: set[int] = set()
         self._box_visible_codes: set[str] = set()
         self._local_pool_order_id = ""
-        self._local_pool_codes: set[str] = set()
+        self._local_pool_codes: dict[str, LocalPoolCodeDto] = {}
         self._local_pool_loaded = False
         self._open_box_after_pool_order_id = ""
         settings = settings_store.load(settings_defaults)
@@ -267,6 +272,27 @@ class AutoPackingController(QObject):
             self._on_orders_loaded,
             self._on_orders_error,
         )
+
+    def handle_realtime_message(self, message: str) -> None:
+        """Обновляет локальный пул при realtime-событиях по коробкам."""
+
+        try:
+            payload = json.loads(message)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(payload, dict):
+            return
+        message_type = str(payload.get("type") or "")
+        if not message_type.startswith("package."):
+            return
+        selected = self._selected_order_option()
+        if selected is None or not selected.scan_required:
+            return
+        event_order_id = str(payload.get("order_id") or "")
+        if event_order_id and event_order_id != selected.order_id:
+            return
+        self._local_pool_loaded = False
+        self._download_local_pool_for(selected)
 
     def select_order_line(self, order_line_id: str) -> None:
         """Выбирает строку заказа для следующей коробки."""
@@ -1082,24 +1108,34 @@ class AutoPackingController(QObject):
         self._set_busy(tr("autoPacking.localPoolDownloading"))
         self._task_runner.submit(
             lambda: self._download_local_pool_codes(selected.order_id, download_method),
-            lambda codes: self._on_local_pool_loaded(selected.order_id, cast(set[str], codes)),
+            lambda codes: self._on_local_pool_loaded(
+                selected.order_id,
+                cast(dict[str, LocalPoolCodeDto], codes),
+            ),
             self._on_local_pool_error,
         )
         return True
 
-    def _download_local_pool_codes(self, order_id: str, download_method: object) -> set[str]:
+    def _download_local_pool_codes(
+        self,
+        order_id: str,
+        download_method: object,
+    ) -> dict[str, LocalPoolCodeDto]:
         """Постранично скачивает и нормализует локальный пул кодов заказа."""
 
         if not callable(download_method):
-            return set()
+            return {}
         limit = 5000
         offset = 0
-        codes: set[str] = set()
+        codes: dict[str, LocalPoolCodeDto] = {}
         while True:
             page = download_method(order_id, limit=limit, offset=offset)
             pool_page = self._expect(page, LocalCodePoolPageDto)
             pool = pool_page.data
-            codes.update(self._normalize_pool_code(code.code) for code in pool.codes)
+            for code in pool.codes:
+                normalized = self._normalize_pool_code(code.code)
+                if normalized:
+                    codes[normalized] = code
             if not pool.has_more or pool.next_offset is None:
                 break
             next_offset = int(pool.next_offset)
@@ -1108,7 +1144,7 @@ class AutoPackingController(QObject):
             offset = next_offset
         return codes
 
-    def _on_local_pool_loaded(self, order_id: str, codes: set[str]) -> None:
+    def _on_local_pool_loaded(self, order_id: str, codes: dict[str, LocalPoolCodeDto]) -> None:
         """Применяет загруженный локальный пул и продолжает открытие коробки при необходимости."""
 
         self._local_pool_order_id = order_id
@@ -1159,8 +1195,22 @@ class AutoPackingController(QObject):
         if selected is None or not self._is_local_pool_ready_for(selected.order_id):
             return code
         normalized = self._normalize_pool_code(code)
-        if normalized in self._local_pool_codes:
+        pool_code = self._local_pool_codes.get(normalized)
+        if pool_code is not None and self._is_pool_code_available(pool_code):
             return normalized
+        if pool_code is not None:
+            self._play(SoundEvent.WARNING)
+            package_code = pool_code.package_code or pool_code.package_unit_id or ""
+            self._set_state(
+                replace(
+                    self._state,
+                    status_message=tr("autoPacking.codeInOtherBox", package_code=package_code),
+                    result_message="",
+                    error_message=tr("autoPacking.notInLocalPoolHint"),
+                    last_scanned_code=code,
+                )
+            )
+            return None
         self._play(SoundEvent.WARNING)
         self._set_state(
             replace(
@@ -1172,6 +1222,16 @@ class AutoPackingController(QObject):
             )
         )
         return None
+
+    @staticmethod
+    def _is_pool_code_available(code: LocalPoolCodeDto) -> bool:
+        """Проверяет, что код из snapshot еще можно класть в локальную коробку."""
+
+        return (
+            code.status not in {"packed", "exported"}
+            and not (code.package_code or "").strip()
+            and not (code.package_unit_id or "").strip()
+        )
 
     @staticmethod
     def _normalize_pool_code(code: str) -> str:

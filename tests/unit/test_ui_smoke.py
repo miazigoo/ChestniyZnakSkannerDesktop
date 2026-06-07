@@ -776,7 +776,7 @@ def test_runtime_status_bar_accepts_snapshot() -> None:
         )
     )
     assert widget is not None
-    assert widget._version_label.text() == "Версия: v1.0.0"  # noqa: SLF001
+    assert widget._version_label.text() == "Версия: v1.0.1"  # noqa: SLF001
 
 
 def test_existing_widgets_retranslate_after_language_change() -> None:
