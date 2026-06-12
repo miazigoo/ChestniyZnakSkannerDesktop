@@ -847,6 +847,7 @@ class AutoPackingController(QObject):
             )
             return
         self._remember_accepted_batch(self._state.current_box, self._state.pending_items)
+        self._mark_pending_codes_packed_in_local_pool(batch)
         self._set_state(
             replace(
                 self._state,
@@ -966,6 +967,7 @@ class AutoPackingController(QObject):
         )
         if closed.ok:
             self._forget_accepted_codes()
+            self._refresh_selected_local_pool()
         self.close_completed.emit(event)
 
     def _on_close_error(self, exc: Exception) -> None:
@@ -1091,12 +1093,13 @@ class AutoPackingController(QObject):
         selected: OrderLineOptionUi | None,
         *,
         open_after: bool = False,
+        force: bool = False,
     ) -> bool:
         """Скачивает локальный пул кодов выбранного заказа, если backend это поддерживает."""
 
         if selected is None or not selected.scan_required:
             return False
-        if self._is_local_pool_ready_for(selected.order_id):
+        if not force and self._is_local_pool_ready_for(selected.order_id):
             return False
         download_method = getattr(self._order_service, "download_local_pool", None)
         if not callable(download_method):
@@ -1116,6 +1119,33 @@ class AutoPackingController(QObject):
             self._on_local_pool_error,
         )
         return True
+
+    def _refresh_selected_local_pool(self) -> None:
+        """Принудительно обновляет snapshot выбранного заказа после изменения коробок."""
+
+        selected = self._selected_order_option()
+        if selected is None or not selected.scan_required:
+            return
+        self._local_pool_loaded = False
+        self._download_local_pool_for(selected, force=True)
+
+    def _mark_pending_codes_packed_in_local_pool(self, batch: ScanBatchToBoxResultDto) -> None:
+        """Сразу исключает принятые batch-коды из локального snapshot без полного скачивания."""
+
+        package_code = batch.box.sscc or str(batch.box.box_id)
+        for item in self._state.pending_items:
+            normalized = self._normalize_pool_code(item.raw_code)
+            pool_code = self._local_pool_codes.get(normalized)
+            if pool_code is None:
+                continue
+            self._local_pool_codes[normalized] = pool_code.model_copy(
+                update={
+                    "status": "packed",
+                    "package_unit_id": str(batch.box.box_id),
+                    "package_code": package_code,
+                    "package_status": "open",
+                }
+            )
 
     def _download_local_pool_codes(
         self,
