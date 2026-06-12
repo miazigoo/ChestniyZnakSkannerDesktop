@@ -18,6 +18,14 @@ class FakeCommandWindow:
         self.commands: list[ScannerCommand] = []
         self.auth_tokens: list[str] = []
         self.cyrillic_warnings = 0
+        self._scan_target = "packing"
+        self._stack = FakeStack()
+        self._login_screen = object()
+        self._packing_controller = FakePackingController()
+        self._auto_packing_controller = FakePackingController()
+        self._defect_controller = FakePackingController()
+        self._box_lookup_controller = FakePackingController()
+        self._verify_controller = FakePackingController()
 
     def _handle_scanner_command(self, command: ScannerCommand) -> bool:
         """Запоминает служебную команду как обработанную."""
@@ -29,6 +37,29 @@ class FakeCommandWindow:
         """Запоминает предупреждение о русской раскладке."""
 
         self.cyrillic_warnings += 1
+
+
+class FakeStack:
+    """Минимальный QStackedWidget для проверки маршрутизации скана."""
+
+    def currentWidget(self) -> object:
+        """Возвращает активный экран, отличный от логина."""
+
+        return object()
+
+
+class FakePackingController:
+    """Контроллер, запоминающий routed-коды."""
+
+    def __init__(self) -> None:
+        """Создает список принятых кодов."""
+
+        self.codes: list[str] = []
+
+    def on_code_scanned(self, code: str) -> None:
+        """Запоминает скан."""
+
+        self.codes.append(code)
 
 
 def test_parse_scanner_command_accepts_known_tokens() -> None:
@@ -62,13 +93,14 @@ def test_service_command_is_intercepted_before_regular_routing() -> None:
     assert window.auth_tokens == []
 
 
-def test_cyrillic_scan_is_rejected_before_regular_routing() -> None:
-    """Проверяет, что скан в русской раскладке не уходит в рабочие сценарии."""
+def test_cyrillic_scan_is_repaired_before_regular_routing() -> None:
+    """Проверяет, что HID-скан в русской раскладке чинится и идет в сценарий."""
 
     window = FakeCommandWindow()
 
-    AppWindow._handle_scanned_code(window, "фыва123")  # type: ignore[arg-type]
+    AppWindow._handle_scanned_code(window, "010460123456789021ЧЬ03")  # type: ignore[arg-type]
 
-    assert window.cyrillic_warnings == 1
+    assert window.cyrillic_warnings == 0
     assert window.commands == []
     assert window.auth_tokens == []
+    assert window._packing_controller.codes == ["010460123456789021XM03"]

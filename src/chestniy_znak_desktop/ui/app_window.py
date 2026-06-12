@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
@@ -26,7 +28,10 @@ from chestniy_znak_desktop.controllers.printer_controller import PrinterControll
 from chestniy_znak_desktop.controllers.scanner_controller import ScannerController
 from chestniy_znak_desktop.controllers.settings_controller import SettingsController
 from chestniy_znak_desktop.controllers.verify_controller import VerifyController
-from chestniy_znak_desktop.domain.scanner_input_guard import contains_cyrillic
+from chestniy_znak_desktop.domain.scanner_input_guard import (
+    contains_cyrillic,
+    repair_cyrillic_keyboard_layout,
+)
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.app_state import AppState
 from chestniy_znak_desktop.runtime.runtime_controller import RuntimeController
@@ -45,6 +50,8 @@ from chestniy_znak_desktop.ui.widgets.close_box_dialog import (
 )
 from chestniy_znak_desktop.ui.widgets.runtime_status_bar import RuntimeStatusBar
 from chestniy_znak_desktop.ui.widgets.settings_saved_dialog import SettingsSavedDialog
+
+logger = logging.getLogger(__name__)
 
 
 class AppWindow(QMainWindow):
@@ -636,9 +643,21 @@ class AppWindow(QMainWindow):
     def _handle_scanned_code(self, code: str) -> None:
         """Маршрутизирует код сканера в активный рабочий сценарий."""
 
+        code, repaired_layout = repair_cyrillic_keyboard_layout(code)
+        if repaired_layout:
+            logger.info(
+                "Scanner keyboard layout repaired before routing: target=%s len=%s",
+                getattr(self, "_scan_target", None),
+                len(code),
+            )
         if contains_cyrillic(code):
             self._show_cyrillic_scan_warning()
             return
+        logger.info(
+            "Scanner code routed: target=%s len=%s",
+            getattr(self, "_scan_target", None),
+            len(code),
+        )
         command = parse_scanner_command(code)
         if command is not None and self._handle_scanner_command(command):
             return
