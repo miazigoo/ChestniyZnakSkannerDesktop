@@ -445,6 +445,8 @@ def test_auto_packing_processes_2000_fast_scans_from_local_pool(tmp_path: Path) 
 
     controller.refresh_orders()
     runner.drain()
+    controller.select_order_line("line-auto-load")
+    runner.drain()
     controller.open_box()
     runner.drain()
     controller.set_codes_per_item(1)

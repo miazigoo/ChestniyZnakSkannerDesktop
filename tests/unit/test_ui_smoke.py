@@ -158,6 +158,10 @@ def test_main_sidebar_keeps_navigation_compact() -> None:
     scroll_area = screen.findChild(QScrollArea, "mainSidebarScroll")
 
     assert scroll_area is not None
+    assert screen._sidebar is not None  # noqa: SLF001
+    assert screen._sidebar.width() >= 258  # noqa: SLF001
+    assert screen._choose_order_button is not None  # noqa: SLF001
+    assert screen._choose_order_button.minimumWidth() >= 210  # noqa: SLF001
     assert screen._session_panel.minimumHeight() == 124  # noqa: SLF001
     assert all(item.minimumHeight() == 58 for item in screen._nav_items)  # noqa: SLF001
 
@@ -173,7 +177,7 @@ def test_main_screen_switches_to_compact_mode() -> None:
 
     assert screen._is_compact is True  # noqa: SLF001
     assert screen._sidebar is not None  # noqa: SLF001
-    assert screen._sidebar.width() == 214  # noqa: SLF001
+    assert screen._sidebar.width() == 258  # noqa: SLF001
 
 
 def test_boxes_screen_has_backend_status_filters() -> None:

@@ -520,6 +520,9 @@ _MESSAGES["ru"].update(
             "добавлен в коробку."
         ),
         "autoPacking.codeInOtherBox": "Код уже находится в коробке {package_code}",
+        "autoPacking.codeInOtherBoxHint": (
+            "Этот код уже упакован. Проверьте указанную коробку или сканируйте другое изделие."
+        ),
         "autoPacking.pendingSerial": "Ожидает проверки",
         "autoPacking.pendingOrder": "Проверка при отправке",
         "autoPacking.addedToLocal": "Код добавлен в автоскана-бокс",
@@ -1112,6 +1115,9 @@ _MESSAGES["en"].update(
             "be added to the box."
         ),
         "autoPacking.codeInOtherBox": "Code is already in box {package_code}",
+        "autoPacking.codeInOtherBoxHint": (
+            "This code is already packed. Check that box or scan another item."
+        ),
         "autoPacking.pendingSerial": "Awaiting verification",
         "autoPacking.pendingOrder": "Verified on submit",
         "autoPacking.addedToLocal": "Code added to the auto-scan box",
@@ -1661,6 +1667,7 @@ _MESSAGES["zh"].update(
         "autoPacking.notInLocalPool": "代码不属于所选订单",
         "autoPacking.notInLocalPoolHint": "请选择正确订单或下载最新码池。该代码不会加入箱中。",
         "autoPacking.codeInOtherBox": "代码已在箱 {package_code} 中",
+        "autoPacking.codeInOtherBoxHint": "该代码已包装。请检查对应箱或扫描其他产品。",
         "autoPacking.pendingSerial": "等待校验",
         "autoPacking.pendingOrder": "提交时校验",
         "autoPacking.addedToLocal": "代码已添加到自动扫描箱",

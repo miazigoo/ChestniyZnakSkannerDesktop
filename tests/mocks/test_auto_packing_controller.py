@@ -653,6 +653,7 @@ def test_auto_packing_blocks_box_for_no_scan_order(tmp_path: Path) -> None:
     )
 
     controller.refresh_orders()
+    controller.select_order_line("line-1")
     controller.open_box()
 
     assert controller.state.selected_order_scan_required is False
@@ -685,6 +686,7 @@ def test_auto_packing_accepts_only_downloaded_local_pool_codes(tmp_path: Path) -
     )
 
     controller.refresh_orders()
+    controller.select_order_line("line-1")
     controller.open_box()
     controller.set_codes_per_item(2)
     controller.on_code_scanned("CODE1")
@@ -732,6 +734,7 @@ def test_auto_packing_rejects_local_pool_code_already_in_closed_box(tmp_path: Pa
     )
 
     controller.refresh_orders()
+    controller.select_order_line("line-1")
     controller.open_box()
     controller.on_code_scanned("CODE1")
 
@@ -763,6 +766,7 @@ def test_auto_packing_refreshes_local_pool_on_package_realtime_event(tmp_path: P
     )
 
     controller.refresh_orders()
+    controller.select_order_line("line-1")
     controller.handle_realtime_message(
         '{"type":"package.closed","order_id":"order-1","package_code":"BOX-001"}'
     )

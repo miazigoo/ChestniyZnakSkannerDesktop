@@ -1047,8 +1047,6 @@ class AutoPackingController(QObject):
         selected_id = self._state.selected_order_line_id
         if selected_id and not any(option.order_line_id == selected_id for option in options):
             selected_id = ""
-        if not selected_id and options:
-            selected_id = options[0].order_line_id
         selected = PackingController._find_option_in(options, selected_id)
         status_message = (
             PackingController._selected_order_status(selected)
@@ -1237,7 +1235,7 @@ class AutoPackingController(QObject):
                     self._state,
                     status_message=tr("autoPacking.codeInOtherBox", package_code=package_code),
                     result_message="",
-                    error_message=tr("autoPacking.notInLocalPoolHint"),
+                    error_message=tr("autoPacking.codeInOtherBoxHint"),
                     last_scanned_code=code,
                 )
             )

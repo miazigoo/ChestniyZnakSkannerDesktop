@@ -125,7 +125,6 @@ class AppWindow(QMainWindow):
         self._auto_packing_controller.state_changed.connect(
             self._main_screen.auto_packing_screen.apply_state
         )
-        self._auto_packing_controller.state_changed.connect(self._main_screen.apply_order_state)
         self._auto_packing_controller.close_completed.connect(self._handle_auto_box_close_completed)
         self._box_lookup_controller.state_changed.connect(
             self._main_screen.box_lookup_screen.apply_state
@@ -227,12 +226,6 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.auto_packing_screen.count_in_packing_changed.connect(
             self._auto_packing_controller.set_count_in_packing
-        )
-        self._main_screen.auto_packing_screen.order_search_changed.connect(
-            self._auto_packing_controller.refresh_orders
-        )
-        self._main_screen.auto_packing_screen.order_line_selected.connect(
-            self._auto_packing_controller.select_order_line
         )
         self._main_screen.auto_packing_screen.clear_pending_requested.connect(
             self._auto_packing_controller.clear_pending

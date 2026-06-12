@@ -168,12 +168,21 @@ class AutoPackingScreen(QWidget):
         self._refresh_button.setObjectName("packingSecondaryButton")
         self._open_box_button.setObjectName("packingPrimaryButton")
         self._close_box_button.setObjectName("packingDangerButton")
-        self._clear_button.setText(tr("autoPacking.clearBoxLocal"))
+        self._clear_button.setText(tr("autoPacking.clearBoxShort"))
+        self._clear_button.setToolTip(tr("autoPacking.clearBoxLocal"))
         self._clear_button.setObjectName("packingDangerButton")
         self._remove_button.setObjectName("packingSecondaryButton")
         self._remove_box_item_button.setObjectName("packingDangerButton")
         self._clear_box_button.setObjectName("packingDangerButton")
         self._delete_box_button.setObjectName("packingDangerButton")
+        for button in (
+            self._refresh_button,
+            self._open_box_button,
+            self._close_box_button,
+            self._clear_button,
+            self._remove_button,
+        ):
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._refresh_button.clicked.connect(self.refresh_requested.emit)
         self._open_box_button.clicked.connect(self.open_box_requested.emit)
         self._close_box_button.clicked.connect(self.close_box_requested.emit)
@@ -246,11 +255,14 @@ class AutoPackingScreen(QWidget):
         quick.setSpacing(8)
         for button in self._quick_buttons:
             quick.addWidget(button)
-        actions = QHBoxLayout()
-        actions.setSpacing(10)
-        actions.addWidget(self._refresh_button)
-        actions.addWidget(self._open_box_button)
-        actions.addWidget(self._close_box_button)
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(10)
+        actions.setVerticalSpacing(8)
+        actions.addWidget(self._refresh_button, 0, 0, 1, 2)
+        actions.addWidget(self._open_box_button, 1, 0)
+        actions.addWidget(self._close_box_button, 1, 1)
+        actions.setColumnStretch(0, 1)
+        actions.setColumnStretch(1, 1)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(8)
