@@ -770,6 +770,50 @@ def test_auto_packing_refreshes_local_pool_once_before_rejecting_scan(tmp_path: 
     assert controller.state.error_message == ""
 
 
+def test_auto_packing_clears_virtual_box_when_selected_order_changes(tmp_path: Path) -> None:
+    """Проверяет, что ВБ не остается от старого заказа после смены заказа."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    order_service = FakeOrderService(_work_order(), pool_codes=["CODE1"])
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+    )
+
+    controller.refresh_orders()
+    controller.select_order_line("line-1")
+    controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned("CODE1")
+
+    assert [item.raw_code for item in controller.state.pending_items] == ["CODE1"]
+    assert controller.state.pending_items[0].order_key == "ORDER-1 · SKU-1 · Номенклатура 1"
+
+    controller.sync_selected_order(
+        OrderLineOptionUi(
+            order_id="order-2",
+            order_line_id="line-2",
+            order_number="ORDER-2",
+            sku="SKU-2",
+            product_name="Номенклатура 2",
+            label="ORDER-2 / Номенклатура 2",
+        )
+    )
+
+    assert controller.state.selected_order_line_id == "line-2"
+    assert controller.state.pending_items == []
+
+
 def test_auto_packing_applies_global_order_selected_before_orders_loaded(
     tmp_path: Path,
 ) -> None:

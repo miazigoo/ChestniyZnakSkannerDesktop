@@ -320,12 +320,19 @@ class AutoPackingController(QObject):
         """Синхронизирует глобально выбранный заказ с автоупаковкой."""
 
         options = self._order_options_with_selected(self._state.order_options, selected)
+        order_changed = (
+            bool(self._state.selected_order_line_id)
+            and self._state.selected_order_line_id != selected.order_line_id
+        )
+        if order_changed:
+            self._reset_local_scan_buffers()
         self._set_state(
             replace(
                 self._state,
                 order_options=options,
                 selected_order_line_id=selected.order_line_id,
                 selected_order_scan_required=selected.scan_required,
+                pending_items=[] if order_changed else self._state.pending_items,
                 status_message=PackingController._selected_order_status(selected),
                 result_message=PackingController._selected_order_result(selected),
                 error_message="",
@@ -675,13 +682,24 @@ class AutoPackingController(QObject):
     def _add_code_to_pending(self, raw_code: str) -> None:
         """Добавляет raw-код в ВБ без предварительной серверной проверки."""
 
+        selected = self._selected_order_option()
+        parsed_gtin = ""
+        parsed_serial = tr("autoPacking.pendingSerial")
+        visible_code = raw_code
+        try:
+            parsed = parse_marking_code(raw_code)
+            parsed_gtin = parsed.gtin
+            parsed_serial = parsed.serial
+            visible_code = parsed.visible_code
+        except MarkingCodeParseError:
+            pass
         item = AutoPackingBoxItemUi(
             code_id=0,
             raw_code=raw_code,
-            gtin="",
-            serial=tr("autoPacking.pendingSerial"),
-            visible_code=raw_code,
-            order_key=tr("autoPacking.pendingOrder"),
+            gtin=parsed_gtin,
+            serial=parsed_serial,
+            visible_code=visible_code,
+            order_key=selected.label if selected is not None else tr("autoPacking.pendingOrder"),
         )
         pending_items = [*self._state.pending_items, item]
         next_state = replace(
@@ -1483,6 +1501,15 @@ class AutoPackingController(QObject):
         if normalized in self._queued_raw_codes:
             return True
         return any(item.raw_code.strip() == normalized for item in self._state.pending_items)
+
+    def _reset_local_scan_buffers(self) -> None:
+        """Сбрасывает in-memory автоскан при смене заказа."""
+
+        self._scan_queue.clear()
+        self._queued_raw_codes.clear()
+        self._active_scan_code = ""
+        self._retry_scan_after_pool_refresh = ""
+        self._pool_miss_retry_codes.clear()
 
     def _box_contains_code(self, code_id: int) -> bool:
         """Проверяет, лежит ли код уже в текущей открытой коробке."""
