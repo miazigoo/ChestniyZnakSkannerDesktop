@@ -1870,6 +1870,70 @@ _MESSAGES["zh"].update(
     }
 )
 
+_MESSAGES["ru"].update(
+    {
+        "main.chooseOrder": "Выбрать заказ",
+        "main.chooseOrderHint": (
+            "Открывает список доступных заказов. Выберите заказ один раз, затем работайте "
+            "с ним в упаковке или автоупаковке."
+        ),
+        "main.noOrderSelected": "Заказ не выбран",
+        "main.selectedOrder": "Заказ: {order} / {product}",
+        "orderDialog.title": "Выбор заказа",
+        "orderDialog.hint": (
+            "Найдите заказ по номеру, SKU или названию товара. После выбора приложение "
+            "скачает локальный пул кодов и будет сверять сканы с выбранным заказом."
+        ),
+        "orderDialog.searchPlaceholder": "Поиск по номеру заказа, SKU или товару",
+        "orderDialog.searchHint": "Фильтрует список ниже без открытия клавиатуры в упаковке.",
+        "orderDialog.refresh": "Обновить список",
+        "orderDialog.select": "Выбрать заказ",
+        "orderDialog.loading": "Загружаем доступные заказы...",
+        "orderDialog.count": "Доступно заказов/строк: {count}",
+    }
+)
+
+_MESSAGES["en"].update(
+    {
+        "main.chooseOrder": "Select order",
+        "main.chooseOrderHint": (
+            "Open available orders. Select an order once, then use packaging or auto packaging."
+        ),
+        "main.noOrderSelected": "No order selected",
+        "main.selectedOrder": "Order: {order} / {product}",
+        "orderDialog.title": "Select order",
+        "orderDialog.hint": (
+            "Search by order number, SKU, or product name. After selection the app downloads "
+            "the local code pool and validates scans against this order."
+        ),
+        "orderDialog.searchPlaceholder": "Search by order number, SKU, or product",
+        "orderDialog.searchHint": (
+            "Filters the list below without putting search fields into packaging."
+        ),
+        "orderDialog.refresh": "Refresh list",
+        "orderDialog.select": "Select order",
+        "orderDialog.loading": "Loading available orders...",
+        "orderDialog.count": "Available orders/lines: {count}",
+    }
+)
+
+_MESSAGES["zh"].update(
+    {
+        "main.chooseOrder": "选择订单",
+        "main.chooseOrderHint": "打开可用订单列表。选择一次后，可在包装或自动包装中使用。",
+        "main.noOrderSelected": "未选择订单",
+        "main.selectedOrder": "订单：{order} / {product}",
+        "orderDialog.title": "选择订单",
+        "orderDialog.hint": "按订单号、SKU 或产品名称搜索。选择后应用会下载本地码池并按该订单校验扫描。",
+        "orderDialog.searchPlaceholder": "按订单号、SKU 或产品搜索",
+        "orderDialog.searchHint": "只过滤下面的列表，不在包装界面显示搜索字段。",
+        "orderDialog.refresh": "刷新列表",
+        "orderDialog.select": "选择订单",
+        "orderDialog.loading": "正在加载可用订单...",
+        "orderDialog.count": "可用订单/行：{count}",
+    }
+)
+
 
 def normalize_language(value: str | None) -> str:
     """Возвращает поддерживаемый код языка."""

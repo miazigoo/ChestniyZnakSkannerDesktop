@@ -117,6 +117,7 @@ class AppWindow(QMainWindow):
         self._main_screen.logout_requested.connect(self._auth_controller.logout)
         self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
+        self._packing_controller.state_changed.connect(self._main_screen.apply_order_state)
         self._printer_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_printer_state
         )
@@ -124,6 +125,7 @@ class AppWindow(QMainWindow):
         self._auto_packing_controller.state_changed.connect(
             self._main_screen.auto_packing_screen.apply_state
         )
+        self._auto_packing_controller.state_changed.connect(self._main_screen.apply_order_state)
         self._auto_packing_controller.close_completed.connect(self._handle_auto_box_close_completed)
         self._box_lookup_controller.state_changed.connect(
             self._main_screen.box_lookup_screen.apply_state
@@ -202,6 +204,14 @@ class AppWindow(QMainWindow):
         )
         self._main_screen.packing_screen.order_line_selected.connect(
             self._packing_controller.select_order_line
+        )
+        self._main_screen.order_refresh_requested.connect(self._packing_controller.refresh_orders)
+        self._main_screen.order_refresh_requested.connect(
+            self._auto_packing_controller.refresh_orders
+        )
+        self._main_screen.order_line_selected.connect(self._packing_controller.select_order_line)
+        self._main_screen.order_line_selected.connect(
+            self._auto_packing_controller.select_order_line
         )
         self._main_screen.auto_packing_screen.refresh_requested.connect(
             self._auto_packing_controller.refresh_current_box

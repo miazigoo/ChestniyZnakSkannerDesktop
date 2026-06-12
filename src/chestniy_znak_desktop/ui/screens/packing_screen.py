@@ -203,12 +203,9 @@ class PackingScreen(QWidget):
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
         layout.addWidget(title)
         layout.addWidget(hint)
-        layout.addWidget(QLabel(tr("packing.orderAndProduct")))
-        layout.addWidget(self._order_search)
-        layout.addWidget(self._order_combo)
         layout.addLayout(buttons)
         layout.addWidget(self._count_in_packing)
         return panel
@@ -325,10 +322,6 @@ class PackingScreen(QWidget):
         self._refresh_button.setEnabled(not is_busy)
         self._open_box_button.setEnabled(is_ready and (self._has_box or can_open_selected_order))
         self._close_box_button.setEnabled(is_ready and self._has_box)
-        self._order_search.setEnabled(not is_busy and not self._has_box)
-        self._order_combo.setEnabled(
-            not is_busy and not self._has_box and self._has_order_selection
-        )
         self._count_in_packing.setEnabled(not is_busy)
         self._summary_card.set_action_state(
             can_choose_order=not is_busy and not self._has_box,

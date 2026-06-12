@@ -258,9 +258,6 @@ class AutoPackingScreen(QWidget):
         layout.addWidget(capacity_label)
         layout.addWidget(self._capacity_spin)
         layout.addLayout(quick)
-        layout.addWidget(QLabel(tr("packing.orderAndProduct")))
-        layout.addWidget(self._order_search)
-        layout.addWidget(self._order_combo)
         layout.addLayout(actions)
         layout.addWidget(self._count_in_packing)
         layout.addWidget(self._scanner_status)
@@ -541,10 +538,6 @@ class AutoPackingScreen(QWidget):
         self._refresh_button.setEnabled(not is_busy)
         self._open_box_button.setEnabled(is_ready and (self._has_box or can_open_selected_order))
         self._close_box_button.setEnabled(is_ready and self._has_box)
-        self._order_search.setEnabled(not is_busy and not self._has_box)
-        self._order_combo.setEnabled(
-            not is_busy and not self._has_box and self._has_order_selection
-        )
         self._capacity_spin.setEnabled(not is_busy)
         self._count_in_packing.setEnabled(not is_busy)
         for button in self._quick_buttons:

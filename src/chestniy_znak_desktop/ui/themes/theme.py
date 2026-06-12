@@ -254,6 +254,16 @@ def _custom_object_styles(palette: ThemePalette) -> str:
             border-radius: 3px;
         }}
 
+        #workspaceOrderBadge {{
+            color: {palette.selection_text};
+            background: {palette.selection_bg};
+            border: 1px solid {palette.button_bg};
+            border-radius: 14px;
+            padding: 8px 14px;
+            font-weight: 850;
+            max-width: 460px;
+        }}
+
         #mainNavItem,
         #loginStatusRow,
         #settingsFormRow {{
@@ -295,6 +305,7 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         }}
 
         #sessionLogout,
+        #sessionOrderButton,
         #packingPrimaryButton,
         #boxesPrimaryButton,
         #lookupPrimaryButton,
@@ -354,6 +365,14 @@ def _custom_object_styles(palette: ThemePalette) -> str:
         #sessionLogout {{
             min-height: 32px;
             border-radius: 10px;
+        }}
+
+        #sessionOrderButton {{
+            min-height: 38px;
+            border-radius: 12px;
+            background: {palette.accent};
+            color: {palette.button_text};
+            font-weight: 900;
         }}
 
         #packingBadge,

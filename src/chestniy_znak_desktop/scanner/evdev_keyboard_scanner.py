@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import glob
 import logging
+import os
 import struct
 import sys
 import threading
 import time
 from pathlib import Path
-from typing import BinaryIO
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QSocketNotifier, QTimer, Signal
 
 from chestniy_znak_desktop.domain.scanner_normalizer import GS, split_completed_gs1_buffer_text
 
@@ -163,10 +163,12 @@ class EvdevKeyboardScanner(QObject):
         self._last_emitted_code = ""
         self._last_emitted_at = 0.0
         self._lock = threading.RLock()
-        self._stop_event = threading.Event()
-        self._thread: threading.Thread | None = None
-        self._stream: BinaryIO | None = None
-        self._idle_timer: threading.Timer | None = None
+        self._fd: int | None = None
+        self._notifier: QSocketNotifier | None = None
+        self._read_buffer = bytearray()
+        self._idle_timer = QTimer(self)
+        self._idle_timer.setSingleShot(True)
+        self._idle_timer.timeout.connect(self._flush_buffer)
         self._is_running = False
         self._last_event_age_ms = 0
 
@@ -183,21 +185,28 @@ class EvdevKeyboardScanner(QObject):
         return self._device_path
 
     def start(self) -> None:
-        """Start the raw evdev reader thread."""
+        """Start raw evdev reading through the Qt event loop."""
 
         if self._is_running:
             return
         if not self._device_path:
             self.error_occurred.emit("USB HID evdev scanner device not found")
             return
-        self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="EvdevKeyboardScanner",
-            daemon=True,
-        )
-        self._thread.start()
+        try:
+            self._fd = os.open(self._device_path, os.O_RDONLY | os.O_NONBLOCK)
+        except PermissionError:
+            self.error_occurred.emit(f"Нет доступа к USB HID сканеру: {self._device_path}")
+            logger.exception("Evdev HID scanner permission denied device=%s", self._device_path)
+            return
+        except OSError as exc:
+            self.error_occurred.emit(f"Ошибка USB HID сканера: {exc!s}")
+            logger.exception("Evdev HID scanner failed device=%s", self._device_path)
+            return
+        self._notifier = QSocketNotifier(self._fd, QSocketNotifier.Type.Read, self)
+        self._notifier.activated.connect(self._drain_fd)
         self._is_running = True
+        logger.info("Evdev HID scanner opened device=%s", self._device_path)
+        self.started.emit()
 
     def stop(self) -> None:
         """Stop reading raw evdev input."""
@@ -205,50 +214,49 @@ class EvdevKeyboardScanner(QObject):
         if not self._is_running:
             return
         self._is_running = False
-        self._stop_event.set()
         self._cancel_idle_timer()
-        stream = self._stream
-        if stream is not None:
+        if self._notifier is not None:
+            self._notifier.setEnabled(False)
+            self._notifier.deleteLater()
+            self._notifier = None
+        fd = self._fd
+        self._fd = None
+        if fd is not None:
             try:
-                stream.close()
+                os.close(fd)
             except OSError:
                 pass
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-        self._thread = None
-        self._stream = None
         with self._lock:
+            self._read_buffer.clear()
             self._buffer.clear()
             self._shift_down.clear()
             self._ctrl_down.clear()
         self.stopped.emit()
 
-    def _run(self) -> None:
-        """Read Linux input_event structs and translate them to scanner text."""
+    def _drain_fd(self, _socket: object = None) -> None:
+        """Read all available Linux input_event structs without blocking the UI loop."""
 
+        fd = self._fd
+        if fd is None:
+            return
         try:
-            path = Path(self._device_path)
-            with path.open("rb", buffering=0) as stream:
-                self._stream = stream
-                logger.info("Evdev HID scanner opened device=%s", self._device_path)
-                self.started.emit()
-                while not self._stop_event.is_set():
-                    data = stream.read(EVENT_STRUCT.size)
-                    if len(data) != EVENT_STRUCT.size:
-                        continue
+            while True:
+                chunk = os.read(fd, EVENT_STRUCT.size * 32)
+                if not chunk:
+                    return
+                self._read_buffer.extend(chunk)
+                while len(self._read_buffer) >= EVENT_STRUCT.size:
+                    data = bytes(self._read_buffer[: EVENT_STRUCT.size])
+                    del self._read_buffer[: EVENT_STRUCT.size]
                     self._handle_event(data)
-        except PermissionError:
-            self.error_occurred.emit(f"Нет доступа к USB HID сканеру: {self._device_path}")
-            logger.exception("Evdev HID scanner permission denied device=%s", self._device_path)
+        except BlockingIOError:
+            return
         except OSError as exc:
-            if not self._stop_event.is_set():
-                self.error_occurred.emit(f"Ошибка USB HID сканера: {exc!s}")
-                logger.exception("Evdev HID scanner failed device=%s", self._device_path)
-        finally:
-            self._stream = None
-            if self._is_running:
-                self._is_running = False
-                self.stopped.emit()
+            if not self._is_running:
+                return
+            self.error_occurred.emit(f"Ошибка USB HID сканера: {exc!s}")
+            logger.exception("Evdev HID scanner failed device=%s", self._device_path)
+            self.stop()
 
     def _handle_event(self, data: bytes) -> None:
         sec, usec, event_type, code, value = EVENT_STRUCT.unpack(data)
@@ -334,17 +342,12 @@ class EvdevKeyboardScanner(QObject):
         return max(0, int(age * 1000))
 
     def _restart_idle_timer(self) -> None:
-        self._cancel_idle_timer()
-        timer = threading.Timer(self._idle_flush_sec, self._flush_buffer)
-        timer.daemon = True
-        self._idle_timer = timer
-        timer.start()
+        if self._idle_flush_sec <= 0:
+            return
+        self._idle_timer.start(max(1, int(self._idle_flush_sec * 1000)))
 
     def _cancel_idle_timer(self) -> None:
-        if self._idle_timer is None:
-            return
-        self._idle_timer.cancel()
-        self._idle_timer = None
+        self._idle_timer.stop()
 
 
 class MultiEvdevKeyboardScanner(QObject):

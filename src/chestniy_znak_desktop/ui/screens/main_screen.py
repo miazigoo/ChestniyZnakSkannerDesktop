@@ -5,10 +5,15 @@ from __future__ import annotations
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
+    QDialog,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
@@ -16,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from chestniy_znak_desktop.controllers.packing_controller import OrderLineOptionUi
 from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.runtime.state_models import RuntimeSnapshot
 from chestniy_znak_desktop.ui.screens.auto_packing_screen import AutoPackingScreen
@@ -38,6 +44,8 @@ class MainScreen(QWidget):
 
     logout_requested = Signal()
     screen_changed = Signal(str)
+    order_refresh_requested = Signal()
+    order_line_selected = Signal(str)
 
     def __init__(self) -> None:
         """Создает современную навигацию и регистрирует рабочие экраны."""
@@ -55,8 +63,14 @@ class MainScreen(QWidget):
         self._nav_items: list[NavItem] = []
         self._workspace_title: QLabel | None = None
         self._workspace_subtitle: QLabel | None = None
+        self._selected_order_label: QLabel | None = None
+        self._choose_order_button: QPushButton | None = None
         self._workplace_section: QLabel | None = None
         self._service_section: QLabel | None = None
+        self._order_options: list[OrderLineOptionUi] = []
+        self._selected_order_line_id = ""
+        self._orders_loading = False
+        self._order_dialog: OrderSelectionDialog | None = None
         self._is_compact = False
         self._sidebar: MainSidebar | None = None
         self._root_layout: QHBoxLayout | None = None
@@ -134,6 +148,20 @@ class MainScreen(QWidget):
         self._defect_screen.apply_runtime_snapshot(snapshot)
         self._diagnostics_screen.apply_runtime_snapshot(snapshot)
 
+    def apply_order_state(self, state: object) -> None:
+        """Обновляет глобальный выбранный заказ в шапке и модалке."""
+
+        self._order_options = list(getattr(state, "order_options", []))
+        self._selected_order_line_id = str(getattr(state, "selected_order_line_id", "") or "")
+        self._orders_loading = bool(getattr(state, "orders_loading", False))
+        self._update_selected_order_label()
+        if self._order_dialog is not None:
+            self._order_dialog.set_options(
+                self._order_options,
+                self._selected_order_line_id,
+                self._orders_loading,
+            )
+
     def retranslate(self) -> None:
         """Обновляет статические тексты рабочего экрана после смены языка."""
 
@@ -143,6 +171,10 @@ class MainScreen(QWidget):
             self._workspace_title.setText(tr("main.title"))
         if self._workspace_subtitle is not None:
             self._workspace_subtitle.setText(tr("main.subtitle"))
+        if self._choose_order_button is not None:
+            self._choose_order_button.setText(tr("main.chooseOrder"))
+            self._choose_order_button.setToolTip(tr("main.chooseOrderHint"))
+        self._update_selected_order_label()
         if self._workplace_section is not None:
             self._workplace_section.setText(tr("main.workplace"))
         if self._service_section is not None:
@@ -225,6 +257,12 @@ class MainScreen(QWidget):
         layout.addWidget(brand)
         layout.addWidget(self._workplace_section)
         layout.addWidget(self._session_panel)
+        choose_order = QPushButton(tr("main.chooseOrder"))
+        choose_order.setObjectName("sessionOrderButton")
+        choose_order.setToolTip(tr("main.chooseOrderHint"))
+        choose_order.clicked.connect(self._open_order_dialog)
+        self._choose_order_button = choose_order
+        layout.addWidget(choose_order)
         layout.addSpacing(6)
         for item in self._main_nav_items():
             layout.addWidget(item)
@@ -286,8 +324,54 @@ class MainScreen(QWidget):
         header = QHBoxLayout()
         header.addLayout(title_box)
         header.addStretch(1)
+        self._selected_order_label = QLabel(tr("main.noOrderSelected"))
+        self._selected_order_label.setObjectName("workspaceOrderBadge")
+        self._selected_order_label.setWordWrap(True)
+        header.addWidget(self._selected_order_label)
         header.addWidget(accent)
         return header
+
+    def _open_order_dialog(self) -> None:
+        """Открывает модалку выбора рабочего заказа."""
+
+        dialog = OrderSelectionDialog(self)
+        self._order_dialog = dialog
+        dialog.refresh_requested.connect(self.order_refresh_requested.emit)
+        dialog.order_selected.connect(self.order_line_selected.emit)
+        dialog.set_options(self._order_options, self._selected_order_line_id, self._orders_loading)
+        dialog.finished.connect(lambda _code: self._clear_order_dialog(dialog))
+        dialog.open()
+        self.order_refresh_requested.emit()
+
+    def _clear_order_dialog(self, dialog: "OrderSelectionDialog") -> None:
+        """Очищает ссылку на закрытую модалку выбора заказа."""
+
+        if self._order_dialog is dialog:
+            self._order_dialog = None
+
+    def _update_selected_order_label(self) -> None:
+        """Показывает выбранный заказ в верхней панели."""
+
+        if self._selected_order_label is None:
+            return
+        selected = next(
+            (
+                option
+                for option in self._order_options
+                if option.order_line_id == self._selected_order_line_id
+            ),
+            None,
+        )
+        if selected is None:
+            text = tr("main.noOrderSelected")
+        else:
+            text = tr(
+                "main.selectedOrder",
+                order=selected.order_number,
+                product=selected.product_name or selected.sku,
+            )
+        self._selected_order_label.setText(text)
+        self._selected_order_label.setToolTip(text)
 
     def _main_nav_items(self) -> list[NavItem]:
         """Создает основные пункты навигации."""
@@ -409,3 +493,113 @@ class MainScreen(QWidget):
         self._stack_animation.setStartValue(0.55)
         self._stack_animation.setEndValue(1.0)
         self._stack_animation.start()
+
+
+class OrderSelectionDialog(QDialog):
+    """Модалка выбора заказа для всей рабочей сессии."""
+
+    order_selected = Signal(str)
+    refresh_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """Создает список заказов с локальным фильтром."""
+
+        super().__init__(parent)
+        self.setObjectName("orderSelectionDialog")
+        self.setWindowTitle(tr("orderDialog.title"))
+        self.setModal(False)
+        self.resize(760, 520)
+        self._options: list[OrderLineOptionUi] = []
+        self._selected_order_line_id = ""
+        self._search = QLineEdit()
+        self._search.setObjectName("settingsInput")
+        self._search.setPlaceholderText(tr("orderDialog.searchPlaceholder"))
+        self._search.setToolTip(tr("orderDialog.searchHint"))
+        self._list = QListWidget()
+        self._list.setObjectName("orderSelectionList")
+        self._status = QLabel("")
+        self._status.setObjectName("packingMutedText")
+        self._refresh_button = QPushButton(tr("orderDialog.refresh"))
+        self._refresh_button.setObjectName("packingSecondaryButton")
+        self._select_button = QPushButton(tr("orderDialog.select"))
+        self._select_button.setObjectName("packingPrimaryButton")
+
+        header = QLabel(tr("orderDialog.hint"))
+        header.setObjectName("packingMutedText")
+        header.setWordWrap(True)
+        actions = QHBoxLayout()
+        actions.addWidget(self._refresh_button)
+        actions.addStretch(1)
+        actions.addWidget(self._select_button)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        layout.addWidget(header)
+        layout.addWidget(self._search)
+        layout.addWidget(self._list, 1)
+        layout.addWidget(self._status)
+        layout.addLayout(actions)
+
+        self._search.textChanged.connect(self._apply_filter)
+        self._refresh_button.clicked.connect(self.refresh_requested.emit)
+        self._select_button.clicked.connect(self._select_current)
+        self._list.itemDoubleClicked.connect(lambda _item: self._select_current())
+        self._list.currentRowChanged.connect(lambda _row: self._sync_select_enabled())
+        self._sync_select_enabled()
+
+    def set_options(
+        self,
+        options: list[OrderLineOptionUi],
+        selected_order_line_id: str,
+        orders_loading: bool,
+    ) -> None:
+        """Обновляет варианты выбора заказа."""
+
+        self._options = options
+        self._selected_order_line_id = selected_order_line_id
+        self._status.setText(
+            tr("orderDialog.loading")
+            if orders_loading
+            else tr("orderDialog.count", count=len(options))
+        )
+        self._refresh_button.setEnabled(not orders_loading)
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        """Фильтрует список по номеру заказа, SKU и названию товара."""
+
+        needle = self._search.text().strip().casefold()
+        self._list.clear()
+        selected_row = 0
+        for option in self._options:
+            haystack = (
+                f"{option.order_number} {option.sku} {option.product_name} {option.label}"
+            ).casefold()
+            if needle and needle not in haystack:
+                continue
+            item = QListWidgetItem(option.label)
+            item.setData(Qt.ItemDataRole.UserRole, option.order_line_id)
+            item.setToolTip(option.label)
+            self._list.addItem(item)
+            if option.order_line_id == self._selected_order_line_id:
+                selected_row = self._list.count() - 1
+        if self._list.count():
+            self._list.setCurrentRow(selected_row)
+        self._sync_select_enabled()
+
+    def _sync_select_enabled(self) -> None:
+        """Блокирует выбор, когда строка не выбрана."""
+
+        self._select_button.setEnabled(self._list.currentItem() is not None)
+
+    def _select_current(self) -> None:
+        """Публикует выбранную строку заказа."""
+
+        row = self._list.currentRow()
+        if row < 0:
+            return
+        item = self._list.item(row)
+        order_line_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        if order_line_id:
+            self.order_selected.emit(order_line_id)
+            self.accept()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import os
 from dataclasses import replace
 from typing import TypeAlias
 
@@ -263,7 +264,12 @@ def _handle_package_realtime_message(
 def _create_hid_scanner() -> HidScannerSource:
     """Возвращает самый надежный HID-источник для текущей платформы."""
 
-    evdev_paths = default_evdev_scanner_paths()
+    # Raw Linux evdev can crash native Qt/PySide on some workstations. Keep it opt-in.
+    evdev_paths = (
+        default_evdev_scanner_paths()
+        if os.getenv("CHZ_ENABLE_EVDEV") == "1" and os.getenv("CHZ_DISABLE_EVDEV") != "1"
+        else []
+    )
     if evdev_paths:
         return MultiEvdevKeyboardScanner(device_paths=evdev_paths)
     if sys.platform == "win32":
