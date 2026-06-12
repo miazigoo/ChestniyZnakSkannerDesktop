@@ -1,17 +1,20 @@
-"""Сервис звуковой обратной связи."""
+"""Сервис звуковой обратной связи без QtMultimedia."""
 
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from importlib.resources import files
-
-from PySide6.QtCore import QUrl
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+MIN_SOUND_INTERVAL_SEC = 0.08
 
 
 class SoundEvent(str, Enum):
@@ -25,32 +28,41 @@ class SoundEvent(str, Enum):
 
 @dataclass(slots=True)
 class SoundPlayback:
-    """Связка media-player и audio-output для одного звука."""
+    """Состояние внешнего проигрывания одного звукового файла."""
 
-    player: QMediaPlayer
-    audio_output: QAudioOutput
+    path: Path
+    command: list[str]
+    process: subprocess.Popen[bytes] | None = None
+    last_started_at: float = 0.0
+
+
+ProcessFactory = Callable[..., subprocess.Popen[bytes]]
 
 
 class SoundService:
-    """Проигрывает короткие звуковые сигналы оператору."""
+    """Проигрывает короткие звуковые сигналы оператору.
+
+    Runtime-звуки специально не используют QtMultimedia: на Linux/Wayland FFmpeg backend
+    может падать native segfault и уронить всё приложение после серии сканов.
+    """
 
     def __init__(
         self,
         enabled: bool = True,
         volume: float = 0.85,
         sound_files: dict[SoundEvent, str] | None = None,
-        player_factory: Callable[[], QMediaPlayer] = QMediaPlayer,
-        audio_output_factory: Callable[[], QAudioOutput] = QAudioOutput,
+        process_factory: ProcessFactory = subprocess.Popen,
+        player_command: list[str] | None = None,
     ) -> None:
-        """Создает кеш MP3-плееров для звуковых эффектов."""
+        """Создает сервис внешнего проигрывания коротких mp3."""
 
         self._playbacks: dict[SoundEvent, SoundPlayback] = {}
         self._preview_playbacks: dict[str, SoundPlayback] = {}
         self._enabled = enabled
         self._volume = max(0.0, min(volume, 1.0))
         self._sound_files = {event: event.value for event in SoundEvent}
-        self._player_factory = player_factory
-        self._audio_output_factory = audio_output_factory
+        self._process_factory = process_factory
+        self._player_command = player_command or self._detect_player_command()
         if sound_files is not None:
             self._sound_files.update(sound_files)
 
@@ -60,13 +72,9 @@ class SoundService:
         self._enabled = enabled
 
     def set_volume(self, volume: float) -> None:
-        """Устанавливает громкость звуков от 0.0 до 1.0."""
+        """Сохраняет громкость звуков от 0.0 до 1.0."""
 
         self._volume = max(0.0, min(volume, 1.0))
-        for playback in self._playbacks.values():
-            playback.audio_output.setVolume(self._volume)
-        for playback in self._preview_playbacks.values():
-            playback.audio_output.setVolume(self._volume)
 
     def set_sound_file(self, event: SoundEvent, filename: str) -> None:
         """Меняет файл звука для события и сбрасывает кеш плеера."""
@@ -86,9 +94,9 @@ class SoundService:
 
         playback = self._preview_playbacks.get(filename)
         if playback is None:
-            playback = self._create_playback(filename, volume=self._volume)
+            playback = self._create_playback(filename)
             self._preview_playbacks[filename] = playback
-        self._play(playback)
+        self._play(playback, force=True)
 
     @staticmethod
     def available_sound_files() -> list[str]:
@@ -101,40 +109,57 @@ class SoundService:
         )
 
     def _playback_for_event(self, event: SoundEvent) -> SoundPlayback:
-        """Возвращает кешированный плеер для события."""
+        """Возвращает кешированный playback для события."""
 
         playback = self._playbacks.get(event)
         if playback is None:
-            playback = self._create_playback(self._sound_files[event], volume=self._volume)
+            playback = self._create_playback(self._sound_files[event])
             self._playbacks[event] = playback
         return playback
 
-    def _create_playback(self, filename: str, volume: float) -> SoundPlayback:
-        """Создает Qt media-player для mp3-файла из ресурсов."""
+    def _create_playback(self, filename: str) -> SoundPlayback:
+        """Создает описание внешнего запуска mp3-файла из ресурсов."""
 
         path = files("chestniy_znak_desktop.resources.sounds").joinpath(filename)
-        player = self._player_factory()
-        audio_output = self._audio_output_factory()
-        audio_output.setVolume(volume)
-        player.setAudioOutput(audio_output)
-        player.setSource(QUrl.fromLocalFile(str(path)))
-        player.errorOccurred.connect(
-            lambda _error, message, filename=filename: self._log_player_error(
-                filename,
-                message,
-            )
+        return SoundPlayback(
+            path=Path(str(path)),
+            command=[*self._player_command, str(path)] if self._player_command else [],
         )
-        return SoundPlayback(player=player, audio_output=audio_output)
+
+    def _play(self, playback: SoundPlayback, *, force: bool = False) -> None:
+        """Запускает внешний проигрыватель, не блокируя UI."""
+
+        if not playback.command:
+            return
+        now = time.monotonic()
+        if not force and now - playback.last_started_at < MIN_SOUND_INTERVAL_SEC:
+            return
+        if playback.process is not None and playback.process.poll() is None:
+            return
+        playback.last_started_at = now
+        try:
+            playback.process = self._process_factory(
+                playback.command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            logger.warning("Не удалось воспроизвести звук %s: %s", playback.path.name, exc)
 
     @staticmethod
-    def _play(playback: SoundPlayback) -> None:
-        """Запускает звук с начала файла."""
+    def _detect_player_command() -> list[str]:
+        """Возвращает безопасный внешний проигрыватель, если он установлен."""
 
-        playback.player.setPosition(0)
-        playback.player.play()
-
-    @staticmethod
-    def _log_player_error(filename: str, message: str) -> None:
-        """Пишет в лог ошибку Qt Multimedia."""
-
-        logger.warning("Не удалось воспроизвести звук %s: %s", filename, message)
+        candidates = (
+            ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"]),
+            ("mpg123", ["mpg123", "-q"]),
+            ("play", ["play", "-q"]),
+            ("cvlc", ["cvlc", "--play-and-exit", "--quiet"]),
+        )
+        for binary, command in candidates:
+            if shutil.which(binary):
+                return command
+        logger.warning("Звуковой проигрыватель не найден; звуки Desktop отключены.")
+        return []

@@ -4,135 +4,110 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QUrl
-
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 
 
-class FakeSignal:
-    """Минимальный fake Qt-сигнала."""
+class FakeProcess:
+    """Fake external audio process."""
+
+    def __init__(self, running: bool = False) -> None:
+        """Создает fake-процесс."""
+
+        self._running = running
+
+    def poll(self) -> int | None:
+        """Возвращает статус процесса."""
+
+        return None if self._running else 0
+
+
+class FakeProcessFactory:
+    """Запоминает команды запуска внешнего проигрывателя."""
 
     def __init__(self) -> None:
-        """Создает список подключенных callback."""
+        """Создает recorder запусков."""
 
-        self.callbacks: list[Any] = []
+        self.calls: list[tuple[list[str], dict[str, Any]]] = []
 
-    def connect(self, callback: Any) -> None:
-        """Запоминает callback сигнала."""
+    def __call__(self, command: list[str], **kwargs: Any) -> FakeProcess:
+        """Запоминает запуск и возвращает завершенный fake-процесс."""
 
-        self.callbacks.append(callback)
-
-
-class FakeAudioOutput:
-    """Fake audio-output для проверки громкости."""
-
-    instances: list["FakeAudioOutput"] = []
-
-    def __init__(self) -> None:
-        """Создает fake audio-output."""
-
-        self.volume = 0.0
-        self.instances.append(self)
-
-    def setVolume(self, volume: float) -> None:  # noqa: N802
-        """Запоминает громкость в Qt-совместимом методе."""
-
-        self.volume = volume
+        self.calls.append((command, kwargs))
+        return FakeProcess()
 
 
-class FakePlayer:
-    """Fake media-player для проверки запуска звука."""
+def _service(
+    enabled: bool = True,
+    volume: float = 0.85,
+    process_factory: FakeProcessFactory | None = None,
+) -> tuple[SoundService, FakeProcessFactory]:
+    """Создает SoundService с fake external player."""
 
-    instances: list["FakePlayer"] = []
-
-    def __init__(self) -> None:
-        """Создает fake media-player."""
-
-        self.audio_output: FakeAudioOutput | None = None
-        self.source = QUrl()
-        self.positions: list[int] = []
-        self.play_count = 0
-        self.errorOccurred = FakeSignal()
-        self.instances.append(self)
-
-    def setAudioOutput(self, audio_output: FakeAudioOutput) -> None:  # noqa: N802
-        """Запоминает audio-output в Qt-совместимом методе."""
-
-        self.audio_output = audio_output
-
-    def setSource(self, source: QUrl) -> None:  # noqa: N802
-        """Запоминает source в Qt-совместимом методе."""
-
-        self.source = source
-
-    def setPosition(self, position: int) -> None:  # noqa: N802
-        """Запоминает позицию старта в Qt-совместимом методе."""
-
-        self.positions.append(position)
-
-    def play(self) -> None:
-        """Запоминает запуск проигрывания."""
-
-        self.play_count += 1
-
-
-def _service(enabled: bool = True, volume: float = 0.85) -> SoundService:
-    """Создает SoundService с fake multimedia объектами."""
-
-    FakePlayer.instances = []
-    FakeAudioOutput.instances = []
-    return SoundService(
-        enabled=enabled,
-        volume=volume,
-        player_factory=FakePlayer,  # type: ignore[arg-type]
-        audio_output_factory=FakeAudioOutput,  # type: ignore[arg-type]
+    factory = process_factory or FakeProcessFactory()
+    return (
+        SoundService(
+            enabled=enabled,
+            volume=volume,
+            process_factory=factory,  # type: ignore[arg-type]
+            player_command=["player", "--quiet"],
+        ),
+        factory,
     )
 
 
-def test_sound_service_plays_event_mp3_with_media_player() -> None:
-    """Проверяет запуск звука события через media-player."""
+def test_sound_service_plays_event_mp3_with_external_player() -> None:
+    """Проверяет запуск звука события внешним процессом."""
 
-    service = _service(volume=0.4)
+    service, factory = _service(volume=0.4)
 
     service.play(SoundEvent.OK)
 
-    player = FakePlayer.instances[0]
-    assert player.play_count == 1
-    assert player.positions == [0]
-    assert player.source.toLocalFile().endswith("/ok_02.mp3")
-    assert player.audio_output is not None
-    assert player.audio_output.volume == 0.4
+    assert len(factory.calls) == 1
+    command, kwargs = factory.calls[0]
+    assert command[:2] == ["player", "--quiet"]
+    assert command[-1].endswith("/ok_02.mp3")
+    assert kwargs["start_new_session"] is True
 
 
 def test_sound_service_preview_plays_selected_file() -> None:
     """Проверяет прослушивание выбранного mp3-файла."""
 
-    service = _service()
+    service, factory = _service()
 
     service.preview_file("error_02.mp3")
 
-    player = FakePlayer.instances[0]
-    assert player.play_count == 1
-    assert player.source.toLocalFile().endswith("/error_02.mp3")
+    assert factory.calls[0][0][-1].endswith("/error_02.mp3")
 
 
 def test_sound_service_disabled_does_not_play_events() -> None:
     """Проверяет отключение звуков событий."""
 
-    service = _service(enabled=False)
+    service, factory = _service(enabled=False)
 
     service.play(SoundEvent.ERROR)
 
-    assert FakePlayer.instances == []
+    assert factory.calls == []
 
 
-def test_sound_service_updates_cached_player_volume() -> None:
-    """Проверяет обновление громкости у уже созданных плееров."""
+def test_sound_service_skips_while_same_sound_is_running() -> None:
+    """Проверяет защиту от пачки внешних процессов на быстром потоке сканов."""
 
-    service = _service(volume=0.2)
+    factory = FakeProcessFactory()
+    service, _factory = _service(process_factory=factory)
+
     service.play(SoundEvent.OK)
-    service.preview_file("error.mp3")
+    service._playbacks[SoundEvent.OK].process = FakeProcess(running=True)  # noqa: SLF001
+    service.play(SoundEvent.OK)
 
+    assert len(factory.calls) == 1
+
+
+def test_sound_service_set_volume_keeps_public_contract() -> None:
+    """Проверяет, что настройка громкости не требует Qt audio output."""
+
+    service, factory = _service(volume=0.2)
     service.set_volume(0.7)
 
-    assert [audio.volume for audio in FakeAudioOutput.instances] == [0.7, 0.7]
+    service.play(SoundEvent.WARNING)
+
+    assert len(factory.calls) == 1
