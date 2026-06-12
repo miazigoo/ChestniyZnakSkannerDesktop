@@ -8,7 +8,7 @@ from dataclasses import dataclass
 GS = "\x1d"
 ESC_GS_SEQ = "\x1b`\x1bb\x1bi"
 AI21_MAX_SERIAL_LEN = 20
-AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE = 13
+AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE = 1
 KNOWN_AI_FIXED_VALUE_LEN = {"91": 4, "93": 4}
 KNOWN_AI_VARIABLE_TO_END = {"92"}
 GROUP_SEPARATOR_TOKEN_RE = re.compile(r"(?i)(?:\\u001d|\\x1d|\\035|<GS>|\[GS\]|\{GS\})")
@@ -126,6 +126,7 @@ def split_tail_without_gs(tail: str) -> tuple[str, dict[str, str], list[str], bo
     """Разделяет serial и AI-хвост, когда scanner не прислал GS явно."""
 
     max_serial_len = min(AI21_MAX_SERIAL_LEN, len(tail))
+    candidates: list[tuple[int, str, dict[str, str]]] = []
     for serial_len in range(max_serial_len, AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE - 1, -1):
         rest = tail[serial_len:]
         if len(rest) < 2:
@@ -134,7 +135,13 @@ def split_tail_without_gs(tail: str) -> tuple[str, dict[str, str], list[str], bo
             continue
         ai_parts, warnings = parse_ai_tail_without_gs(rest)
         if ai_parts and not warnings:
-            return tail[:serial_len], ai_parts, [], True
+            candidates.append((serial_len, tail[:serial_len], ai_parts))
+    if candidates:
+        _serial_len, serial, ai_parts = max(
+            candidates,
+            key=lambda candidate: (len(candidate[2]), candidate[0]),
+        )
+        return serial, ai_parts, [], True
 
     serial = tail[:AI21_MAX_SERIAL_LEN]
     rest = tail[AI21_MAX_SERIAL_LEN:]

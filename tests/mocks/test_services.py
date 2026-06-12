@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from chestniy_znak_desktop.api.models.orders import LocalCodePoolDto
+from chestniy_znak_desktop.api.models.orders import LocalCodePoolPageDto
+from chestniy_znak_desktop.api.models.orders import LocalPoolCodeDto
+from chestniy_znak_desktop.api.models.orders import WorkOrderDto
 from chestniy_znak_desktop.api.services.box_edit_service import BoxEditService
 from chestniy_znak_desktop.api.services.chestniy_znak_service import ChestniyZnakService
 from chestniy_znak_desktop.api.services.order_service import OrderService
@@ -438,6 +442,65 @@ def test_order_service_caches_local_pool_for_offline_desktop(tmp_path) -> None:
     assert cached.data.codes[0].code == "010460123456789021SERIAL"
     assert cached.data.codes[0].status == "packed"
     assert cached.data.codes[0].package_code == "BOX-001"
+
+
+def test_local_pool_cache_deletes_closed_order(tmp_path) -> None:
+    """Проверяет очистку sqlite snapshot после закрытия заказа."""
+
+    cache = OrderLocalPoolCache(tmp_path / "local_pool.sqlite3")
+    cache.save_page(_local_pool_page(order_status="in_progress", codes=["CODE1"]))
+    assert cache.load_page("order-1", limit=5000, offset=0) is not None
+
+    cache.save_page(_local_pool_page(order_status="closed", codes=["CODE1"]))
+
+    assert cache.load_page("order-1", limit=5000, offset=0) is None
+
+
+def test_local_pool_cache_appends_new_pool_codes(tmp_path) -> None:
+    """Проверяет догрузку новых кодов в локальный sqlite snapshot заказа."""
+
+    cache = OrderLocalPoolCache(tmp_path / "local_pool.sqlite3")
+
+    cache.save_page(_local_pool_page(order_status="in_progress", codes=["CODE1"]))
+    cache.save_page(_local_pool_page(order_status="in_progress", codes=["CODE1", "CODE2"]))
+
+    cached = cache.load_page("order-1", limit=5000, offset=0)
+
+    assert cached is not None
+    assert [code.code for code in cached.data.codes] == ["CODE1", "CODE2"]
+
+
+def _local_pool_page(order_status: str, codes: list[str]) -> LocalCodePoolPageDto:
+    """Создает страницу локального пула для cache-тестов."""
+
+    return LocalCodePoolPageDto(
+        data=LocalCodePoolDto(
+            order=WorkOrderDto(
+                id="order-1",
+                plant_id="plant-1",
+                supplier_id="supplier-1",
+                order_number="PO-1",
+                status=order_status,
+                scan_required=True,
+                lines=[],
+            ),
+            codes=[
+                LocalPoolCodeDto(
+                    id=f"code-{index}",
+                    code=code,
+                    status="downloaded",
+                    order_line_id="line-1",
+                )
+                for index, code in enumerate(codes, start=1)
+            ],
+            total=len(codes),
+            count=len(codes),
+            limit=5000,
+            offset=0,
+            next_offset=None,
+            has_more=False,
+        )
+    )
 
 
 def test_printer_service_autoselects_single_printer_and_reports_print_result() -> None:

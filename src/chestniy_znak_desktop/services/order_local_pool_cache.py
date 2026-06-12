@@ -13,6 +13,16 @@ from chestniy_znak_desktop.api.models.orders import (
     WorkOrderDto,
 )
 
+INACTIVE_ORDER_STATUSES = {
+    "closed",
+    "completed",
+    "complete",
+    "cancelled",
+    "canceled",
+    "finished",
+    "done",
+}
+
 
 class OrderLocalPoolCache:
     """Хранит snapshot кодов заказа для local-first упаковки."""
@@ -28,6 +38,9 @@ class OrderLocalPoolCache:
         """Сохраняет страницу local-pool, полученную от backend."""
 
         pool = page.data
+        if self._is_inactive_status(pool.order.status):
+            self.delete_order(pool.order.id)
+            return
         now = int(time.time())
         with self._connect() as connection:
             connection.execute(
@@ -95,6 +108,31 @@ class OrderLocalPoolCache:
                     for code in pool.codes
                 ],
             )
+            self.cleanup_inactive_orders(connection)
+
+    def delete_order(self, order_id: str) -> None:
+        """Полностью удаляет локальный snapshot заказа."""
+
+        with self._connect() as connection:
+            connection.execute("DELETE FROM local_order_codes WHERE order_id = ?", (order_id,))
+            connection.execute("DELETE FROM local_orders WHERE order_id = ?", (order_id,))
+
+    def cleanup_inactive_orders(self, connection: sqlite3.Connection | None = None) -> None:
+        """Удаляет из sqlite заказы, которые уже закрыты или отменены."""
+
+        if connection is None:
+            with self._connect() as own_connection:
+                self.cleanup_inactive_orders(own_connection)
+            return
+        placeholders = ",".join("?" for _ in INACTIVE_ORDER_STATUSES)
+        rows = connection.execute(
+            f"SELECT order_id FROM local_orders WHERE lower(status) IN ({placeholders})",
+            tuple(INACTIVE_ORDER_STATUSES),
+        ).fetchall()
+        for row in rows:
+            order_id = str(row["order_id"])
+            connection.execute("DELETE FROM local_order_codes WHERE order_id = ?", (order_id,))
+            connection.execute("DELETE FROM local_orders WHERE order_id = ?", (order_id,))
 
     def load_page(self, order_id: str, *, limit: int, offset: int) -> LocalCodePoolPageDto | None:
         """Возвращает страницу из SQLite или `None`, если заказа нет в кэше."""
@@ -208,3 +246,10 @@ class OrderLocalPoolCache:
                 CREATE INDEX IF NOT EXISTS idx_local_order_codes_package
                 ON local_order_codes(order_id, package_code)
                 """)
+            self.cleanup_inactive_orders(connection)
+
+    @staticmethod
+    def _is_inactive_status(status: str) -> bool:
+        """Проверяет, что заказ больше не должен храниться локально."""
+
+        return status.strip().casefold() in INACTIVE_ORDER_STATUSES

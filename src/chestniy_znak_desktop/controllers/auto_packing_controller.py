@@ -223,6 +223,7 @@ class AutoPackingController(QObject):
         self._box_visible_codes: set[str] = set()
         self._local_pool_order_id = ""
         self._local_pool_codes: dict[str, LocalPoolCodeDto] = {}
+        self._local_pool_identity_codes: dict[str, LocalPoolCodeDto] = {}
         self._local_pool_loaded = False
         self._open_box_after_pool_order_id = ""
         settings = settings_store.load(settings_defaults)
@@ -1120,6 +1121,7 @@ class AutoPackingController(QObject):
             return False
         self._local_pool_order_id = selected.order_id
         self._local_pool_codes.clear()
+        self._local_pool_identity_codes.clear()
         self._local_pool_loaded = False
         if open_after:
             self._open_box_after_pool_order_id = selected.order_id
@@ -1194,6 +1196,7 @@ class AutoPackingController(QObject):
 
         self._local_pool_order_id = order_id
         self._local_pool_codes = codes
+        self._local_pool_identity_codes = self._index_local_pool_by_identity(codes)
         self._local_pool_loaded = True
         open_after = self._open_box_after_pool_order_id == order_id
         self._open_box_after_pool_order_id = ""
@@ -1215,6 +1218,7 @@ class AutoPackingController(QObject):
 
         self._local_pool_loaded = False
         self._local_pool_codes.clear()
+        self._local_pool_identity_codes.clear()
         self._open_box_after_pool_order_id = ""
         self._set_state(
             replace(
@@ -1241,8 +1245,10 @@ class AutoPackingController(QObject):
             return code
         normalized = self._normalize_pool_code(code)
         pool_code = self._local_pool_codes.get(normalized)
+        if pool_code is None:
+            pool_code = self._local_pool_identity_codes.get(self._pool_identity_key(code))
         if pool_code is not None and self._is_pool_code_available(pool_code):
-            return normalized
+            return self._normalize_pool_code(pool_code.code) or normalized
         if pool_code is not None:
             self._play(SoundEvent.WARNING)
             package_code = pool_code.package_code or pool_code.package_unit_id or ""
@@ -1289,6 +1295,29 @@ class AutoPackingController(QObject):
             return parse_marking_code(raw_code).raw_code
         except MarkingCodeParseError:
             return raw_code
+
+    @classmethod
+    def _index_local_pool_by_identity(
+        cls,
+        codes: dict[str, LocalPoolCodeDto],
+    ) -> dict[str, LocalPoolCodeDto]:
+        """Индексирует локальный пул по GTIN+serial для HID-сканов без GS."""
+
+        indexed: dict[str, LocalPoolCodeDto] = {}
+        for code in codes.values():
+            identity = cls._pool_identity_key(code.code)
+            if identity:
+                indexed[identity] = code
+        return indexed
+
+    @staticmethod
+    def _pool_identity_key(code: str) -> str:
+        """Возвращает стабильный ключ GTIN+serial для кода из пула или скана."""
+
+        try:
+            return parse_marking_code(code).identity_key
+        except MarkingCodeParseError:
+            return ""
 
     def _selected_order_option(self) -> OrderLineOptionUi | None:
         """Возвращает выбранную строку заказа."""

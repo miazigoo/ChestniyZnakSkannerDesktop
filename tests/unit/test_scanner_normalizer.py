@@ -60,6 +60,18 @@ def test_parse_long_crypto_tail_without_gs() -> None:
     assert parsed.gs_restored is True
 
 
+def test_parse_short_serial_crypto_tail_without_gs() -> None:
+    """Проверяет HID-код с коротким serial и потерянными GS перед 91/92."""
+
+    parsed = parse_marking_code("010460123456789021A10000005591W81K925Y7N")
+
+    assert parsed.gtin == "04601234567890"
+    assert parsed.serial == "A100000055"
+    assert parsed.ai_parts == {"91": "W81K", "92": "5Y7N"}
+    assert parsed.visible_code == "010460123456789021A100000055<GS>91W81K<GS>925Y7N"
+    assert parsed.gs_restored is True
+
+
 def test_parse_longer_crypto_tail_without_gs() -> None:
     """Проверяет удлиненный криптохвост без привязки к общей длине кода."""
 

@@ -699,6 +699,39 @@ def test_auto_packing_accepts_only_downloaded_local_pool_codes(tmp_path: Path) -
     assert verifier.calls == []
 
 
+def test_auto_packing_matches_hid_scan_without_gs_to_local_pool(tmp_path: Path) -> None:
+    """Проверяет совпадение HID-скана без GS с локальным пулом, где GS сохранен."""
+
+    pool_code = "010460123456789021A100000055\x1d91W81K\x1d925Y7N"
+    hid_code = pool_code.replace("\x1d", "")
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    order_service = FakeOrderService(_work_order(), pool_codes=[pool_code])
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+    )
+
+    controller.refresh_orders()
+    controller.select_order_line("line-1")
+    controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned(hid_code)
+
+    assert [item.raw_code for item in controller.state.pending_items] == [pool_code]
+    assert controller.state.error_message == ""
+    assert verifier.calls == []
+
+
 def test_auto_packing_applies_global_order_selected_before_orders_loaded(
     tmp_path: Path,
 ) -> None:
