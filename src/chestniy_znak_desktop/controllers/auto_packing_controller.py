@@ -226,6 +226,8 @@ class AutoPackingController(QObject):
         self._local_pool_identity_codes: dict[str, LocalPoolCodeDto] = {}
         self._local_pool_loaded = False
         self._open_box_after_pool_order_id = ""
+        self._retry_scan_after_pool_refresh = ""
+        self._pool_miss_retry_codes: set[str] = set()
         settings = settings_store.load(settings_defaults)
         self._state = AutoPackingUiState(
             codes_per_item=max(1, settings.auto_pack_codes_per_item),
@@ -564,6 +566,8 @@ class AutoPackingController(QObject):
         """Обрабатывает один уже выделенный код маркировки."""
 
         selected = self._selected_order_option()
+        if self._should_refresh_pool_before_reject(normalized, selected):
+            return
         local_pool_code = self._code_from_selected_local_pool(normalized, selected)
         if local_pool_code is None:
             return
@@ -1209,6 +1213,11 @@ class AutoPackingController(QObject):
                 error_message="",
             )
         )
+        retry_scan = self._retry_scan_after_pool_refresh
+        self._retry_scan_after_pool_refresh = ""
+        if retry_scan:
+            self._handle_single_code_scanned(retry_scan)
+            return
         selected = self._selected_order_option()
         if open_after and selected is not None and selected.order_id == order_id:
             self.open_box()
@@ -1220,6 +1229,7 @@ class AutoPackingController(QObject):
         self._local_pool_codes.clear()
         self._local_pool_identity_codes.clear()
         self._open_box_after_pool_order_id = ""
+        self._retry_scan_after_pool_refresh = ""
         self._set_state(
             replace(
                 self._state,
@@ -1243,10 +1253,7 @@ class AutoPackingController(QObject):
 
         if selected is None or not self._is_local_pool_ready_for(selected.order_id):
             return code
-        normalized = self._normalize_pool_code(code)
-        pool_code = self._local_pool_codes.get(normalized)
-        if pool_code is None:
-            pool_code = self._local_pool_identity_codes.get(self._pool_identity_key(code))
+        normalized, pool_code = self._lookup_local_pool_code(code)
         if pool_code is not None and self._is_pool_code_available(pool_code):
             return self._normalize_pool_code(pool_code.code) or normalized
         if pool_code is not None:
@@ -1273,6 +1280,34 @@ class AutoPackingController(QObject):
             )
         )
         return None
+
+    def _should_refresh_pool_before_reject(
+        self,
+        code: str,
+        selected: OrderLineOptionUi | None,
+    ) -> bool:
+        """Обновляет локальный пул один раз перед ошибкой `код не из заказа`."""
+
+        if selected is None or not self._is_local_pool_ready_for(selected.order_id):
+            return False
+        normalized, pool_code = self._lookup_local_pool_code(code)
+        if pool_code is not None:
+            return False
+        retry_key = normalized or code
+        if retry_key in self._pool_miss_retry_codes:
+            return False
+        self._pool_miss_retry_codes.add(retry_key)
+        self._retry_scan_after_pool_refresh = code
+        return self._download_local_pool_for(selected, force=True)
+
+    def _lookup_local_pool_code(self, code: str) -> tuple[str, LocalPoolCodeDto | None]:
+        """Ищет код в локальном пуле по raw-коду и fallback identity."""
+
+        normalized = self._normalize_pool_code(code)
+        pool_code = self._local_pool_codes.get(normalized)
+        if pool_code is None:
+            pool_code = self._local_pool_identity_codes.get(self._pool_identity_key(code))
+        return normalized, pool_code
 
     @staticmethod
     def _is_pool_code_available(code: LocalPoolCodeDto) -> bool:
