@@ -698,6 +698,37 @@ def test_auto_packing_accepts_only_downloaded_local_pool_codes(tmp_path: Path) -
     assert verifier.calls == []
 
 
+def test_auto_packing_applies_global_order_selected_before_orders_loaded(
+    tmp_path: Path,
+) -> None:
+    """Проверяет синхронизацию глобального выбора заказа до загрузки списка автоупаковки."""
+
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    order_service = FakeOrderService(_work_order(), pool_codes=["CODE1"])
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+    )
+
+    controller.select_order_line("line-1")
+    controller.refresh_orders()
+    controller.open_box()
+
+    assert controller.state.selected_order_line_id == "line-1"
+    assert service.open_calls == [("pc-1", True, "order-1", "line-1")]
+    assert order_service.pool_calls == [("order-1", 5000, 0)]
+
+
 def test_auto_packing_rejects_local_pool_code_already_in_closed_box(tmp_path: Path) -> None:
     """Проверяет локальный стоп, если snapshot говорит, что код уже в закрытой коробке."""
 

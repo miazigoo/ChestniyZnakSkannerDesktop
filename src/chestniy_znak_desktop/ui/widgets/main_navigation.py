@@ -24,13 +24,13 @@ class MainSidebar(QFrame):
 
         super().__init__(parent)
         self.setObjectName("mainSidebar")
-        self.setFixedWidth(278)
+        self.setFixedWidth(330)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Ignored)
 
     def set_compact(self, is_compact: bool) -> None:
         """Переключает ширину сайдбара для небольших экранов."""
 
-        self.setFixedWidth(258 if is_compact else 278)
+        self.setFixedWidth(310 if is_compact else 330)
         self.setProperty("compact", is_compact)
         self.style().unpolish(self)
         self.style().polish(self)

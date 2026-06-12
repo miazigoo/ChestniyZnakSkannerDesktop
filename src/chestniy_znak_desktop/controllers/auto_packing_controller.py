@@ -302,6 +302,16 @@ class AutoPackingController(QObject):
             return
         selected = self._find_order_option(order_line_id)
         if selected is None:
+            if order_line_id and order_line_id != self._state.selected_order_line_id:
+                self._set_state(
+                    replace(
+                        self._state,
+                        selected_order_line_id=order_line_id,
+                        status_message=tr("packing.selectOrder"),
+                        result_message="",
+                        error_message="",
+                    )
+                )
             return
         self._set_state(
             replace(

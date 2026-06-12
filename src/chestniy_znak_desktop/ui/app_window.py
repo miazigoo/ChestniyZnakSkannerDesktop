@@ -86,6 +86,7 @@ class AppWindow(QMainWindow):
         self._settings_controller = settings_controller
         self._scan_target = "packing"
         self._suppress_next_screen_refresh = False
+        self._last_auto_synced_order_line_id = ""
         self._central = QWidget()
         self._stack = QStackedWidget()
         self._status_bar = RuntimeStatusBar()
@@ -118,6 +119,7 @@ class AppWindow(QMainWindow):
         self._main_screen.screen_changed.connect(self._handle_screen_changed)
         self._packing_controller.state_changed.connect(self._main_screen.packing_screen.apply_state)
         self._packing_controller.state_changed.connect(self._main_screen.apply_order_state)
+        self._packing_controller.state_changed.connect(self._sync_auto_packing_order)
         self._printer_controller.state_changed.connect(
             self._main_screen.settings_screen.apply_printer_state
         )
@@ -327,6 +329,15 @@ class AppWindow(QMainWindow):
         """Сохраняет активный рабочий сценарий для входящих сканов."""
 
         self._scan_target = screen_name
+
+    def _sync_auto_packing_order(self, state: object) -> None:
+        """Передает глобально выбранный заказ в автоупаковку."""
+
+        order_line_id = str(getattr(state, "selected_order_line_id", "") or "")
+        if not order_line_id or order_line_id == self._last_auto_synced_order_line_id:
+            return
+        self._last_auto_synced_order_line_id = order_line_id
+        self._auto_packing_controller.select_order_line(order_line_id)
 
     def _handle_screen_changed(self, screen_name: str) -> None:
         """Обновляет активный сценарий и подтягивает актуальные данные экрана."""
