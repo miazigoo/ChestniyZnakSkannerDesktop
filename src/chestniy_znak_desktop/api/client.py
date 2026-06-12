@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from http.cookiejar import MozillaCookieJar
+import threading
 from typing import Any
 
 import httpx
@@ -40,6 +41,7 @@ class ApiClient:
         self._cookie_jar = cookie_store.load() if cookie_store else MozillaCookieJar()
         self._bearer_store = bearer_store
         self._bearer_session = bearer_store.load() if bearer_store else None
+        self._request_lock = threading.RLock()
         self._client = httpx.Client(
             base_url=config.api_base_url,
             timeout=config.request_timeout_sec,
@@ -79,8 +81,9 @@ class ApiClient:
     def close(self) -> None:
         """Закрывает сетевые ресурсы клиента."""
 
-        self.save_cookies()
-        self._client.close()
+        with self._request_lock:
+            self.save_cookies()
+            self._client.close()
 
     def save_cookies(self) -> None:
         """Сохраняет cookies текущей сессии, если задано хранилище."""
@@ -91,19 +94,21 @@ class ApiClient:
     def clear_cookies(self) -> None:
         """Очищает cookies в памяти и на диске."""
 
-        self._client.cookies.clear()
-        self._cookie_jar.clear()
-        if self._cookie_store is not None:
-            self._cookie_store.clear()
+        with self._request_lock:
+            self._client.cookies.clear()
+            self._cookie_jar.clear()
+            if self._cookie_store is not None:
+                self._cookie_store.clear()
 
     def set_bearer_tokens(self, access_token: str, refresh_token: str) -> None:
         """Сохраняет bearer-токены SaaS app-сессии."""
 
-        self._bearer_session = BearerSession(
-            access_token=access_token,
-            refresh_token=refresh_token,
-        )
-        self.save_bearer_tokens()
+        with self._request_lock:
+            self._bearer_session = BearerSession(
+                access_token=access_token,
+                refresh_token=refresh_token,
+            )
+            self.save_bearer_tokens()
 
     def save_bearer_tokens(self) -> None:
         """Сохраняет bearer-токены на диск, если задано хранилище."""
@@ -114,9 +119,10 @@ class ApiClient:
     def clear_bearer_tokens(self) -> None:
         """Очищает bearer-токены SaaS app-сессии."""
 
-        self._bearer_session = None
-        if self._bearer_store is not None:
-            self._bearer_store.clear()
+        with self._request_lock:
+            self._bearer_session = None
+            if self._bearer_store is not None:
+                self._bearer_store.clear()
 
     def get(self, url: str, params: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Выполняет GET-запрос и возвращает JSON-словарь."""
@@ -160,30 +166,31 @@ class ApiClient:
     def _request_response(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Отправляет HTTP-запрос и возвращает сырой ответ после проверки ошибок."""
 
-        retry_auth = bool(kwargs.pop("_retry_auth", True))
-        request_url = self._surface_url(url)
-        kwargs = self._with_language_headers(kwargs)
-        kwargs = self._with_csrf_header(method, kwargs)
-        kwargs = self._with_bearer_header(request_url, kwargs)
-        response = self._client.request(method, request_url, **kwargs)
-        if (
-            response.status_code == 401
-            and retry_auth
-            and self._bearer_session is not None
-            and not self._is_public_url(request_url)
-            and self._refresh_bearer_session()
-        ):
-            return self._request_response(method, request_url, _retry_auth=False, **kwargs)
-        if response.status_code == 401:
-            raise UnauthorizedError(self._extract_error_message(response))
-        if response.status_code == 402 and self._extract_error_code(response) == (
-            "plant_subscription_inactive"
-        ):
-            raise PlantSubscriptionExpiredError(self._extract_error_message(response))
-        if response.is_error:
-            raise ApiError(self._extract_error_message(response))
-        self.save_cookies()
-        return response
+        with self._request_lock:
+            retry_auth = bool(kwargs.pop("_retry_auth", True))
+            request_url = self._surface_url(url)
+            kwargs = self._with_language_headers(kwargs)
+            kwargs = self._with_csrf_header(method, kwargs)
+            kwargs = self._with_bearer_header(request_url, kwargs)
+            response = self._client.request(method, request_url, **kwargs)
+            if (
+                response.status_code == 401
+                and retry_auth
+                and self._bearer_session is not None
+                and not self._is_public_url(request_url)
+                and self._refresh_bearer_session()
+            ):
+                return self._request_response(method, request_url, _retry_auth=False, **kwargs)
+            if response.status_code == 401:
+                raise UnauthorizedError(self._extract_error_message(response))
+            if response.status_code == 402 and self._extract_error_code(response) == (
+                "plant_subscription_inactive"
+            ):
+                raise PlantSubscriptionExpiredError(self._extract_error_message(response))
+            if response.is_error:
+                raise ApiError(self._extract_error_message(response))
+            self.save_cookies()
+            return response
 
     def _refresh_bearer_session(self) -> bool:
         """Обновляет SaaS access token через refresh token."""

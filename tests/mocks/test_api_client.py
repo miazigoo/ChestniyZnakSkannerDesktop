@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import threading
+import time
 from typing import cast
 
 import httpx
@@ -100,6 +102,46 @@ def test_api_client_adds_language_headers(monkeypatch: pytest.MonkeyPatch) -> No
     assert seen_headers["X-App-Language"] == "zh"
     assert seen_headers["X-Language"] == "zh"
     assert seen_headers["Accept-Language"].startswith("zh-CN")
+
+
+def test_api_client_serializes_concurrent_requests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет защиту общего httpx.Client от одновременных worker-запросов."""
+
+    active_requests = 0
+    max_active_requests = 0
+    guard = threading.Lock()
+
+    def fake_request(self: httpx.Client, method: str, url: str, **kwargs: object) -> httpx.Response:
+        """Имитирует долгий запрос и проверяет отсутствие параллельного входа."""
+
+        nonlocal active_requests, max_active_requests
+        with guard:
+            active_requests += 1
+            max_active_requests = max(max_active_requests, active_requests)
+        time.sleep(0.02)
+        with guard:
+            active_requests -= 1
+        request = httpx.Request(method, f"http://test/{url}")
+        return httpx.Response(200, json={"ok": True}, request=request)
+
+    monkeypatch.setattr(httpx.Client, "request", fake_request)
+    client = ApiClient(AppConfig(api_base_url="http://test/api/v1/"))
+    errors: list[Exception] = []
+
+    def request_worker() -> None:
+        try:
+            assert client.get("health") == {"ok": True}
+        except Exception as exc:  # pragma: no cover - regression helper.
+            errors.append(exc)
+
+    threads = [threading.Thread(target=request_worker) for _index in range(5)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert max_active_requests == 1
 
 
 def test_api_client_adds_bearer_header_for_saas(monkeypatch: pytest.MonkeyPatch) -> None:
