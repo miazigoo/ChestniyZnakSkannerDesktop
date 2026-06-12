@@ -261,7 +261,7 @@ class MainScreen(QWidget):
         choose_order.setObjectName("sessionOrderButton")
         choose_order.setToolTip(tr("main.chooseOrderHint"))
         choose_order.setMinimumWidth(210)
-        choose_order.setMaximumWidth(278)
+        choose_order.setMaximumWidth(298)
         choose_order.clicked.connect(self._open_order_dialog)
         self._choose_order_button = choose_order
         layout.addWidget(choose_order)

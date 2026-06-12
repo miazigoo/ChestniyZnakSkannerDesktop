@@ -298,8 +298,6 @@ class AutoPackingController(QObject):
     def select_order_line(self, order_line_id: str) -> None:
         """Выбирает строку заказа для следующей коробки."""
 
-        if self._state.current_box is not None:
-            return
         selected = self._find_order_option(order_line_id)
         if selected is None:
             if order_line_id and order_line_id != self._state.selected_order_line_id:
@@ -313,9 +311,16 @@ class AutoPackingController(QObject):
                     )
                 )
             return
+        self.sync_selected_order(selected)
+
+    def sync_selected_order(self, selected: OrderLineOptionUi) -> None:
+        """Синхронизирует глобально выбранный заказ с автоупаковкой."""
+
+        options = self._order_options_with_selected(self._state.order_options, selected)
         self._set_state(
             replace(
                 self._state,
+                order_options=options,
                 selected_order_line_id=selected.order_line_id,
                 selected_order_scan_required=selected.scan_required,
                 status_message=PackingController._selected_order_status(selected),
@@ -1055,8 +1060,9 @@ class AutoPackingController(QObject):
         page = self._expect(result, WorkOrderPageDto)
         options = PackingController._order_options(page)
         selected_id = self._state.selected_order_line_id
-        if selected_id and not any(option.order_line_id == selected_id for option in options):
-            selected_id = ""
+        selected = self._selected_order_option()
+        if selected is not None:
+            options = self._order_options_with_selected(options, selected)
         selected = PackingController._find_option_in(options, selected_id)
         status_message = (
             PackingController._selected_order_status(selected)
@@ -1288,6 +1294,17 @@ class AutoPackingController(QObject):
         """Возвращает выбранную строку заказа."""
 
         return self._find_order_option(self._state.selected_order_line_id)
+
+    @staticmethod
+    def _order_options_with_selected(
+        options: list[OrderLineOptionUi],
+        selected: OrderLineOptionUi,
+    ) -> list[OrderLineOptionUi]:
+        """Добавляет выбранный заказ в список, если страница заказов его не вернула."""
+
+        if any(option.order_line_id == selected.order_line_id for option in options):
+            return options
+        return [selected, *options]
 
     def _find_order_option(self, order_line_id: str) -> OrderLineOptionUi | None:
         """Ищет строку заказа в текущем списке выбора."""

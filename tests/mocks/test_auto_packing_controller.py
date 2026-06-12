@@ -28,6 +28,7 @@ from chestniy_znak_desktop.app.config import AppConfig
 from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent
+from chestniy_znak_desktop.controllers.packing_controller import OrderLineOptionUi
 from chestniy_znak_desktop.services.sound_service import SoundEvent
 
 
@@ -720,11 +721,23 @@ def test_auto_packing_applies_global_order_selected_before_orders_loaded(
         scanner_id="desktop-com",
     )
 
-    controller.select_order_line("line-1")
-    controller.refresh_orders()
+    controller.sync_selected_order(
+        OrderLineOptionUi(
+            order_id="order-1",
+            order_line_id="line-1",
+            order_number="ORDER-1",
+            sku="SKU-1",
+            product_name="Номенклатура 1",
+            label="ORDER-1 / Номенклатура 1",
+        )
+    )
     controller.open_box()
+    controller.set_codes_per_item(2)
+    controller.on_code_scanned("CODE1")
 
     assert controller.state.selected_order_line_id == "line-1"
+    assert controller.state.order_options[0].order_line_id == "line-1"
+    assert [item.raw_code for item in controller.state.pending_items] == ["CODE1"]
     assert service.open_calls == [("pc-1", True, "order-1", "line-1")]
     assert order_service.pool_calls == [("order-1", 5000, 0)]
 

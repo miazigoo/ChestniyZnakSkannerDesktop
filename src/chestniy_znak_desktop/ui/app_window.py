@@ -336,8 +336,18 @@ class AppWindow(QMainWindow):
         order_line_id = str(getattr(state, "selected_order_line_id", "") or "")
         if not order_line_id or order_line_id == self._last_auto_synced_order_line_id:
             return
+        selected = next(
+            (
+                option
+                for option in getattr(state, "order_options", [])
+                if option.order_line_id == order_line_id
+            ),
+            None,
+        )
+        if selected is None:
+            return
         self._last_auto_synced_order_line_id = order_line_id
-        self._auto_packing_controller.select_order_line(order_line_id)
+        self._auto_packing_controller.sync_selected_order(selected)
 
     def _handle_screen_changed(self, screen_name: str) -> None:
         """Обновляет активный сценарий и подтягивает актуальные данные экрана."""

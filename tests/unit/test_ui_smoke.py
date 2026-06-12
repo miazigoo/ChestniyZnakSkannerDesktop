@@ -154,6 +154,9 @@ def test_main_sidebar_keeps_navigation_compact() -> None:
 
     qapp()
     screen = MainScreen()
+    screen.resize(1280, 760)
+    screen.show()
+    qapp().processEvents()
 
     scroll_area = screen.findChild(QScrollArea, "mainSidebarScroll")
 
@@ -162,8 +165,8 @@ def test_main_sidebar_keeps_navigation_compact() -> None:
     assert screen._sidebar.width() >= 310  # noqa: SLF001
     assert screen._choose_order_button is not None  # noqa: SLF001
     assert screen._choose_order_button.minimumWidth() >= 210  # noqa: SLF001
-    assert screen._choose_order_button.width() < screen._sidebar.width()  # noqa: SLF001
-    assert screen._session_panel.minimumHeight() == 124  # noqa: SLF001
+    assert screen._choose_order_button.width() <= screen._sidebar.width() - 32  # noqa: SLF001
+    assert screen._session_panel.minimumHeight() == 140  # noqa: SLF001
     assert all(item.minimumHeight() == 58 for item in screen._nav_items)  # noqa: SLF001
 
 
