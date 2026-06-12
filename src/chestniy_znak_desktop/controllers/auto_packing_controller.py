@@ -860,7 +860,7 @@ class AutoPackingController(QObject):
             )
         )
         self._play(SoundEvent.OK)
-        self._continue_after_batch()
+        self._continue_after_batch(batch)
 
     def _on_box_edit_result(self, result: object) -> None:
         """Обрабатывает быструю правку текущей коробки автоскана."""
@@ -1470,13 +1470,26 @@ class AutoPackingController(QObject):
         self._scan_queue.clear()
         self._queued_raw_codes.clear()
 
-    def _continue_after_batch(self) -> None:
+    def _continue_after_batch(self, batch: ScanBatchToBoxResultDto) -> None:
         """Продолжает очередь сканов или обновляет детали коробки, когда поток стих."""
 
         if self._scan_queue:
             self._process_next_queued_scan()
             return
+        if not self._should_refresh_current_box_after_batch(batch):
+            return
         self._refresh_current_box_after_batch()
+
+    @staticmethod
+    def _should_refresh_current_box_after_batch(batch: ScanBatchToBoxResultDto) -> bool:
+        """Ограничивает detail-refresh, чтобы быстрый автосканер не удваивал HTTP-поток."""
+
+        if batch.added != 1:
+            return True
+        capacity = batch.box.capacity
+        if capacity > 0 and batch.box.filled >= capacity:
+            return True
+        return batch.box.filled > 0 and batch.box.filled % 10 == 0
 
     def _refresh_current_box_after_batch(self) -> None:
         """Фоново обновляет подробности коробки, не блокируя следующие сканы."""

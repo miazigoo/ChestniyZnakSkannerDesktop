@@ -150,14 +150,17 @@ class FakePackingService:
         """Создает fake-сервис с состоянием вызовов."""
 
         self.current_box_result: BoxDetailDto | None = None
+        self.current_box_calls = 0
         self.batch_calls: list[tuple[int, list[str], str]] = []
         self.close_calls: list[tuple[int, str]] = []
         self.count_calls: list[tuple[int, bool]] = []
         self.open_calls: list[tuple[str, bool, str | None, str | None]] = []
+        self.scanned_codes: list[str] = []
 
     def current_box(self) -> BoxDetailDto | None:
         """Возвращает текущую коробку."""
 
+        self.current_box_calls += 1
         return self.current_box_result
 
     def open_box(
@@ -172,6 +175,7 @@ class FakePackingService:
         """Возвращает открытую коробку."""
 
         self.open_calls.append((device_id, count_in_packing, order_id, order_line_id))
+        self.scanned_codes = []
         return OpenBoxResultDto(
             ok=True,
             created=True,
@@ -188,8 +192,9 @@ class FakePackingService:
         """Запоминает пачку и возвращает обновленную коробку."""
 
         self.batch_calls.append((box_id, codes, scanner_id))
+        self.scanned_codes.extend(codes)
         self.current_box_result = BoxDetailDto(
-            **_box(filled=len(codes)).model_dump(),
+            **_box(filled=len(self.scanned_codes)).model_dump(),
             items=[
                 BoxItemDto(
                     id=index,
@@ -199,14 +204,14 @@ class FakePackingService:
                     serial=f"SERIAL{index}",
                     visible_code=code,
                 )
-                for index, code in enumerate(codes, start=1)
+                for index, code in enumerate(self.scanned_codes, start=1)
             ],
         )
         return ScanBatchToBoxResultDto(
             ok=True,
             reason_code="batch_added",
             added=len(codes),
-            box=_box(filled=len(codes)),
+            box=_box(filled=len(self.scanned_codes)),
         )
 
     def close_box(self, box_id: int, device_id: str) -> CloseBoxResultDto:
@@ -500,6 +505,29 @@ def test_auto_packing_sends_batch_only_when_local_box_is_full(tmp_path: Path) ->
     assert sounds.events == [SoundEvent.OK]
 
 
+def test_auto_packing_throttles_single_code_current_box_refresh(tmp_path: Path) -> None:
+    """Проверяет, что одиночный автоскан не дергает detail-refresh после каждого кода."""
+
+    controller, service, _verifier, _sounds = _controller_pair(tmp_path)
+    controller.open_box()
+    controller.set_codes_per_item(1)
+
+    for index in range(1, 10):
+        controller.on_code_scanned(f"CODE{index}")
+
+    assert service.current_box_calls == 0
+    assert len(service.batch_calls) == 9
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 9
+
+    controller.on_code_scanned("CODE10")
+
+    assert service.current_box_calls == 1
+    assert len(service.batch_calls) == 10
+    assert controller.state.current_box is not None
+    assert controller.state.current_box.filled == 10
+
+
 def test_auto_packing_splits_glued_gs1_codes(tmp_path: Path) -> None:
     """Проверяет разделение двух DataMatrix, склеенных HID-вводом."""
 
@@ -784,9 +812,8 @@ def test_auto_packing_queues_fast_scans_while_batch_is_busy(tmp_path: Path) -> N
 
     runner.run_next()
 
-    assert len(runner.tasks) == 1
+    assert len(runner.tasks) == 0
     assert not bool(controller.state.is_busy)
-    runner.run_next()
 
     assert controller.state.pending_count == 0
     assert service.batch_calls == [
@@ -934,7 +961,7 @@ def test_auto_packing_drops_duplicate_raw_scan_while_busy(tmp_path: Path) -> Non
 
     assert verifier.calls == []
     assert controller.state.pending_count == 0
-    assert len(runner.tasks) == 1
+    assert len(runner.tasks) == 0
 
 
 def test_auto_packing_skips_visible_code_already_in_current_box(tmp_path: Path) -> None:
