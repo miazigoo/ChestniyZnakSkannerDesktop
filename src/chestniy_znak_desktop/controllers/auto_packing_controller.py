@@ -7,6 +7,7 @@ import json
 import re
 from collections import deque
 from dataclasses import dataclass, field, replace
+from hashlib import sha256
 from typing import Any, Protocol, TypeVar, cast
 
 from PySide6.QtCore import QObject, Signal
@@ -1270,8 +1271,33 @@ class AutoPackingController(QObject):
         """Возвращает нормализованный код, если он есть в пуле выбранного заказа."""
 
         if selected is None or not self._is_local_pool_ready_for(selected.order_id):
+            logger.info(
+                "Auto packing local-pool bypass: selected=%s pool_order=%s pool_loaded=%s code=%s",
+                selected.order_id if selected is not None else "",
+                self._local_pool_order_id,
+                self._local_pool_loaded,
+                self._scan_log_ref(code),
+            )
             return code
         normalized, pool_code = self._lookup_local_pool_code(code)
+        logger.info(
+            "Auto packing local-pool lookup: selected=%s line=%s pool_order=%s "
+            "pool_codes=%s pool_identity=%s found=%s status=%s package=%s identity=%s code=%s",
+            selected.order_id,
+            selected.order_line_id,
+            self._local_pool_order_id,
+            len(self._local_pool_codes),
+            len(self._local_pool_identity_codes),
+            pool_code is not None,
+            pool_code.status if pool_code is not None else "",
+            (
+                pool_code.package_code or pool_code.package_unit_id or ""
+                if pool_code is not None
+                else ""
+            ),
+            self._pool_identity_key(code),
+            self._scan_log_ref(code),
+        )
         if pool_code is not None and self._is_pool_code_available(pool_code):
             return self._normalize_pool_code(pool_code.code) or normalized
         if pool_code is not None:
@@ -1326,6 +1352,15 @@ class AutoPackingController(QObject):
         if pool_code is None:
             pool_code = self._local_pool_identity_codes.get(self._pool_identity_key(code))
         return normalized, pool_code
+
+    @staticmethod
+    def _scan_log_ref(code: str) -> str:
+        """Возвращает безопасную ссылку на скан для диагностики UI-пути."""
+
+        normalized = (code or "").strip()
+        digest = sha256(normalized.encode("utf-8", errors="replace")).hexdigest()[:16]
+        tail = normalized[-16:] if normalized else ""
+        return f"len={len(normalized)} sha={digest} tail={tail!r}"
 
     @staticmethod
     def _is_pool_code_available(code: LocalPoolCodeDto) -> bool:

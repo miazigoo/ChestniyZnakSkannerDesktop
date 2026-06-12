@@ -29,7 +29,9 @@ from chestniy_znak_desktop.app.settings_store import SettingsStore
 from chestniy_znak_desktop.controllers.auto_packing_controller import AutoPackingController
 from chestniy_znak_desktop.controllers.packing_controller import CloseBoxUiEvent
 from chestniy_znak_desktop.controllers.packing_controller import OrderLineOptionUi
+from chestniy_znak_desktop.i18n import tr
 from chestniy_znak_desktop.services.sound_service import SoundEvent
+from chestniy_znak_desktop.ui.app_window import AppWindow
 
 
 class ImmediateTaskRunner:
@@ -142,6 +144,42 @@ class FakeWsVerifyService:
 
         self.calls.append((code, box_id))
         return f"ws-{len(self.calls)}"
+
+
+class FakeAutoPackingWindow:
+    """Минимальное окно для проверки UI-route скана в автоупаковку."""
+
+    def __init__(self, controller: AutoPackingController) -> None:
+        """Создает fake-окно с активной вкладкой автоупаковки."""
+
+        self._scan_target = "auto_packing"
+        self._auto_packing_controller = controller
+        self._packing_controller = controller
+        self._defect_controller = controller
+        self._box_lookup_controller = controller
+        self._verify_controller = controller
+        self._stack = FakeStack()
+        self._login_screen = object()
+        self.cyrillic_warnings = 0
+
+    def _show_cyrillic_scan_warning(self) -> None:
+        """Запоминает предупреждения по раскладке."""
+
+        self.cyrillic_warnings += 1
+
+    def _handle_scanner_command(self, _command: object) -> bool:
+        """В тесте служебных команд нет."""
+
+        return False
+
+
+class FakeStack:
+    """Минимальный stack, где активный экран не логин."""
+
+    def currentWidget(self) -> object:
+        """Возвращает активный экран."""
+
+        return object()
 
 
 class FakePackingService:
@@ -902,6 +940,59 @@ def test_auto_packing_rejects_local_pool_code_already_in_closed_box(tmp_path: Pa
     assert verifier.calls == []
     assert "BOX-001" in controller.state.status_message
     assert sounds.events[-1] == SoundEvent.WARNING
+
+
+def test_ui_route_reports_closed_box_for_cyrillic_hid_scan_from_local_pool(
+    tmp_path: Path,
+) -> None:
+    """Проверяет UI-route: RU HID скан packed-кода показывает коробку, а не ошибку пула."""
+
+    pool_code = "010460123456789021A100000046\x1d91FZKG\x1d92G4VKYIZN5706GS7Y"
+    ru_hid_code = "010460123456789021Ф10000004691АЯЛП92П4МЛНШЯТ5706ПЫ7Н"
+    service = FakePackingService()
+    verifier = FakeVerifyService()
+    sounds = FakeSoundService()
+    order_service = FakeOrderService(
+        _work_order(),
+        pool_codes=[
+            LocalPoolCodeDto(
+                id="code-46",
+                code=pool_code,
+                status="packed",
+                order_line_id="line-1",
+                package_unit_id="package-1",
+                package_code="BOX-046",
+                package_status="closed",
+            )
+        ],
+    )
+    config = AppConfig(data_dir=tmp_path)
+    store = SettingsStore.from_file(str(tmp_path / "settings.ini"))
+    controller = AutoPackingController(
+        packing_service=service,
+        verify_service=verifier,
+        box_edit_service=None,
+        task_runner=ImmediateTaskRunner(),
+        settings_store=store,
+        settings_defaults=config,
+        device_id="pc-1",
+        order_service=order_service,
+        scanner_id="desktop-com",
+        sound_service=sounds,
+    )
+
+    controller.refresh_orders()
+    controller.select_order_line("line-1")
+    controller.open_box()
+    window = FakeAutoPackingWindow(controller)
+
+    AppWindow._handle_scanned_code(window, ru_hid_code)  # type: ignore[arg-type]
+
+    assert window.cyrillic_warnings == 0
+    assert controller.state.pending_items == []
+    assert controller.state.status_message == "Код уже находится в коробке BOX-046"
+    assert controller.state.error_message == tr("autoPacking.codeInOtherBoxHint")
+    assert sounds.events == [SoundEvent.WARNING]
 
 
 def test_auto_packing_refreshes_local_pool_on_package_realtime_event(tmp_path: Path) -> None:
