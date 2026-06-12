@@ -948,7 +948,7 @@ def test_ui_route_reports_closed_box_for_cyrillic_hid_scan_from_local_pool(
     """Проверяет UI-route: RU HID скан packed-кода показывает коробку, а не ошибку пула."""
 
     pool_code = "010460123456789021A100000046\x1d91FZKG\x1d92G4VKYIZN5706GS7Y"
-    ru_hid_code = "010460123456789021Ф10000004691АЯЛП92П4МЛНШЯТ5706ПЫ7Н"
+    ru_hid_code = "010460123456789021Ф100000046002991АЯЛП002992П4МЛНШЯТ5706ПЫ7Н"
     service = FakePackingService()
     verifier = FakeVerifyService()
     sounds = FakeSoundService()

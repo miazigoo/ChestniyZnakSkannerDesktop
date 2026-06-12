@@ -72,6 +72,25 @@ def test_parse_short_serial_crypto_tail_without_gs() -> None:
     assert parsed.gs_restored is True
 
 
+def test_parse_hid_decimal_group_separator_before_crypto_ai() -> None:
+    """Проверяет сканер, который отправляет GS как текст `0029` перед AI."""
+
+    parsed = parse_marking_code(
+        "010460123456789021A100000046002991FZKG0029926X2F0VZD16AR61Y2"
+        "SIICCBRHKL3OI8RWK6A773NJG4VKYIZN5706GS7Y"
+    )
+
+    assert parsed.gtin == "04601234567890"
+    assert parsed.serial == "A100000046"
+    assert parsed.identity_key == "04601234567890|A100000046"
+    assert parsed.ai_parts == {
+        "91": "FZKG",
+        "92": "6X2F0VZD16AR61Y2SIICCBRHKL3OI8RWK6A773NJG4VKYIZN5706GS7Y",
+    }
+    assert parsed.visible_code.startswith("010460123456789021A100000046<GS>91FZKG<GS>92")
+    assert parsed.scanner_gs_native is True
+
+
 def test_parse_longer_crypto_tail_without_gs() -> None:
     """Проверяет удлиненный криптохвост без привязки к общей длине кода."""
 

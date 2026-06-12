@@ -12,6 +12,7 @@ AI21_MIN_SERIAL_LEN_FOR_GS_RESTORE = 1
 KNOWN_AI_FIXED_VALUE_LEN = {"91": 4, "93": 4}
 KNOWN_AI_VARIABLE_TO_END = {"92"}
 GROUP_SEPARATOR_TOKEN_RE = re.compile(r"(?i)(?:\\u001d|\\x1d|\\035|<GS>|\[GS\]|\{GS\})")
+DECIMAL_GS_BEFORE_AI_RE = re.compile(r"0029(?=(?:91|92|93))")
 BRACKETED_AI_RE = re.compile(r"\((01|21|91|92|93)\)")
 GS1_CODE_START_RE = re.compile(r"01\d{14}21")
 GTIN21_START_RE = re.compile(r"\d{14}21")
@@ -66,6 +67,7 @@ def normalize_scanner_input(code: str) -> tuple[str, bool, bool]:
     """Нормализует строку сканера и возвращает признаки GS-разделителя."""
 
     normalized = GROUP_SEPARATOR_TOKEN_RE.sub(GS, str(code or ""))
+    normalized = DECIMAL_GS_BEFORE_AI_RE.sub(GS, normalized)
     normalized = compact_bracketed_ai(normalized)
     native_gs = GS in normalized
     escaped_gs = ESC_GS_SEQ in normalized
