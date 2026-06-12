@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from chestniy_znak_desktop.services.sound_service import SoundEvent, SoundService
 
 
@@ -111,3 +113,19 @@ def test_sound_service_set_volume_keeps_public_contract() -> None:
     service.play(SoundEvent.WARNING)
 
     assert len(factory.calls) == 1
+
+
+def test_sound_service_detects_pipewire_player(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет fallback на стандартный Linux PipeWire player."""
+
+    monkeypatch.setattr(
+        "chestniy_znak_desktop.services.sound_service.shutil.which",
+        lambda binary: "/usr/bin/pw-play" if binary == "pw-play" else None,
+    )
+    factory = FakeProcessFactory()
+    service = SoundService(volume=0.55, process_factory=factory)  # type: ignore[arg-type]
+
+    service.play(SoundEvent.OK)
+
+    command = factory.calls[0][0]
+    assert command[:3] == ["pw-play", "--volume", "0.55"]

@@ -75,6 +75,8 @@ class SoundService:
         """Сохраняет громкость звуков от 0.0 до 1.0."""
 
         self._volume = max(0.0, min(volume, 1.0))
+        self._playbacks.clear()
+        self._preview_playbacks.clear()
 
     def set_sound_file(self, event: SoundEvent, filename: str) -> None:
         """Меняет файл звука для события и сбрасывает кеш плеера."""
@@ -123,8 +125,17 @@ class SoundService:
         path = files("chestniy_znak_desktop.resources.sounds").joinpath(filename)
         return SoundPlayback(
             path=Path(str(path)),
-            command=[*self._player_command, str(path)] if self._player_command else [],
+            command=self._build_command_for_path(str(path)),
         )
+
+    def _build_command_for_path(self, path: str) -> list[str]:
+        """Собирает команду проигрывания с учетом возможностей выбранного плеера."""
+
+        if not self._player_command:
+            return []
+        if self._player_command[0] == "pw-play":
+            return [*self._player_command, "--volume", f"{self._volume:.2f}", path]
+        return [*self._player_command, path]
 
     def _play(self, playback: SoundPlayback, *, force: bool = False) -> None:
         """Запускает внешний проигрыватель, не блокируя UI."""
@@ -155,6 +166,7 @@ class SoundService:
         candidates = (
             ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"]),
             ("mpg123", ["mpg123", "-q"]),
+            ("pw-play", ["pw-play"]),
             ("play", ["play", "-q"]),
             ("cvlc", ["cvlc", "--play-and-exit", "--quiet"]),
         )

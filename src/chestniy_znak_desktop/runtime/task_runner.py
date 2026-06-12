@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
@@ -36,6 +37,7 @@ class FunctionWorker(QRunnable):
         """Создает worker для указанной задачи."""
 
         super().__init__()
+        self.setAutoDelete(False)
         self.signals = WorkerSignals()
         self._task = task
 
@@ -58,6 +60,7 @@ class QtTaskRunner:
         """Создает runner с переданным или глобальным пулом потоков."""
 
         self._thread_pool = thread_pool or QThreadPool.globalInstance()
+        self._active_workers: set[FunctionWorker] = set()
 
     def submit(
         self,
@@ -68,9 +71,17 @@ class QtTaskRunner:
         """Запускает задачу в пуле Qt-потоков."""
 
         worker = FunctionWorker(task)
+        self._active_workers.add(worker)
         worker.signals.succeeded.connect(on_success)
         worker.signals.failed.connect(on_error)
+        worker.signals.succeeded.connect(partial(self._forget_worker, worker))
+        worker.signals.failed.connect(partial(self._forget_worker, worker))
         self._thread_pool.start(worker)
+
+    def _forget_worker(self, worker: FunctionWorker, _result: object = None) -> None:
+        """Освобождает worker только после доставки сигнала результата в UI thread."""
+
+        self._active_workers.discard(worker)
 
 
 class UnauthorizedAwareTaskRunner:

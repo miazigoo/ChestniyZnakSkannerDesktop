@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from chestniy_znak_desktop.api.errors import UnauthorizedError
+from chestniy_znak_desktop.runtime.task_runner import FunctionWorker, QtTaskRunner
 from chestniy_znak_desktop.runtime.task_runner import UnauthorizedAwareTaskRunner
 
 
@@ -25,6 +26,41 @@ class ImmediateTaskRunner:
             on_error(exc)
             return
         on_success(result)
+
+
+class RecordingThreadPool:
+    """Тестовый пул, который только запоминает переданный worker."""
+
+    def __init__(self) -> None:
+        """Создает пустой список запущенных задач."""
+
+        self.started_workers: list[FunctionWorker] = []
+
+    def start(self, worker: FunctionWorker) -> None:
+        """Запоминает worker без запуска отдельного потока."""
+
+        self.started_workers.append(worker)
+
+
+def test_qt_runner_keeps_worker_alive_until_signal_delivery() -> None:
+    """Проверяет защиту от преждевременного удаления QRunnable в PySide."""
+
+    pool = RecordingThreadPool()
+    runner = QtTaskRunner(thread_pool=pool)  # type: ignore[arg-type]
+
+    runner.submit(
+        task=lambda: "ok",
+        on_success=lambda _result: None,
+        on_error=lambda _exc: None,
+    )
+
+    worker = pool.started_workers[0]
+    assert worker.autoDelete() is False
+    assert worker in runner._active_workers
+
+    runner._forget_worker(worker)
+
+    assert worker not in runner._active_workers
 
 
 def test_unauthorized_runner_handles_session_expiration() -> None:
