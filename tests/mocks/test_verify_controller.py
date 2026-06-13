@@ -116,7 +116,10 @@ def test_verify_controller_checks_scanned_code() -> None:
 
     assert service.last_call == ("CODE", "desktop-com-verify", True)
     assert controller.state.status_message == "Код обработан"
-    assert controller.state.result_message == "Код найден"
+    assert (
+        controller.state.result_message
+        == "Код найден. Заказ: 26-0001. Коробка #101, SSCC: SSCC-101, статус: закрыта."
+    )
     assert controller.state.order_name == "26-0001"
     assert controller.state.device_name == "Device"
     assert controller.state.box_id == 101

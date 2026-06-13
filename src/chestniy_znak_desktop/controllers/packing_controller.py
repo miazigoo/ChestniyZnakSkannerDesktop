@@ -625,6 +625,7 @@ class PackingController(QObject):
                 result_message=result_message,
             )
         )
+        self._prefetch_local_pools(page)
 
     def _on_orders_error(self, exc: Exception) -> None:
         """Показывает ошибку загрузки заказов без сброса текущей коробки."""
@@ -635,6 +636,20 @@ class PackingController(QObject):
                 orders_loading=False,
                 error_message=tr("packing.ordersLoadFailed", error=exc),
             )
+        )
+
+    def _prefetch_local_pools(self, page: WorkOrderPageDto) -> None:
+        """Запускает фоновую догрузку локальных пулов видимых заказов."""
+
+        if self._order_service is None:
+            return
+        prefetch = getattr(self._order_service, "prefetch_local_pools", None)
+        if not callable(prefetch):
+            return
+        self._task_runner.submit(
+            lambda: prefetch(page),
+            lambda _result: None,
+            lambda exc: logger.debug("Local pool prefetch failed: %s", exc),
         )
 
     def _selected_order_option(self) -> OrderLineOptionUi | None:

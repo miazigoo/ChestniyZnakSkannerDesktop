@@ -182,9 +182,23 @@ class VerifyController(QObject):
     def _result_message(result: VerifyExistsResponseDto) -> str:
         """Возвращает человекочитаемый результат проверки."""
 
-        if result.ok:
-            return result.message or tr("verify.found")
-        return result.message or tr("verify.notFound")
+        base = result.message or (tr("verify.found") if result.ok else tr("verify.notFound"))
+        if not result.exists or result.code is None:
+            return base
+        order_name = VerifyController._order_name(result) or "-"
+        if result.box is None:
+            return tr("verify.summaryNotPacked", message=base, order=order_name)
+        box_id = result.box.box_id or "-"
+        sscc = result.box.sscc or "-"
+        box_status = VerifyController._box_status(result)
+        return tr(
+            "verify.summaryPacked",
+            message=base,
+            order=order_name,
+            box=box_id,
+            sscc=sscc,
+            status=box_status,
+        )
 
     @staticmethod
     def _visible_code(result: VerifyExistsResponseDto) -> str:

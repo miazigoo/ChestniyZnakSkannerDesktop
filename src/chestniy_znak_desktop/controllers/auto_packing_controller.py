@@ -1112,6 +1112,7 @@ class AutoPackingController(QObject):
                 result_message=result_message,
             )
         )
+        self._prefetch_local_pools(page)
         if selected is not None and selected.scan_required and self._state.current_box is None:
             self._download_local_pool_for(selected)
 
@@ -1124,6 +1125,20 @@ class AutoPackingController(QObject):
                 orders_loading=False,
                 error_message=tr("packing.ordersLoadFailed", error=exc),
             )
+        )
+
+    def _prefetch_local_pools(self, page: WorkOrderPageDto) -> None:
+        """Запускает фоновую догрузку локальных пулов видимых заказов."""
+
+        if self._order_service is None:
+            return
+        prefetch = getattr(self._order_service, "prefetch_local_pools", None)
+        if not callable(prefetch):
+            return
+        self._task_runner.submit(
+            lambda: prefetch(page),
+            lambda _result: None,
+            lambda exc: logger.debug("Auto local pool prefetch failed: %s", exc),
         )
 
     def _download_local_pool_for(

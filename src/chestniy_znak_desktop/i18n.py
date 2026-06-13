@@ -580,6 +580,10 @@ _MESSAGES["ru"].update(
         "verify.scannerBlocked": "Сканер не запущен. Проверка кода заблокирована.",
         "verify.found": "код найден",
         "verify.notFound": "код не найден",
+        "verify.summaryNotPacked": "{message}. Заказ: {order}. В коробке: нет.",
+        "verify.summaryPacked": (
+            "{message}. Заказ: {order}. Коробка #{box}, SSCC: {sscc}, статус: {status}."
+        ),
         "verify.checking": "Проверяем код...",
         "verify.processed": "Код обработан",
         "verify.errorStatus": "Ошибка проверки кода",
@@ -1177,6 +1181,10 @@ _MESSAGES["en"].update(
         "verify.scannerBlocked": "Scanner is not running. Code verification is blocked.",
         "verify.found": "code found",
         "verify.notFound": "code not found",
+        "verify.summaryNotPacked": "{message}. Order: {order}. In box: no.",
+        "verify.summaryPacked": (
+            "{message}. Order: {order}. Box #{box}, SSCC: {sscc}, status: {status}."
+        ),
         "verify.checking": "Checking code...",
         "verify.processed": "Code processed",
         "verify.errorStatus": "Code verification error",
@@ -1722,6 +1730,10 @@ _MESSAGES["zh"].update(
         "verify.scannerBlocked": "扫描器未运行，代码校验已阻止。",
         "verify.found": "已找到代码",
         "verify.notFound": "未找到代码",
+        "verify.summaryNotPacked": "{message}。订单：{order}。箱内：否。",
+        "verify.summaryPacked": (
+            "{message}。订单：{order}。箱 #{box}，SSCC：{sscc}，状态：{status}。"
+        ),
         "verify.checking": "正在校验代码...",
         "verify.processed": "代码已处理",
         "verify.errorStatus": "代码校验错误",
