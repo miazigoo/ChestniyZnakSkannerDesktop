@@ -475,6 +475,10 @@ _MESSAGES["ru"].update(
             "Коды сначала копятся в локальном боксе изделия. В коробку они уходят "
             "только после заполнения бокса."
         ),
+        "autoPacking.virtualBoxHint": (
+            "Виртуальный бокс нужен для мультиплат: если один код не считался, "
+            "очистите весь бокс, переклейте код и отсканируйте мультиплату заново."
+        ),
         "autoPacking.itemSettings": "Настройка изделия",
         "autoPacking.codesPerItem": "DataMatrix на изделии",
         "autoPacking.tableTitle": "Коды автоскана и текущей коробки",
@@ -1074,6 +1078,10 @@ _MESSAGES["en"].update(
             "Codes first accumulate in the local item box. They are sent to the "
             "shipping box only after the item box is complete."
         ),
+        "autoPacking.virtualBoxHint": (
+            "The virtual box is for multi-code items: if one code was not read, "
+            "clear the whole box, replace the label, and scan the item again."
+        ),
         "autoPacking.itemSettings": "Item setup",
         "autoPacking.codesPerItem": "DataMatrix per item",
         "autoPacking.tableTitle": "Auto-scan and current box codes",
@@ -1639,6 +1647,7 @@ _MESSAGES["zh"].update(
         "autoPacking.scannerStopped": "扫描器未运行",
         "autoPacking.heroTitle": "多码自动包装",
         "autoPacking.heroSubtitle": "代码先累积到本地产品箱。只有产品箱满后，代码才会发送到包装箱。",
+        "autoPacking.virtualBoxHint": "虚拟箱用于多码产品：如果有一个码未读到，请清空整个箱，更换标签后重新扫描该产品。",
         "autoPacking.itemSettings": "产品设置",
         "autoPacking.codesPerItem": "每件 DataMatrix 数量",
         "autoPacking.tableTitle": "自动扫描和当前箱代码",

@@ -79,6 +79,9 @@ class AutoPackingScreen(QWidget):
         self._status_detail = QLabel(tr("autoPacking.waitCodes"))
         self._status_detail.setObjectName("autoPackingStatusDetail")
         self._status_detail.setWordWrap(True)
+        self._virtual_box_hint = QLabel(tr("autoPacking.virtualBoxHint"))
+        self._virtual_box_hint.setObjectName("packingMutedText")
+        self._virtual_box_hint.setWordWrap(True)
         self._error_label = QLabel("")
         self._error_label.setObjectName("packingError")
         self._error_label.setWordWrap(True)
@@ -328,6 +331,7 @@ class AutoPackingScreen(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(10)
         layout.addLayout(header)
+        layout.addWidget(self._virtual_box_hint)
         layout.addWidget(self._error_label)
         layout.addLayout(buttons)
         return panel
