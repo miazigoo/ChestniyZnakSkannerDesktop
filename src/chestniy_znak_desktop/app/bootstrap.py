@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import sys
 import os
+from importlib import resources
 from dataclasses import replace
 from typing import TypeAlias
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from chestniy_znak_desktop.api.client import ApiClient
@@ -68,6 +70,10 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
 
     qt_app.setApplicationName(config.app_name)
     qt_app.setOrganizationName(config.organization_name)
+    icon_path = resources.files("chestniy_znak_desktop.resources.icons").joinpath(
+        "chestniy_znak_app.png"
+    )
+    qt_app.setWindowIcon(QIcon(str(icon_path)))
     settings_store = SettingsStore.from_config(config)
     settings = settings_store.load(defaults=config)
     set_current_language(settings.language)

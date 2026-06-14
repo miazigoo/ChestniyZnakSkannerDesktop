@@ -6,13 +6,15 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 
-PROJECT_ROOT = Path(SPECPATH).parent.parent
+SPEC_DIR = Path(SPECPATH)
+PROJECT_ROOT = SPEC_DIR if (SPEC_DIR / "src").is_dir() else SPEC_DIR.parent
 SRC_DIR = PROJECT_ROOT / "src"
 PACKAGE_DIR = SRC_DIR / "chestniy_znak_desktop"
 ENTRYPOINT = PACKAGE_DIR / "app" / "main.py"
 
 SOUNDS_DIR = PACKAGE_DIR / "resources" / "sounds"
 ICONS_DIR = PACKAGE_DIR / "resources" / "icons"
+APP_ICON = ICONS_DIR / "chestniy_znak_app.ico"
 
 datas = [
     (str(SOUNDS_DIR), "chestniy_znak_desktop/resources/sounds"),
@@ -64,6 +66,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(APP_ICON),
 )
 
 coll = COLLECT(

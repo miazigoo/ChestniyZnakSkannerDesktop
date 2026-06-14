@@ -1,5 +1,5 @@
 #define MyAppName "Chestniy Znak Desktop"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "DevAndProd"
 #define MyAppExeName "ChestniyZnakDesktop.exe"
 #define MyBuildDir "..\dist\ChestniyZnakDesktop"
@@ -20,9 +20,10 @@ SolidCompression=yes
 WizardStyle=modern
 WizardImageFile=installer_assets\installer_wizard.bmp
 WizardSmallImageFile=installer_assets\installer_small.bmp
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile=..\src\chestniy_znak_desktop\resources\icons\chestniy_znak_app.ico
 SetupLogging=yes
 
 [Languages]

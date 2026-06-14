@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Chestniy Znak">
+  <defs>
+    <linearGradient id="bg" x1="76" y1="48" x2="436" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A1B2D"/>
+      <stop offset="0.48" stop-color="#102D3B"/>
+      <stop offset="1" stop-color="#071018"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="121" y1="107" x2="401" y2="419" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4C7"/>
+      <stop offset="0.38" stop-color="#E7C46B"/>
+      <stop offset="0.72" stop-color="#B9852E"/>
+      <stop offset="1" stop-color="#F4D989"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="167" y1="132" x2="366" y2="376" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#69F0D8"/>
+      <stop offset="0.52" stop-color="#2EC7B0"/>
+      <stop offset="1" stop-color="#14937F"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-18%" width="136%" height="136%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#02060A" flood-opacity="0.48"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#FFFFFF" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <path d="M87 151c0-35.3 28.7-64 64-64h210c35.3 0 64 28.7 64 64v210c0 35.3-28.7 64-64 64H151c-35.3 0-64-28.7-64-64V151Z" fill="#FFFFFF" opacity="0.045"/>
+  <path d="M123 155c0-17.7 14.3-32 32-32h45v24h-45a8 8 0 0 0-8 8v45h-24v-45Zm189-32h45c17.7 0 32 14.3 32 32v45h-24v-45a8 8 0 0 0-8-8h-45v-24ZM147 312v45a8 8 0 0 0 8 8h45v24h-45c-17.7 0-32-14.3-32-32v-45h24Zm218 0h24v45c0 17.7-14.3 32-32 32h-45v-24h45a8 8 0 0 0 8-8v-45Z" fill="url(#gold)" opacity="0.96"/>
+  <g filter="url(#shadow)">
+    <path d="M256 130 365 193v126l-109 63-109-63V193l109-63Z" fill="#0D1D2A" stroke="url(#gold)" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M256 163 334 208 256 253 178 208l78-45Z" fill="url(#mint)"/>
+    <path d="M178 230v75l78 45v-75l-78-45Z" fill="#1C7E77"/>
+    <path d="M334 230v75l-78 45v-75l78-45Z" fill="#115E5E"/>
+    <path d="m214 278 30 30 66-78" fill="none" stroke="#FFF4C7" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M68 256h54M390 256h54M256 68v54M256 390v54" stroke="#E7C46B" stroke-width="10" stroke-linecap="round" opacity="0.78"/>
+</svg>

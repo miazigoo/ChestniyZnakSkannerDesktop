@@ -43,7 +43,9 @@ def test_pyinstaller_spec_keeps_runtime_resources() -> None:
 
     spec_text = Path("packaging/chestniy_znak_desktop.spec").read_text(encoding="utf-8")
 
-    assert "PROJECT_ROOT = Path(SPECPATH).parent.parent" in spec_text
+    assert (
+        'PROJECT_ROOT = SPEC_DIR if (SPEC_DIR / "src").is_dir() else SPEC_DIR.parent' in spec_text
+    )
     assert "resources/sounds" in spec_text
     assert "resources/icons" in spec_text
     assert "PySide6.QtWebSockets" in spec_text

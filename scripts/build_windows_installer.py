@@ -38,6 +38,7 @@ def find_iscc() -> str:
     program_files = [
         os.environ.get("ProgramFiles(x86)", ""),
         os.environ.get("ProgramFiles", ""),
+        os.environ.get("LOCALAPPDATA", "") + r"\Programs",
     ]
     for base_dir in program_files:
         if not base_dir:
@@ -70,7 +71,7 @@ def render_svg_to_bmp(svg_path: Path, bmp_path: Path, width: int, height: int) -
     finally:
         painter.end()
 
-    if not image.scaled(QSize(width, height)).save(str(bmp_path), b"BMP"):
+    if not image.scaled(QSize(width, height)).save(str(bmp_path), "BMP"):
         raise RuntimeError(f"Не удалось сохранить BMP установщика: {bmp_path}")
 
 
