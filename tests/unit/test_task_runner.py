@@ -63,6 +63,27 @@ def test_qt_runner_keeps_worker_alive_until_signal_delivery() -> None:
     assert worker not in runner._active_workers
 
 
+def test_qt_runner_shutdown_blocks_active_worker_callbacks() -> None:
+    """Проверяет, что shutdown не дает поздним signals дергать удаляемый UI."""
+
+    pool = RecordingThreadPool()
+    runner = QtTaskRunner(thread_pool=pool)  # type: ignore[arg-type]
+    results: list[object] = []
+
+    runner.submit(
+        task=lambda: "late-ok",
+        on_success=results.append,
+        on_error=lambda _exc: None,
+    )
+
+    worker = pool.started_workers[0]
+    runner.shutdown()
+    worker.run()
+
+    assert worker.signals.signalsBlocked()
+    assert results == []
+
+
 def test_unauthorized_runner_handles_session_expiration() -> None:
     """Проверяет централизованный перехват истекшей сессии."""
 

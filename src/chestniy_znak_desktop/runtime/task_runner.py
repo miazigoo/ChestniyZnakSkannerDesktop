@@ -7,6 +7,7 @@ from functools import partial
 from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
+from shiboken6 import isValid
 
 from chestniy_znak_desktop.api.errors import UnauthorizedError
 
@@ -48,9 +49,29 @@ class FunctionWorker(QRunnable):
         try:
             result = self._task()
         except Exception as exc:  # pragma: no cover - путь проверяется через TaskRunner.
-            self.signals.failed.emit(exc)
+            self._emit_failed(exc)
             return
-        self.signals.succeeded.emit(result)
+        self._emit_succeeded(result)
+
+    def _emit_succeeded(self, result: object) -> None:
+        """Публикует успех, если Qt signal source еще жив при завершении приложения."""
+
+        if not isValid(self.signals):
+            return
+        try:
+            self.signals.succeeded.emit(result)
+        except RuntimeError:
+            return
+
+    def _emit_failed(self, exc: Exception) -> None:
+        """Публикует ошибку, если приложение еще не уничтожило Qt signal source."""
+
+        if not isValid(self.signals):
+            return
+        try:
+            self.signals.failed.emit(exc)
+        except RuntimeError:
+            return
 
 
 class QtTaskRunner:
@@ -61,6 +82,7 @@ class QtTaskRunner:
 
         self._thread_pool = thread_pool or QThreadPool.globalInstance()
         self._active_workers: set[FunctionWorker] = set()
+        self._shutting_down = False
 
     def submit(
         self,
@@ -70,6 +92,8 @@ class QtTaskRunner:
     ) -> None:
         """Запускает задачу в пуле Qt-потоков."""
 
+        if self._shutting_down:
+            return
         worker = FunctionWorker(task)
         self._active_workers.add(worker)
         worker.signals.succeeded.connect(on_success)
@@ -82,6 +106,14 @@ class QtTaskRunner:
         """Освобождает worker только после доставки сигнала результата в UI thread."""
 
         self._active_workers.discard(worker)
+
+    def shutdown(self) -> None:
+        """Отключает callbacks активных задач перед уничтожением QApplication."""
+
+        self._shutting_down = True
+        for worker in self._active_workers:
+            if isValid(worker.signals):
+                worker.signals.blockSignals(True)
 
 
 class UnauthorizedAwareTaskRunner:

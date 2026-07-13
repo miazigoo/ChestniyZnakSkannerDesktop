@@ -219,9 +219,23 @@ def create_app_window(qt_app: QApplication, config: AppConfig) -> AppWindow:
         (HidKeyboardScanner, WindowsHidScanner, WindowsRawInputScanner),
     ):
         hid_keyboard_scanner.bind_root(window)
-    window.destroyed.connect(lambda _obj: runtime_controller.stop())
-    window.destroyed.connect(lambda _obj: api_client.close())
-    window.destroyed.connect(lambda _obj: scanner_controller.stop())
+
+    cleaned_up = False
+
+    def cleanup_runtime() -> None:
+        """Останавливает сервисы до того, как Qt удалит дочерние таймеры окна."""
+
+        nonlocal cleaned_up
+        if cleaned_up:
+            return
+        cleaned_up = True
+        task_runner.shutdown()
+        runtime_controller.stop()
+        scanner_controller.stop()
+        api_client.close()
+
+    qt_app.aboutToQuit.connect(cleanup_runtime)
+    window.destroyed.connect(lambda _obj: cleanup_runtime())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_current_box())
     auth_controller.authenticated.connect(lambda _user: packing_controller.refresh_orders())
     auth_controller.authenticated.connect(
